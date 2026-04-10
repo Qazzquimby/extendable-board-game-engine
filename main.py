@@ -14,8 +14,9 @@ class EventPhase(Enum):
 
 
 class ActionType(Enum):
-    MOVE = auto()
-    DEFAULT_ATTACK = auto()
+    BASIC_MOVE = auto()
+    DEFAULT = auto()
+    NON_DEFAULT = auto()
 
 
 @dataclass
@@ -136,7 +137,7 @@ class Entity:
 
     def get_legal_actions(self) -> List[Action]:
         # Default behavior: Can move, can attack
-        default_actions = [Action(ActionType.MOVE), Action(ActionType.DEFAULT_ATTACK)]
+        default_actions = [Action(ActionType.BASIC_MOVE), Action(ActionType.DEFAULT)]
         q = QueryLegalActions(self, result=default_actions)
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
@@ -178,11 +179,14 @@ class ModValue:
 
     @property
     def value(self) -> int:
-        v = float(self.base)
-        for a in self._adds: v += a() if callable(a) else a
-        for m in self._mults: v *= m() if callable(m) else m
-        for c in self._caps: v = c(int(v)) if callable(c) else min(v, float(c))
-        return int(v)
+        value = float(self.base)
+        for addition in self._adds:
+            value += addition() if callable(addition) else addition
+        for multiplier in self._mults:
+            value *= multiplier() if callable(multiplier) else multiplier
+        for cap in self._caps:
+            value = cap(int(value)) if callable(cap) else min(value, float(cap))
+        return int(value)
 
 
 class DamageEvent:
@@ -196,9 +200,10 @@ class DamageEvent:
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
 
-        # Cleanly encapsulated rule resolution
-        if not self.amount.is_irreducible and self.target.has_armor():
+        if self.target.has_armor():
             self.amount.add(-1)
+
+        # todo handle irreducible
 
         final_damage = max(0, self.amount.value)
         self.target.hp -= final_damage
@@ -234,10 +239,12 @@ class QueryLegalActions:
         self.target = target
         self.result = result
 
+
 class QueryCanMove:
     def __init__(self, target: Entity):
         self.target = target
         self.result: bool = True
+
 
 # ==========================================
 # ABILITIES (Developer Implementations)
@@ -248,14 +255,13 @@ class InnateArmor(Modifier):
     def grant_armor(self, q: QueryHasArmor) -> None:
         q.result = True
 
+
 class PaladinAura(Modifier):
     @query(QueryHasArmor, target_self=False)
     def grant_armor_to_adjacent(self, q):
         # Affects OTHERS: checks if the query target is near this aura's owner
         if q.target != self.owner and q.target.distance_to(self.owner) <= 1:
             q.result = True
-
-
 
 
 class Marksmanship(Modifier):
@@ -287,11 +293,12 @@ class Taunted(Modifier):
     @query(QueryLegalActions)
     def force_attack(self, q: QueryLegalActions) -> None:
         # Overrides the default result entirely
-        q.result = [Action(ActionType.DEFAULT_ATTACK, target=self.taunter)]
+        q.result = [Action(ActionType.DEFAULT, target=self.taunter)]
 
     @query(QueryCanMove)
     def prevent_move(self, q):
         q.result = False
+
 
 # ==========================================
 # PYTESTS
@@ -349,7 +356,7 @@ def test_taunted_legal_actions_override():
     # Before taunt: can move and attack
     actions = enemy.get_legal_actions()
     assert len(actions) == 2
-    assert Action(ActionType.MOVE) in actions
+    assert Action(ActionType.BASIC_MOVE) in actions
 
     # Apply Taunt
     enemy.add_modifier(Taunted(taunter=axe))
@@ -357,7 +364,7 @@ def test_taunted_legal_actions_override():
     # After taunt: Only 1 legal action (Attack Axe)
     actions = enemy.get_legal_actions()
     assert len(actions) == 1
-    assert actions[0].action_type == ActionType.DEFAULT_ATTACK
+    assert actions[0].action_type == ActionType.DEFAULT
     assert actions[0].target == axe
 
 
@@ -412,3 +419,16 @@ def test_taunted_dataclass():
     enemy.add_modifier(Taunted(taunter=axe))
 
     assert enemy.can_move() is False
+
+
+
+# todo
+# mult and division interaction
+# always round down
+# heroes with legal actions
+# grid movement
+# vision
+# ability ordering
+# replacement events
+# conditional modifiers and ordering
+# godot UI
