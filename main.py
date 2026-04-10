@@ -1,4 +1,3 @@
-import pytest
 from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Type, Any, Union
@@ -124,6 +123,11 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
+    def can_move(self) -> bool:
+        q = QueryCanMove(self)
+        self.engine.router.publish(q, EventPhase.QUERY)
+        return q.result
+
     def has_adjacent_enemies(self) -> bool:
         for other in self.engine.entities:
             if other.team != self.team and self.distance_to(other) <= 1:
@@ -230,6 +234,10 @@ class QueryLegalActions:
         self.target = target
         self.result = result
 
+class QueryCanMove:
+    def __init__(self, target: Entity):
+        self.target = target
+        self.result: bool = True
 
 # ==========================================
 # ABILITIES (Developer Implementations)
@@ -239,6 +247,15 @@ class InnateArmor(Modifier):
     @query(QueryHasArmor)
     def grant_armor(self, q: QueryHasArmor) -> None:
         q.result = True
+
+class PaladinAura(Modifier):
+    @query(QueryHasArmor, target_self=False)
+    def grant_armor_to_adjacent(self, q):
+        # Affects OTHERS: checks if the query target is near this aura's owner
+        if q.target != self.owner and q.target.distance_to(self.owner) <= 1:
+            q.result = True
+
+
 
 
 class Marksmanship(Modifier):
@@ -272,6 +289,9 @@ class Taunted(Modifier):
         # Overrides the default result entirely
         q.result = [Action(ActionType.DEFAULT_ATTACK, target=self.taunter)]
 
+    @query(QueryCanMove)
+    def prevent_move(self, q):
+        q.result = False
 
 # ==========================================
 # PYTESTS
@@ -339,3 +359,56 @@ def test_taunted_legal_actions_override():
     assert len(actions) == 1
     assert actions[0].action_type == ActionType.DEFAULT_ATTACK
     assert actions[0].target == axe
+
+
+def test_armor_and_damage():
+    engine = Engine()
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=1)
+    enemy = Entity(engine, "Enemy", hp=10, pos=(1, 0), team=2)
+
+    axe.add_modifier(InnateArmor())
+
+    # 3 damage attack -> reduced by 1 from armor -> 2 damage taken
+    DamageEvent(engine, source=enemy, target=axe, amount=3).resolve()
+    assert axe.hp == 8
+
+
+def test_shallow_grave_cap():
+    engine = Engine()
+    dazzle = Entity(engine, "Dazzle", hp=8, pos=(0, 0), team=2)
+
+    dazzle.add_modifier(ShallowGrave())
+
+    # Massive 50 damage attack
+    DamageEvent(engine, source=None, target=dazzle, amount=50).resolve()
+
+    # Cap ensures HP doesn't drop below 1
+    assert dazzle.hp == 1
+
+
+def test_paladin_aura_affects_others():
+    engine = Engine()
+    reinhardt = Entity(engine, "Reinhardt", hp=12, pos=(0, 0), team=1)
+    ally = Entity(engine, "Ally", hp=5, pos=(0, 1), team=1)  # Distance 1
+    far_ally = Entity(engine, "FarAlly", hp=5, pos=(0, 3), team=1)  # Distance 3
+
+    reinhardt.add_modifier(PaladinAura())
+
+    # Attack adjacent ally (has armor from aura) -> 3 dmg becomes 2
+    DamageEvent(engine, source=None, target=ally, amount=3).resolve()
+    assert ally.hp == 3
+
+    # Attack far ally (no aura) -> 3 dmg stays 3
+    DamageEvent(engine, source=None, target=far_ally, amount=3).resolve()
+    assert far_ally.hp == 2
+
+
+def test_taunted_dataclass():
+    engine = Engine()
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=2)
+    enemy = Entity(engine, "Enemy", hp=5, pos=(1, 0), team=1)
+
+    # Apply taunt using dataclass initialization
+    enemy.add_modifier(Taunted(taunter=axe))
+
+    assert enemy.can_move() is False
