@@ -1,3 +1,4 @@
+import math
 from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Type, Any, Union
@@ -179,13 +180,31 @@ class ModValue:
 
     @property
     def value(self) -> int:
-        value = float(self.base)
-        for addition in self._adds:
-            value += addition() if callable(addition) else addition
-        for multiplier in self._mults:
-            value *= multiplier() if callable(multiplier) else multiplier
+        adds = [a() if callable(a) else a for a in self._adds]
+        mults = [m() if callable(m) else m for m in self._mults]
+
+        pos_mults = [m for m in mults if m > 1.0]
+        neg_mults = [m for m in mults if m < 1.0]
+
+        if pos_mults and neg_mults:
+            final_mult = 1.0
+        elif pos_mults:
+            final_mult = 1.0 + sum(m - 1.0 for m in pos_mults)
+        elif neg_mults:
+            # I think in reality you can only have "1/2" and it wont stack.
+            final_mult = 1.0
+            for m in neg_mults:
+                final_mult *= m
+        else:
+            final_mult = 1.0
+
+        value = float(self.base) * final_mult
+        value += sum(adds)
+        value = math.ceil(value)
+
         for cap in self._caps:
             value = cap(int(value)) if callable(cap) else min(value, float(cap))
+            
         return int(value)
 
 
@@ -422,9 +441,39 @@ def test_taunted_dataclass():
 
 
 
+def test_modvalue_multiply_before_add():
+    mod = ModValue(2)
+    mod.add(1)
+    mod.mult(2.0) # +100%
+    # 2 * 2.0 + 1 = 5
+    assert mod.value == 5
+
+
+def test_modvalue_cancellation():
+    mod = ModValue(2)
+    mod.mult(2.0) # +100%
+    mod.mult(0.5) # Resistance
+    # Cancel out -> 2
+    assert mod.value == 2
+
+
+def test_modvalue_round_up():
+    mod = ModValue(3)
+    mod.mult(0.5)
+    # 3 * 0.5 = 1.5 -> rounds up to 2
+    assert mod.value == 2
+
+
+def test_modvalue_additive_multipliers():
+    mod = ModValue(2)
+    mod.mult(1.5) # +50%
+    mod.mult(2.0) # +100%
+    # 1.0 + 0.5 + 1.0 = 2.5
+    # 2 * 2.5 = 5
+    assert mod.value == 5
+
+
 # todo
-# mult and division interaction
-# always round up
 # heroes with legal actions
 # grid movement
 # vision

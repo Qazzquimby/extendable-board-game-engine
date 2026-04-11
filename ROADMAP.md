@@ -1,5 +1,7 @@
 # Development Roadmap
 
+All features must be tested and type hinted.
+
 ## Phase 1: Core Engine Completeness (Rules & Mechanics)
 - **Math & Modifiers:** Implement "multiply before add", division/multiplication cancellation, and "always round up" rules in `ModValue`.
 - **Grid & Movement:** Implement a proper 2D grid, non-diagonal movement, pathfinding, blocking terrain, and forced movement (push/pull).
