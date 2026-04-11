@@ -424,7 +424,7 @@ def test_taunted_dataclass():
 
 # todo
 # mult and division interaction
-# always round down
+# always round up
 # heroes with legal actions
 # grid movement
 # vision
