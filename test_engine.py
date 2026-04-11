@@ -1,0 +1,159 @@
+from main import Engine, Entity, Action, ActionType, DamageEvent, HealEvent, InnateArmor, PaladinAura, Marksmanship, ShallowGrave, Taunted
+from mod_value import ModValue
+
+def test_marksmanship_conditional_irreducible():
+    engine = Engine()
+    drow = Entity(engine, "Drow", hp=8, pos=(0, 0), team=1)
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 4), team=2)  # Range 4
+    axe.add_modifier(InnateArmor())
+    drow.add_modifier(Marksmanship())
+
+    # Drow attacks Axe from range 4. Base dmg = 2.
+    # Marksmanship adds +1 dmg and makes it irreducible. Axe's armor is ignored.
+    # Total damage should be 3.
+    DamageEvent(engine, source=drow, target=axe, amount=2).resolve()
+    assert axe.hp == 7
+
+
+def test_marksmanship_disabled_by_adjacent_enemy():
+    engine = Engine()
+    drow = Entity(engine, "Drow", hp=8, pos=(0, 0), team=1)
+    flanker = Entity(engine, "Flanker", hp=5, pos=(0, 1),
+                     team=2)  # Range 1, adjacent enemy
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 4), team=2)
+
+    axe.add_modifier(InnateArmor())
+    drow.add_modifier(Marksmanship())
+
+    # Because Drow has an adjacent enemy, Marksmanship is disabled.
+    # Base dmg 2 -> Armor reduces to 1.
+    DamageEvent(engine, source=drow, target=axe, amount=2).resolve()
+    assert axe.hp == 9
+
+
+def test_shallow_grave_multipliers_and_caps():
+    engine = Engine()
+    dazzle = Entity(engine, "Dazzle", hp=5, pos=(0, 0), team=1)
+    dazzle.add_modifier(ShallowGrave())
+
+    # Heal for 2 -> +50% multiplier -> 3
+    HealEvent(engine, target=dazzle, amount=2).resolve()
+    assert dazzle.hp == 8
+
+    # Take massive damage (50) -> Cap triggers preventing HP < 1.
+    DamageEvent(engine, source=None, target=dazzle, amount=50).resolve()
+    assert dazzle.hp == 1
+
+
+def test_taunted_legal_actions_override():
+    engine = Engine()
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=1)
+    enemy = Entity(engine, "Enemy", hp=5, pos=(1, 0), team=2)
+
+    # Before taunt: can move and attack
+    actions = enemy.get_legal_actions()
+    assert len(actions) == 2
+    assert Action(ActionType.BASIC_MOVE) in actions
+
+    # Apply Taunt
+    enemy.add_modifier(Taunted(taunter=axe))
+
+    # After taunt: Only 1 legal action (Attack Axe)
+    actions = enemy.get_legal_actions()
+    assert len(actions) == 1
+    assert actions[0].action_type == ActionType.DEFAULT
+    assert actions[0].target == axe
+
+
+def test_armor_and_damage():
+    engine = Engine()
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=1)
+    enemy = Entity(engine, "Enemy", hp=10, pos=(1, 0), team=2)
+
+    axe.add_modifier(InnateArmor())
+
+    # 3 damage attack -> reduced by 1 from armor -> 2 damage taken
+    DamageEvent(engine, source=enemy, target=axe, amount=3).resolve()
+    assert axe.hp == 8
+
+
+def test_shallow_grave_cap():
+    engine = Engine()
+    dazzle = Entity(engine, "Dazzle", hp=8, pos=(0, 0), team=2)
+
+    dazzle.add_modifier(ShallowGrave())
+
+    # Massive 50 damage attack
+    DamageEvent(engine, source=None, target=dazzle, amount=50).resolve()
+
+    # Cap ensures HP doesn't drop below 1
+    assert dazzle.hp == 1
+
+
+def test_paladin_aura_affects_others():
+    engine = Engine()
+    reinhardt = Entity(engine, "Reinhardt", hp=12, pos=(0, 0), team=1)
+    ally = Entity(engine, "Ally", hp=5, pos=(0, 1), team=1)  # Distance 1
+    far_ally = Entity(engine, "FarAlly", hp=5, pos=(0, 3), team=1)  # Distance 3
+
+    reinhardt.add_modifier(PaladinAura())
+
+    # Attack adjacent ally (has armor from aura) -> 3 dmg becomes 2
+    DamageEvent(engine, source=None, target=ally, amount=3).resolve()
+    assert ally.hp == 3
+
+    # Attack far ally (no aura) -> 3 dmg stays 3
+    DamageEvent(engine, source=None, target=far_ally, amount=3).resolve()
+    assert far_ally.hp == 2
+
+
+def test_taunted_dataclass():
+    engine = Engine()
+    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=2)
+    enemy = Entity(engine, "Enemy", hp=5, pos=(1, 0), team=1)
+
+    # Apply taunt using dataclass initialization
+    enemy.add_modifier(Taunted(taunter=axe))
+
+    assert enemy.can_move() is False
+
+
+def test_modvalue_multiply_before_add():
+    mod = ModValue(2)
+    mod.add(1)
+    mod.mult(2.0) # +100%
+    # 2 * 2.0 + 1 = 5
+    assert mod.value == 5
+
+
+def test_modvalue_cancellation():
+    mod = ModValue(2)
+    mod.mult(2.0) # +100%
+    mod.add_resistance() # Resistance
+    # Cancel out -> 2
+    assert mod.value == 2
+
+
+def test_modvalue_round_up():
+    mod = ModValue(3)
+    mod.add_resistance()
+    # 3 * 0.5 = 1.5 -> rounds up to 2
+    assert mod.value == 2
+
+
+def test_modvalue_additive_multipliers():
+    mod = ModValue(2)
+    mod.mult(1.5) # +50%
+    mod.mult(2.0) # +100%
+    # 1.0 + 0.5 + 1.0 = 2.5
+    # 2 * 2.5 = 5
+    assert mod.value == 5
+
+
+def test_modvalue_irreducible():
+    mod = ModValue(4)
+    mod.add(-2)
+    mod.add_resistance()
+    mod.is_irreducible = True
+    # Irreducible ignores the -2 and the resistance
+    assert mod.value == 4
