@@ -94,7 +94,19 @@ class Grid:
         # Handle the simple diagonal cases first (common rule: squeezing points is blocked)
         dx = target_x - start_x
         dy = target_y - start_y
-        if abs(dx) == abs(dy):
+        if dx == 0:
+            step = 1 if dy > 0 else -1
+            for y in range(start_y + step, target_y, step):
+                if (start_x, y) in self.walls:
+                    visible = False
+                    break
+        elif dy == 0:
+            step = 1 if dx > 0 else -1
+            for x in range(start_x + step, target_x, step):
+                if (x, start_y) in self.walls:
+                    visible = False
+                    break
+        elif abs(dx) == abs(dy):
             gap_w1 = (start_x + (1 if dx > 0 else -1), start_y)
             gap_w2 = (start_x, start_y + (1 if dy > 0 else -1))
             if gap_w1 in self.walls and gap_w2 in self.walls:
@@ -143,73 +155,62 @@ class Grid:
 
         return visible, grazing
 
-    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None, visible: Optional[bool] = None, grazing: Optional[bool] = None) -> str:
-        path_set = set(path) if path else set()
+    def _render_html(self, color_func, legend_html: str) -> str:
         html = ['<table style="border-collapse: collapse;">']
         for y in range(self.height):
             html.append('  <tr>')
             for x in range(self.width):
-                p = (x, y)
-                color = "white"
-                if p == start:
-                    color = "green"
-                elif p == target:
-                    color = "red"
-                elif p in self.walls:
-                    color = "black"
-                elif p in path_set:
-                    color = "blue"
+                color = color_func((x, y))
                 html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
             html.append('  </tr>')
         html.append('</table>')
         
         html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
-        html.append('<strong>Legend:</strong><br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:red; border:1px solid #ccc;"></span> Target<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:blue; border:1px solid #ccc;"></span> Path<br>')
-        
-        if visible is not None:
-            html.append(f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}')
-            if grazing:
-                html.append(' (Grazing)')
-        
+        html.append(legend_html)
         html.append('</div>')
         
         return "\n".join(html)
 
+    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None, visible: Optional[bool] = None, grazing: Optional[bool] = None) -> str:
+        path_set = set(path) if path else set()
+        
+        def get_color(p: Point) -> str:
+            if p == start: return "green"
+            if p == target: return "red"
+            if p in self.walls: return "black"
+            if p in path_set: return "blue"
+            return "white"
+            
+        legend = [
+            '<strong>Legend:</strong><br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:red; border:1px solid #ccc;"></span> Target<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:blue; border:1px solid #ccc;"></span> Path<br>'
+        ]
+        if visible is not None:
+            legend.append(f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}')
+            if grazing:
+                legend.append(' (Grazing)')
+                
+        return self._render_html(get_color, "\n".join(legend))
+
     def visualize_visibility(self, start: Point) -> str:
-        html = ['<table style="border-collapse: collapse;">']
-        for y in range(self.height):
-            html.append('  <tr>')
-            for x in range(self.width):
-                p = (x, y)
-                color = "white"
-                if p == start:
-                    color = "green"
-                elif p in self.walls:
-                    color = "black"
-                else:
-                    visible, grazing = self.get_line_of_sight(start, p)
-                    if not visible:
-                        color = "darkgray"
-                    elif grazing:
-                        color = "yellow"
-                    else:
-                        color = "lightblue"
-                html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
-            html.append('  </tr>')
-        html.append('</table>')
-        
-        html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
-        html.append('<strong>Visibility Legend:</strong><br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:lightblue; border:1px solid #ccc;"></span> Visible<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Grazing<br>')
-        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>')
-        html.append('</div>')
-        
-        return "\n".join(html)
+        def get_color(p: Point) -> str:
+            if p == start: return "green"
+            if p in self.walls: return "black"
+            vis, graz = self.get_line_of_sight(start, p)
+            if not vis: return "darkgray"
+            if graz: return "yellow"
+            return "lightblue"
+            
+        legend = [
+            '<strong>Visibility Legend:</strong><br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:lightblue; border:1px solid #ccc;"></span> Visible<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Grazing<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>'
+        ]
+        return self._render_html(get_color, "\n".join(legend))
 
