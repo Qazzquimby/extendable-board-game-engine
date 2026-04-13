@@ -26,6 +26,25 @@ def test_grid_pathfinding_with_edge_walls():
     # Must go around the edge wall: (0,0)->(0,1)->(1,1)->(1,0)
     assert len(path) == 4
 
+def test_get_range():
+    grid = Grid()
+    assert grid.get_range((0, 0), (0, 0)) == 0
+    assert grid.get_range((0, 0), (3, 0)) == 3
+    assert grid.get_range((0, 0), (0, 3)) == 3
+    assert grid.get_range((0, 0), (1, 1)) == 1
+    assert grid.get_range((0, 0), (2, 2)) == 3
+    assert grid.get_range((0, 0), (3, 1)) == 3
+
+def test_push_pull_movement():
+    grid = Grid()
+    path = grid.get_pull_path((3, 0), (1, 0), pull_to=(0, 0))
+    assert path is not None
+    assert len(path) == 3
+
+    path = grid.get_push_path((1, 0), (3, 0), push_from=(0, 0))
+    assert path is not None
+    assert len(path) == 3
+
 def test_grid_pathfinding_blocked():
     grid = Grid()
     grid.add_wall((1, 0))

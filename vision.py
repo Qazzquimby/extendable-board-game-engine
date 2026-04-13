@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Set, List, Optional
+from typing import Tuple, Set, List, Optional, Callable
 from collections import deque
 
 Point = Tuple[int, int]
@@ -22,6 +22,14 @@ class Grid:
         edge: Edge = tuple(sorted([p1, p2])) # type: ignore
         self.edge_walls.add(edge)
 
+    def get_range(self, p1: Point, p2: Point) -> int:
+        """Calculates range where first step can be diagonal, subsequent must be orthogonal."""
+        dx = abs(p1[0] - p2[0])
+        dy = abs(p1[1] - p2[1])
+        if dx > 0 and dy > 0:
+            return dx + dy - 1
+        return dx + dy
+
     def is_movement_blocked(self, current: Point, next_pos: Point) -> bool:
         """Checks if movement between two adjacent spaces is blocked."""
         if next_pos in self.walls:
@@ -31,7 +39,7 @@ class Grid:
             return True
         return False
 
-    def get_path(self, start: Point, target: Point, visualize_file: Optional[str] = None) -> Optional[List[Point]]:
+    def get_path(self, start: Point, target: Point, visualize_file: Optional[str] = None, valid_step: Optional[Callable[[Point, Point], bool]] = None) -> Optional[List[Point]]:
         """Finds the shortest path using BFS, respecting walls and edge walls."""
         if start == target:
             if visualize_file:
@@ -57,13 +65,26 @@ class Grid:
                 n = (nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
                     if n not in visited and not self.is_movement_blocked(curr, n):
-                        visited.add(n)
-                        queue.append(path + [n])
+                        if valid_step is None or valid_step(curr, n):
+                            visited.add(n)
+                            queue.append(path + [n])
 
         if visualize_file:
             with open(visualize_file, 'w') as f:
                 f.write(self.visualize(start=start, target=target, path=None))
         return None
+
+    def get_push_path(self, start: Point, target: Point, push_from: Point) -> Optional[List[Point]]:
+        """Finds a path where every step moves further away from the push_from point."""
+        def is_away(curr: Point, nxt: Point) -> bool:
+            return self.get_range(nxt, push_from) > self.get_range(curr, push_from)
+        return self.get_path(start, target, valid_step=is_away)
+
+    def get_pull_path(self, start: Point, target: Point, pull_to: Point) -> Optional[List[Point]]:
+        """Finds a path where every step moves closer to the pull_to point."""
+        def is_toward(curr: Point, nxt: Point) -> bool:
+            return self.get_range(nxt, pull_to) < self.get_range(curr, pull_to)
+        return self.get_path(start, target, valid_step=is_toward)
 
     def get_line_of_sight(self, start_pos: Point, target_pos: Point, visualize_file: Optional[str] = None) -> \
     Tuple[bool, bool]:
