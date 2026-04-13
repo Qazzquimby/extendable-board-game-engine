@@ -31,9 +31,12 @@ class Grid:
             return True
         return False
 
-    def get_path(self, start: Point, target: Point) -> Optional[List[Point]]:
+    def get_path(self, start: Point, target: Point, visualize_file: Optional[str] = None) -> Optional[List[Point]]:
         """Finds the shortest path using BFS, respecting walls and edge walls."""
         if start == target:
+            if visualize_file:
+                with open(visualize_file, 'w') as f:
+                    f.write(self.visualize(start=start, target=target, path=[start]))
             return [start]
 
         queue: deque[List[Point]] = deque([[start]])
@@ -44,6 +47,9 @@ class Grid:
             curr = path[-1]
 
             if curr == target:
+                if visualize_file:
+                    with open(visualize_file, 'w') as f:
+                        f.write(self.visualize(start=start, target=target, path=path))
                 return path
 
             x, y = curr
@@ -53,9 +59,13 @@ class Grid:
                     if n not in visited and not self.is_movement_blocked(curr, n):
                         visited.add(n)
                         queue.append(path + [n])
+        
+        if visualize_file:
+            with open(visualize_file, 'w') as f:
+                f.write(self.visualize(start=start, target=target, path=None))
         return None
 
-    def get_line_of_sight(self, start_pos: Point, target_pos: Point) -> \
+    def get_line_of_sight(self, start_pos: Point, target_pos: Point, visualize_file: Optional[str] = None) -> \
     Tuple[bool, bool]:
         """
         Calculates visibility based strictly on corner-to-corner math.
@@ -65,6 +75,9 @@ class Grid:
         target_x, target_y = target_pos
 
         if start_pos == target_pos:
+            if visualize_file:
+                with open(visualize_file, 'w') as f:
+                    f.write(self.visualize(start=start_pos, target=target_pos, visible=True, grazing=False))
             return True, False
 
         # 1. Corner Selection based on proximity
@@ -124,9 +137,13 @@ class Grid:
                         grazing = True
                         break
 
+        if visualize_file:
+            with open(visualize_file, 'w') as f:
+                f.write(self.visualize(start=start_pos, target=target_pos, visible=visible, grazing=grazing))
+
         return visible, grazing
 
-    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None) -> str:
+    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None, visible: Optional[bool] = None, grazing: Optional[bool] = None) -> str:
         path_set = set(path) if path else set()
         html = ['<table style="border-collapse: collapse;">']
         for y in range(self.height):
@@ -145,5 +162,54 @@ class Grid:
                 html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
             html.append('  </tr>')
         html.append('</table>')
+        
+        html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
+        html.append('<strong>Legend:</strong><br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:red; border:1px solid #ccc;"></span> Target<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:blue; border:1px solid #ccc;"></span> Path<br>')
+        
+        if visible is not None:
+            html.append(f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}')
+            if grazing:
+                html.append(' (Grazing)')
+        
+        html.append('</div>')
+        
+        return "\n".join(html)
+
+    def visualize_visibility(self, start: Point) -> str:
+        html = ['<table style="border-collapse: collapse;">']
+        for y in range(self.height):
+            html.append('  <tr>')
+            for x in range(self.width):
+                p = (x, y)
+                color = "white"
+                if p == start:
+                    color = "green"
+                elif p in self.walls:
+                    color = "black"
+                else:
+                    visible, grazing = self.get_line_of_sight(start, p)
+                    if not visible:
+                        color = "darkgray"
+                    elif grazing:
+                        color = "yellow"
+                    else:
+                        color = "lightblue"
+                html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
+            html.append('  </tr>')
+        html.append('</table>')
+        
+        html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
+        html.append('<strong>Visibility Legend:</strong><br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:lightblue; border:1px solid #ccc;"></span> Visible<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Grazing<br>')
+        html.append('<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>')
+        html.append('</div>')
+        
         return "\n".join(html)
 

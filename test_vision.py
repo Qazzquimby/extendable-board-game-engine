@@ -53,12 +53,15 @@ def test_grid_visualize():
     grid.add_wall((1, 1))
     path = [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)]
     
-    vis = grid.visualize(start=(0, 0), target=(2, 2), path=path)
+    vis = grid.visualize(start=(0, 0), target=(2, 2), path=path, visible=True, grazing=True)
     assert "<table" in vis
     assert "background-color: green" in vis
     assert "background-color: red" in vis
     assert "background-color: black" in vis
     assert "background-color: blue" in vis
+    assert "Legend:" in vis
+    assert "Line of Sight: Visible" in vis
+    assert "(Grazing)" in vis
 
 def test_line_of_sight_grazing():
     grid = Grid()
@@ -73,3 +76,15 @@ def test_line_of_sight_grazing():
     visible, grazing = grid.get_line_of_sight((0, 0), (2, 0))
     assert visible is True
     assert grazing is True
+
+def test_visualize_visibility():
+    grid = Grid(width=5, height=5)
+    grid.add_wall((2, 2))
+    
+    vis = grid.visualize_visibility(start=(0, 0))
+    assert "<table" in vis
+    assert "background-color: green" in vis
+    assert "background-color: black" in vis
+    assert "background-color: lightblue" in vis
+    assert "background-color: darkgray" in vis
+    assert "Visibility Legend:" in vis
