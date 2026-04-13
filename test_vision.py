@@ -47,6 +47,19 @@ def test_line_of_sight_blocked():
     visible, grazing = get_line_of_sight((0, 0), (2, 0), walls)
     assert visible is False
 
+def test_grid_visualize():
+    grid = Grid(width=3, height=3)
+    grid.add_wall((1, 1))
+    path = [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)]
+    
+    vis = grid.visualize(start=(0, 0), target=(2, 2), path=path)
+    expected = (
+        "🟩🟦🟦\n"
+        "⬜⬛🟦\n"
+        "⬜⬜🟥"
+    )
+    assert vis == expected
+
 def test_line_of_sight_grazing():
     walls = {(1, 1)}
     # Looking past a wall that is adjacent to the target

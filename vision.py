@@ -7,7 +7,9 @@ Edge = Tuple[Point, Point]
 
 
 class Grid:
-    def __init__(self) -> None:
+    def __init__(self, width: int = 10, height: int = 10) -> None:
+        self.width = width
+        self.height = height
         self.walls: Set[Point] = set()
         self.edge_walls: Set[Edge] = set()
 
@@ -17,8 +19,8 @@ class Grid:
     def add_edge_wall(self, p1: Point, p2: Point) -> None:
         """Adds a wall on the edge between two adjacent spaces."""
         # Normalize the edge so order doesn't matter
-        edge = tuple(sorted([p1, p2]))
-        self.edge_walls.add(edge)  # type: ignore
+        edge: Edge = tuple(sorted([p1, p2])) # type: ignore
+        self.edge_walls.add(edge)
 
     def is_movement_blocked(self, current: Point, next_pos: Point) -> bool:
         """Checks if movement between two adjacent spaces is blocked."""
@@ -47,10 +49,32 @@ class Grid:
             x, y = curr
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = (nx, ny)
-                if n not in visited and not self.is_movement_blocked(curr, n):
-                    visited.add(n)
-                    queue.append(path + [n])
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    if n not in visited and not self.is_movement_blocked(curr, n):
+                        visited.add(n)
+                        queue.append(path + [n])
         return None
+
+    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None) -> str:
+        """Returns a non-ASCII string representation of the grid."""
+        path_set = set(path) if path else set()
+        lines = []
+        for y in range(self.height):
+            row = []
+            for x in range(self.width):
+                p = (x, y)
+                if p == start:
+                    row.append("🟩")
+                elif p == target:
+                    row.append("🟥")
+                elif p in self.walls:
+                    row.append("⬛")
+                elif p in path_set:
+                    row.append("🟦")
+                else:
+                    row.append("⬜")
+            lines.append("".join(row))
+        return "\n".join(lines)
 
 
 def get_line_of_sight(start_pos: Point, target_pos: Point, walls: Set[Point]) -> Tuple[bool, bool]:
