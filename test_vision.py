@@ -1,4 +1,4 @@
-from vision import Grid, get_line_of_sight
+from vision import Grid
 
 def test_grid_pathfinding_open():
     grid = Grid()
@@ -37,14 +37,15 @@ def test_grid_pathfinding_blocked():
     assert path is None
 
 def test_line_of_sight_clear():
-    walls = set()
-    visible, grazing = get_line_of_sight((0, 0), (3, 0), walls)
+    grid = Grid()
+    visible, grazing = grid.get_line_of_sight((0, 0), (3, 0))
     assert visible is True
     assert grazing is False
 
 def test_line_of_sight_blocked():
-    walls = {(1, 0)}
-    visible, grazing = get_line_of_sight((0, 0), (2, 0), walls)
+    grid = Grid()
+    grid.add_wall((1, 0))
+    visible, grazing = grid.get_line_of_sight((0, 0), (2, 0))
     assert visible is False
 
 def test_grid_visualize():
@@ -53,21 +54,22 @@ def test_grid_visualize():
     path = [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)]
     
     vis = grid.visualize(start=(0, 0), target=(2, 2), path=path)
-    expected = (
-        "🟩🟦🟦\n"
-        "⬜⬛🟦\n"
-        "⬜⬜🟥"
-    )
-    assert vis == expected
+    assert "<table" in vis
+    assert "background-color: green" in vis
+    assert "background-color: red" in vis
+    assert "background-color: black" in vis
+    assert "background-color: blue" in vis
 
 def test_line_of_sight_grazing():
-    walls = {(1, 1)}
+    grid = Grid()
+    grid.add_wall((1, 1))
     # Looking past a wall that is adjacent to the target
-    visible, grazing = get_line_of_sight((0, 0), (2, 0), walls)
+    visible, grazing = grid.get_line_of_sight((0, 0), (2, 0))
     assert visible is True
     # Depending on exact geometry, this might be grazing if the wall is adjacent to target
     # In this specific setup, (1,1) is not adjacent to (2,0). Let's use a wall at (2,1)
-    walls = {(2, 1)}
-    visible, grazing = get_line_of_sight((0, 0), (2, 0), walls)
+    grid = Grid()
+    grid.add_wall((2, 1))
+    visible, grazing = grid.get_line_of_sight((0, 0), (2, 0))
     assert visible is True
     assert grazing is True

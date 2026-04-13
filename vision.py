@@ -55,91 +55,95 @@ class Grid:
                         queue.append(path + [n])
         return None
 
-    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None) -> str:
-        """Returns a non-ASCII string representation of the grid."""
-        path_set = set(path) if path else set()
-        lines = []
-        for y in range(self.height):
-            row = []
-            for x in range(self.width):
-                p = (x, y)
-                if p == start:
-                    row.append("🟩")
-                elif p == target:
-                    row.append("🟥")
-                elif p in self.walls:
-                    row.append("⬛")
-                elif p in path_set:
-                    row.append("🟦")
-                else:
-                    row.append("⬜")
-            lines.append("".join(row))
-        return "\n".join(lines)
+    def get_line_of_sight(self, start_pos: Point, target_pos: Point) -> \
+    Tuple[bool, bool]:
+        """
+        Calculates visibility based strictly on corner-to-corner math.
+        Returns (isVisible, isGrazing).
+        """
+        start_x, start_y = start_pos
+        target_x, target_y = target_pos
 
+        if start_pos == target_pos:
+            return True, False
 
-def get_line_of_sight(start_pos: Point, target_pos: Point, walls: Set[Point]) -> Tuple[bool, bool]:
-    """
-    Calculates visibility based strictly on corner-to-corner math.
-    Returns (isVisible, isGrazing).
-    """
-    start_x, start_y = start_pos
-    target_x, target_y = target_pos
+        # 1. Corner Selection based on proximity
+        corner_x = 1.0 if target_x >= start_x else 0.0
+        corner_y = 1.0 if target_y >= start_y else 0.0
 
-    if start_pos == target_pos:
-        return True, False
+        # Mathematical float coordinates of the chosen corners
+        x0, y0 = float(start_x + corner_x), float(start_y + corner_y)
+        x1, y1 = float(target_x + corner_x), float(target_y + corner_y)
 
-    # 1. Corner Selection based on proximity
-    corner_x = 1.0 if target_x >= start_x else 0.0
-    corner_y = 1.0 if target_y >= start_y else 0.0
+        # 2. Geometry Check: Does the segment intersect any wall interior?
+        visible = True
 
-    # Mathematical float coordinates of the chosen corners
-    x0, y0 = float(start_x + corner_x), float(start_y + corner_y)
-    x1, y1 = float(target_x + corner_x), float(target_y + corner_y)
+        # Handle the simple diagonal cases first (common rule: squeezing points is blocked)
+        dx = target_x - start_x
+        dy = target_y - start_y
+        if abs(dx) == abs(dy):
+            gap_w1 = (start_x + (1 if dx > 0 else -1), start_y)
+            gap_w2 = (start_x, start_y + (1 if dy > 0 else -1))
+            if gap_w1 in self.walls and gap_w2 in self.walls:
+                visible = False
 
-    # 2. Geometry Check: Does the segment intersect any wall interior?
-    visible = True
+        # Perform ray tracing (DDA-style) if not already blocked
+        if visible:
+            distance = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+            if distance > 0:
+                steps = distance * 2
+                for i in range(1, int(steps)):
+                    t = i / steps
+                    curr_x = x0 + t * (x1 - x0)
+                    curr_y = y0 + t * (y1 - y0)
 
-    # Handle the simple diagonal cases first (common rule: squeezing points is blocked)
-    dx = target_x - start_x
-    dy = target_y - start_y
-    if abs(dx) == abs(dy):
-        gap_w1 = (start_x + (1 if dx > 0 else -1), start_y)
-        gap_w2 = (start_x, start_y + (1 if dy > 0 else -1))
-        if gap_w1 in walls and gap_w2 in walls:
-            visible = False
+                    grid_x, grid_y = math.floor(curr_x), math.floor(curr_y)
+                    local_x, local_y = curr_x % 1.0, curr_y % 1.0
 
-    # Perform ray tracing (DDA-style) if not already blocked
-    if visible:
-        distance = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
-        if distance > 0:
-            steps = distance * 2
-            for i in range(1, int(steps)):
-                t = i / steps
-                curr_x = x0 + t * (x1 - x0)
-                curr_y = y0 + t * (y1 - y0)
+                    if (grid_x, grid_y) in self.walls:
+                        if (grid_x, grid_y) == (start_x, start_y) or (
+                        grid_x, grid_y) == (target_x, target_y):
+                            continue
 
-                grid_x, grid_y = math.floor(curr_x), math.floor(curr_y)
-                local_x, local_y = curr_x % 1.0, curr_y % 1.0
+                        EPSILON = 0.000001
+                        if (EPSILON < local_x < (1.0 - EPSILON)) and (
+                                EPSILON < local_y < (1.0 - EPSILON)):
+                            visible = False
+                            break
 
-                if (grid_x, grid_y) in walls:
-                    if (grid_x, grid_y) == (start_x, start_y) or (grid_x, grid_y) == (target_x, target_y):
-                        continue
-
-                    EPSILON = 0.000001
-                    if (EPSILON < local_x < (1.0 - EPSILON)) and (EPSILON < local_y < (1.0 - EPSILON)):
-                        visible = False
+        # 3. Grazing Check (Must be visible)
+        grazing = False
+        if visible:
+            neighbors = [(target_x - 1, target_y), (target_x + 1, target_y),
+                         (target_x, target_y - 1), (target_x, target_y + 1)]
+            target_dist = (target_x - start_x) ** 2 + (target_y - start_y) ** 2
+            for nx, ny in neighbors:
+                if (nx, ny) in self.walls:
+                    wall_dist = (nx - start_x) ** 2 + (ny - start_y) ** 2
+                    if wall_dist < target_dist:
+                        grazing = True
                         break
 
-    # 3. Grazing Check (Must be visible)
-    grazing = False
-    if visible:
-        neighbors = [(target_x - 1, target_y), (target_x + 1, target_y), (target_x, target_y - 1), (target_x, target_y + 1)]
-        target_dist = (target_x - start_x) ** 2 + (target_y - start_y) ** 2
-        for nx, ny in neighbors:
-            if (nx, ny) in walls:
-                wall_dist = (nx - start_x) ** 2 + (ny - start_y) ** 2
-                if wall_dist < target_dist:
-                    grazing = True
-                    break
+        return visible, grazing
 
-    return visible, grazing
+    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None) -> str:
+        path_set = set(path) if path else set()
+        html = ['<table style="border-collapse: collapse;">']
+        for y in range(self.height):
+            html.append('  <tr>')
+            for x in range(self.width):
+                p = (x, y)
+                color = "white"
+                if p == start:
+                    color = "green"
+                elif p == target:
+                    color = "red"
+                elif p in self.walls:
+                    color = "black"
+                elif p in path_set:
+                    color = "blue"
+                html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
+            html.append('  </tr>')
+        html.append('</table>')
+        return "\n".join(html)
+
