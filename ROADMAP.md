@@ -3,8 +3,7 @@
 All features must be tested and type hinted.
 
 ## Phase 1: Core Engine Completeness (Rules & Mechanics)
-- **Grid & Movement:** Implement a proper 2D grid, non-diagonal movement, pathfinding, blocking terrain, and forced movement (push/pull).
-- **Vision & Line of Sight:** Implement corner-to-corner LoS checking and cover mechanics (+2 defense).
+- **Grid & Movement:** Add forced movement (push/pull).
 - **Abilities & Targeting:** Expand the action system to support AoE (burst, line, path), ranges, and targeting empty spaces.
 - **Event System Enhancements:** Add support for replacement events, deterministic ability ordering, and conditional modifiers.
 - **Turn Management:** Implement the sequence of play (Rounds, Turns, Move/Standard/Free Actions, Tapping/Untapping).

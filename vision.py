@@ -59,7 +59,7 @@ class Grid:
                     if n not in visited and not self.is_movement_blocked(curr, n):
                         visited.add(n)
                         queue.append(path + [n])
-        
+
         if visualize_file:
             with open(visualize_file, 'w') as f:
                 f.write(self.visualize(start=start, target=target, path=None))
@@ -137,7 +137,7 @@ class Grid:
                             break
 
         # 3. Grazing Check (Must be visible)
-        grazing = False
+        covered = False
         if visible:
             neighbors = [(target_x - 1, target_y), (target_x + 1, target_y),
                          (target_x, target_y - 1), (target_x, target_y + 1)]
@@ -146,14 +146,14 @@ class Grid:
                 if (nx, ny) in self.walls:
                     wall_dist = (nx - start_x) ** 2 + (ny - start_y) ** 2
                     if wall_dist < target_dist:
-                        grazing = True
+                        covered = True
                         break
 
         if visualize_file:
             with open(visualize_file, 'w') as f:
-                f.write(self.visualize(start=start_pos, target=target_pos, visible=visible, grazing=grazing))
+                f.write(self.visualize(start=start_pos, target=target_pos, visible=visible, grazing=covered))
 
-        return visible, grazing
+        return visible, covered
 
     def _render_html(self, color_func, legend_html: str) -> str:
         html = ['<table style="border-collapse: collapse;">']
@@ -164,23 +164,23 @@ class Grid:
                 html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
             html.append('  </tr>')
         html.append('</table>')
-        
+
         html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
         html.append(legend_html)
         html.append('</div>')
-        
+
         return "\n".join(html)
 
     def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None, visible: Optional[bool] = None, grazing: Optional[bool] = None) -> str:
         path_set = set(path) if path else set()
-        
+
         def get_color(p: Point) -> str:
             if p == start: return "green"
             if p == target: return "red"
             if p in self.walls: return "black"
             if p in path_set: return "blue"
             return "white"
-            
+
         legend = [
             '<strong>Legend:</strong><br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
@@ -192,18 +192,18 @@ class Grid:
             legend.append(f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}')
             if grazing:
                 legend.append(' (Grazing)')
-                
+
         return self._render_html(get_color, "\n".join(legend))
 
     def visualize_visibility(self, start: Point) -> str:
         def get_color(p: Point) -> str:
             if p == start: return "green"
             if p in self.walls: return "black"
-            vis, graz = self.get_line_of_sight(start, p)
-            if not vis: return "darkgray"
-            if graz: return "yellow"
+            visible, covered = self.get_line_of_sight(start, p)
+            if not visible: return "darkgray"
+            if covered: return "yellow"
             return "lightblue"
-            
+
         legend = [
             '<strong>Visibility Legend:</strong><br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
