@@ -1,111 +1,84 @@
 import math
 
-
 # todo typing
-# todo visualizer
-
-def calculate_full_field_of_view(start_x, start_y, grid_width, grid_height, walls):
+# this is inefficient, want to quickly get full set of spaces in los.
+# has edge cases particularly around corners.
+def get_line_of_sight(start_pos, target_pos, walls):
     """
-    Calculates all visible cells from a start position using recursive shadowcasting
-    adapted for corner-to-corner geometry.
+    Calculates visibility based strictly on corner-to-corner math.
+    Returns (isVisible, isGrazing).
     """
-    visible_cells = {(start_x, start_y)}
-    grazing_cells = set()
+    start_x, start_y = start_pos
+    target_x, target_y = target_pos
 
-    # Scan each of the 8 octants
-    for octant in range(8):
-        scan_octant(
-            start_x, start_y, 1, 1.0, 0.0,
-            grid_width, grid_height, walls,
-            octant, visible_cells, grazing_cells
-        )
+    if start_pos == target_pos:
+        return True, False
 
-    return visible_cells, grazing_cells
+    # 1. Corner Selection based on proximity
+    corner_x = 1.0 if target_x >= start_x else 0.0
+    corner_y = 1.0 if target_y >= start_y else 0.0
 
+    # Mathematical float coordinates of the chosen corners
+    x0, y0 = float(start_x + corner_x), float(start_y + corner_y)
+    x1, y1 = float(target_x + corner_x), float(target_y + corner_y)
 
-def scan_octant(start_x, start_y, row, start_slope, end_slope,
-                grid_width, grid_height, walls, octant,
-                visible_set, grazing_set):
-    if start_slope < end_slope:
-        return
+    # 2. Geometry Check: Does the segment intersect any wall interior?
+    visible = True
 
-    for distance in range(row, max(grid_width, grid_height)):
-        blocked = False
-        next_start_slope = start_slope
+    # Handle the simple diagonal cases first (common rule: squeezing points is blocked)
+    # If looking NW through a gap between a North and West wall, block it.
+    dx = target_x - start_x
+    dy = target_y - start_y
+    if abs(dx) == abs(dy):
+        # Check standard diagonal gap blockage
+        gap_w1 = (start_x + (1 if dx > 0 else -1), start_y)
+        gap_w2 = (start_x, start_y + (1 if dy > 0 else -1))
+        if gap_w1 in walls and gap_w2 in walls:
+            visible = False
 
-        # Calculate the range of cells in this row/column
-        for column in range(distance + 1):
-            # Transform relative coordinates to global grid coordinates based on octant
-            relative_x, relative_y = transform_octant(column, distance, octant)
-            target_x = start_x + relative_x
-            target_y = start_y + relative_y
+    # Perform ray tracing (DDA-style) if not already blocked
+    if visible:
+        distance = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+        if distance > 0:
+            # Step size for intersection checks
+            steps = distance * 2
+            for i in range(1, int(steps)):
+                t = i / steps
+                # Sample point on the line segment
+                curr_x = x0 + t * (x1 - x0)
+                curr_y = y0 + t * (y1 - y0)
 
-            if not (0 <= target_x < grid_width and 0 <= target_y < grid_height):
-                continue
+                # Check if this point lies strictly INSIDE a wall
+                # We use floor() to get grid coord, and then add epsilon
+                # to check if the point is within the (epsilon, 1-epsilon) range of the tile.
+                grid_x, grid_y = math.floor(curr_x), math.floor(curr_y)
+                local_x, local_y = curr_x % 1.0, curr_y % 1.0
 
-            # Calculate slopes of the current cell's corners relative to start
-            # For visibility, we check the 'inner' and 'outer' slopes of the tile
-            left_slope = (column + 0.5) / (distance - 0.5)
-            right_slope = (column - 0.5) / (distance + 0.5)
+                # If point is inside a wall tile and not in the "scraping" zone (near boundary)
+                if (grid_x, grid_y) in walls:
+                    # Ignore the start and end cells
+                    if (grid_x, grid_y) == (start_x, start_y) or (grid_x, grid_y) == (target_x, target_y):
+                        continue
 
-            if start_slope < right_slope:
-                continue
-            if end_slope > left_slope:
-                break
+                    # Rule: Only passing through the tile *interior* blocks.
+                    # We define interior as being more than EPSILON away from 0.0 or 1.0
+                    EPSILON = 0.000001
+                    if (EPSILON < local_x < (1.0 - EPSILON)) and (
+                            EPSILON < local_y < (1.0 - EPSILON)):
+                        visible = False
+                        break
 
-            # If it's within the current view arc, it's visible
-            visible_set.add((target_x, target_y))
+    # 3. Grazing Check (Must be visible)
+    grazing = False
+    if visible:
+        neighbors = [(target_x - 1, target_y), (target_x + 1, target_y), (target_x, target_y - 1), (target_x, target_y + 1)]
+        target_dist = (target_x - start_x) ** 2 + (target_y - start_y) ** 2
+        for nx, ny in neighbors:
+            if (nx, ny) in walls:
+                # If wall is orthogonally adjacent and closer to start
+                wall_dist = (nx - start_x) ** 2 + (ny - start_y) ** 2
+                if wall_dist < target_dist:
+                    grazing = True
+                    break
 
-            # Check for Grazing
-            if is_grazing(start_x, start_y, target_x, target_y, walls):
-                grazing_set.add((target_x, target_y))
-
-            # Handle wall transitions to cast shadows
-            is_wall = (target_x, target_y) in walls
-            if blocked:
-                if is_wall:
-                    next_start_slope = right_slope
-                else:
-                    blocked = False
-                    start_slope = next_start_slope
-            else:
-                if is_wall and distance > 0:
-                    blocked = True
-                    scan_octant(start_x, start_y, distance + 1, start_slope, left_slope,
-                                grid_width, grid_height, walls, octant,
-                                visible_set, grazing_set)
-                    next_start_slope = right_slope
-
-        if blocked:
-            break
-
-
-def is_grazing(start_x, start_y, target_x, target_y, walls):
-    """
-    Checks if a visible target has an orthogonally adjacent wall
-    situated between the start and the target.
-    """
-    neighbors = [
-        (target_x - 1, target_y), (target_x + 1, target_y),
-        (target_x, target_y - 1), (target_x, target_y + 1)
-    ]
-    target_distance_sq = (target_x - start_x) ** 2 + (target_y - start_y) ** 2
-
-    for neighbor_x, neighbor_y in neighbors:
-        if (neighbor_x, neighbor_y) in walls:
-            wall_distance_sq = (neighbor_x - start_x) ** 2 + (neighbor_y - start_y) ** 2
-            if wall_distance_sq < target_distance_sq:
-                return True
-    return False
-
-
-def transform_octant(row, col, octant):
-    """Maps local octant coordinates to global relative coordinates."""
-    if octant == 0: return (col, -row)
-    if octant == 1: return (row, -col)
-    if octant == 2: return (row, col)
-    if octant == 3: return (col, row)
-    if octant == 4: return (-col, row)
-    if octant == 5: return (-row, col)
-    if octant == 6: return (-row, -col)
-    if octant == 7: return (-col, -row)
+    return visible, grazing
