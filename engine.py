@@ -4,10 +4,10 @@ from typing import Callable, List, Optional, Type, Any
 
 from mod_value import ModValue
 
-
 # ==========================================
 # ENUMS & TYPES
 # ==========================================
+
 
 class EventPhase(Enum):
     BEFORE = auto()
@@ -24,16 +24,17 @@ class ActionType(Enum):
 @dataclass
 class Action:
     action_type: ActionType
-    target: Optional['Entity'] = None
+    target: Optional["Entity"] = None
 
 
 # ==========================================
 # ROUTER & SUBSCRIPTIONS
 # ==========================================
 
+
 @dataclass
 class Subscription:
-    modifier: 'Modifier'
+    modifier: "Modifier"
     event_type: Type
     phase: EventPhase
     target_self: bool
@@ -44,7 +45,7 @@ class Router:
     def __init__(self) -> None:
         self.subscribers: List[Subscription] = []
 
-    def subscribe(self, modifier: 'Modifier') -> None:
+    def subscribe(self, modifier: "Modifier") -> None:
         for name in dir(modifier):
             method = getattr(modifier, name)
             if hasattr(method, "_listen_event"):
@@ -54,7 +55,7 @@ class Router:
                         event_type=method._listen_event,
                         phase=method._listen_phase,
                         target_self=method._listen_target_self,
-                        func=method
+                        func=method,
                     )
                 )
 
@@ -72,9 +73,14 @@ class Router:
 # DECORATORS
 # ==========================================
 
+
 def before(event_type: Type, target_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
-        func._listen_event, func._listen_phase, func._listen_target_self = event_type, EventPhase.BEFORE, target_self
+        func._listen_event, func._listen_phase, func._listen_target_self = (
+            event_type,
+            EventPhase.BEFORE,
+            target_self,
+        )
         return func
 
     return decorator
@@ -82,7 +88,11 @@ def before(event_type: Type, target_self: bool = True) -> Callable:
 
 def after(event_type: Type, target_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
-        func._listen_event, func._listen_phase, func._listen_target_self = event_type, EventPhase.AFTER, target_self
+        func._listen_event, func._listen_phase, func._listen_target_self = (
+            event_type,
+            EventPhase.AFTER,
+            target_self,
+        )
         return func
 
     return decorator
@@ -90,7 +100,11 @@ def after(event_type: Type, target_self: bool = True) -> Callable:
 
 def query(event_type: Type, target_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
-        func._listen_event, func._listen_phase, func._listen_target_self = event_type, EventPhase.QUERY, target_self
+        func._listen_event, func._listen_phase, func._listen_target_self = (
+            event_type,
+            EventPhase.QUERY,
+            target_self,
+        )
         return func
 
     return decorator
@@ -100,24 +114,26 @@ def query(event_type: Type, target_self: bool = True) -> Callable:
 # CORE ENGINE & ENTITIES
 # ==========================================
 
+
 class Engine:
     def __init__(self) -> None:
         self.router = Router()
-        self.entities: List['Entity'] = []
+        self.entities: List["Entity"] = []
 
-    def add_entity(self, entity: 'Entity') -> None:
+    def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
 
 
 class Entity:
-    def __init__(self, engine: Engine, name: str, hp: int, pos: tuple[int, int],
-                 team: int):
+    def __init__(
+        self, engine: Engine, name: str, hp: int, pos: tuple[int, int], team: int
+    ):
         self.engine = engine
         self.name = name
         self.hp = hp
         self.pos = pos
         self.team = team
-        self.modifiers: List['Modifier'] = []
+        self.modifiers: List["Modifier"] = []
         self.engine.add_entity(self)
 
     # --- Engine Query Helpers ---
@@ -145,10 +161,10 @@ class Entity:
         return q.result
 
     # --- Utility Helpers ---
-    def distance_to(self, other: 'Entity') -> int:
+    def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 
-    def add_modifier(self, modifier: 'Modifier') -> None:
+    def add_modifier(self, modifier: "Modifier") -> None:
         modifier.owner = self
         self.modifiers.append(modifier)
         self.engine.router.subscribe(modifier)
@@ -162,9 +178,11 @@ class Modifier:
 # EVENTS
 # ==========================================
 
+
 class DamageEvent:
-    def __init__(self, engine: Engine, source: Optional[Entity], target: Entity,
-                 amount: int):
+    def __init__(
+        self, engine: Engine, source: Optional[Entity], target: Entity, amount: int
+    ):
         self.engine = engine
         self.source = source
         self.target = target
@@ -199,6 +217,7 @@ class HealEvent:
 # QUERIES
 # ==========================================
 
+
 class QueryHasArmor:
     def __init__(self, target: Entity):
         self.target = target
@@ -221,6 +240,7 @@ class QueryCanMove:
 # ABILITIES (Developer Implementations)
 # ==========================================
 
+
 class InnateArmor(Modifier):
     @query(QueryHasArmor)
     def grant_armor(self, q: QueryHasArmor) -> None:
@@ -241,8 +261,10 @@ class Marksmanship(Modifier):
         # Buff applies if owner or ally attacks an enemy from range 3+
         # and owner has no adjacent enemies.
         if e.source and e.source.team == self.owner.team:
-            if not self.owner.has_adjacent_enemies() and e.source.distance_to(
-                    e.target) >= 3:
+            if (
+                not self.owner.has_adjacent_enemies()
+                and e.source.distance_to(e.target) >= 3
+            ):
                 e.amount.add(1)
                 e.amount.is_irreducible = True
 

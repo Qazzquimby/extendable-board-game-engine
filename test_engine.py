@@ -1,5 +1,18 @@
-from engine import Engine, Entity, Action, ActionType, DamageEvent, HealEvent, InnateArmor, PaladinAura, Marksmanship, ShallowGrave, Taunted
+from engine import (
+    Engine,
+    Entity,
+    Action,
+    ActionType,
+    DamageEvent,
+    HealEvent,
+    InnateArmor,
+    PaladinAura,
+    Marksmanship,
+    ShallowGrave,
+    Taunted,
+)
 from mod_value import ModValue
+
 
 def test_marksmanship_conditional_irreducible():
     engine = Engine()
@@ -18,8 +31,9 @@ def test_marksmanship_conditional_irreducible():
 def test_marksmanship_disabled_by_adjacent_enemy():
     engine = Engine()
     drow = Entity(engine, "Drow", hp=8, pos=(0, 0), team=1)
-    flanker = Entity(engine, "Flanker", hp=5, pos=(0, 1),
-                     team=2)  # Range 1, adjacent enemy
+    flanker = Entity(
+        engine, "Flanker", hp=5, pos=(0, 1), team=2
+    )  # Range 1, adjacent enemy
     axe = Entity(engine, "Axe", hp=10, pos=(0, 4), team=2)
 
     axe.add_modifier(InnateArmor())
@@ -121,15 +135,15 @@ def test_taunted_dataclass():
 def test_modvalue_multiply_before_add():
     mod = ModValue(2)
     mod.add(1)
-    mod.mult(2.0) # +100%
+    mod.mult(2.0)  # +100%
     # 2 * 2.0 + 1 = 5
     assert mod.value == 5
 
 
 def test_modvalue_cancellation():
     mod = ModValue(2)
-    mod.mult(2.0) # +100%
-    mod.add_resistance() # Resistance
+    mod.mult(2.0)  # +100%
+    mod.add_resistance()  # Resistance
     # Cancel out -> 2
     assert mod.value == 2
 
@@ -143,8 +157,8 @@ def test_modvalue_round_up():
 
 def test_modvalue_additive_multipliers():
     mod = ModValue(2)
-    mod.mult(1.5) # +50%
-    mod.mult(2.0) # +100%
+    mod.mult(1.5)  # +50%
+    mod.mult(2.0)  # +100%
     # 1.0 + 0.5 + 1.0 = 2.5
     # 2 * 2.5 = 5
     assert mod.value == 5

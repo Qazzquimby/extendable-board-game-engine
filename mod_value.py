@@ -1,6 +1,7 @@
 import math
 from typing import Callable, List, Union
 
+
 class ModValue:
     def __init__(self, base: int):
         self.base: int = base
@@ -49,5 +50,5 @@ class ModValue:
 
         for cap in self._caps:
             value = cap(int(value)) if callable(cap) else min(value, float(cap))
-            
+
         return int(value)

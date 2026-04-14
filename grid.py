@@ -19,7 +19,7 @@ class Grid:
     def add_edge_wall(self, p1: Point, p2: Point) -> None:
         """Adds a wall on the edge between two adjacent spaces."""
         # Normalize the edge so order doesn't matter
-        edge: Edge = tuple(sorted([p1, p2])) # type: ignore
+        edge: Edge = tuple(sorted([p1, p2]))  # type: ignore
         self.edge_walls.add(edge)
 
     def get_range(self, p1: Point, p2: Point) -> int:
@@ -39,11 +39,17 @@ class Grid:
             return True
         return False
 
-    def get_path(self, start: Point, target: Point, visualize_file: Optional[str] = None, valid_step: Optional[Callable[[Point, Point], bool]] = None) -> Optional[List[Point]]:
+    def get_path(
+        self,
+        start: Point,
+        target: Point,
+        visualize_file: Optional[str] = None,
+        valid_step: Optional[Callable[[Point, Point], bool]] = None,
+    ) -> Optional[List[Point]]:
         """Finds the shortest path using BFS, respecting walls and edge walls."""
         if start == target:
             if visualize_file:
-                with open(visualize_file, 'w') as f:
+                with open(visualize_file, "w") as f:
                     f.write(self.visualize(start=start, target=target, path=[start]))
             return [start]
 
@@ -56,7 +62,7 @@ class Grid:
 
             if curr == target:
                 if visualize_file:
-                    with open(visualize_file, 'w') as f:
+                    with open(visualize_file, "w") as f:
                         f.write(self.visualize(start=start, target=target, path=path))
                 return path
 
@@ -70,24 +76,33 @@ class Grid:
                             queue.append(path + [n])
 
         if visualize_file:
-            with open(visualize_file, 'w') as f:
+            with open(visualize_file, "w") as f:
                 f.write(self.visualize(start=start, target=target, path=None))
         return None
 
-    def get_push_path(self, start: Point, target: Point, push_from: Point) -> Optional[List[Point]]:
+    def get_push_path(
+        self, start: Point, target: Point, push_from: Point
+    ) -> Optional[List[Point]]:
         """Finds a path where every step moves further away from the push_from point."""
+
         def is_away(curr: Point, nxt: Point) -> bool:
             return self.get_range(nxt, push_from) > self.get_range(curr, push_from)
+
         return self.get_path(start, target, valid_step=is_away)
 
-    def get_pull_path(self, start: Point, target: Point, pull_to: Point) -> Optional[List[Point]]:
+    def get_pull_path(
+        self, start: Point, target: Point, pull_to: Point
+    ) -> Optional[List[Point]]:
         """Finds a path where every step moves closer to the pull_to point."""
+
         def is_toward(curr: Point, nxt: Point) -> bool:
             return self.get_range(nxt, pull_to) < self.get_range(curr, pull_to)
+
         return self.get_path(start, target, valid_step=is_toward)
 
-    def get_line_of_sight(self, start_pos: Point, target_pos: Point, visualize_file: Optional[str] = None) -> \
-    Tuple[bool, bool]:
+    def get_line_of_sight(
+        self, start_pos: Point, target_pos: Point, visualize_file: Optional[str] = None
+    ) -> Tuple[bool, bool]:
         """
         Calculates visibility based strictly on corner-to-corner math.
         Returns (isVisible, isGrazing).
@@ -97,8 +112,15 @@ class Grid:
 
         if start_pos == target_pos:
             if visualize_file:
-                with open(visualize_file, 'w') as f:
-                    f.write(self.visualize(start=start_pos, target=target_pos, visible=True, grazing=False))
+                with open(visualize_file, "w") as f:
+                    f.write(
+                        self.visualize(
+                            start=start_pos,
+                            target=target_pos,
+                            visible=True,
+                            grazing=False,
+                        )
+                    )
             return True, False
 
         # 1. Corner Selection based on proximity
@@ -148,20 +170,27 @@ class Grid:
 
                     if (grid_x, grid_y) in self.walls:
                         if (grid_x, grid_y) == (start_x, start_y) or (
-                        grid_x, grid_y) == (target_x, target_y):
+                            grid_x,
+                            grid_y,
+                        ) == (target_x, target_y):
                             continue
 
                         EPSILON = 0.000001
                         if (EPSILON < local_x < (1.0 - EPSILON)) and (
-                                EPSILON < local_y < (1.0 - EPSILON)):
+                            EPSILON < local_y < (1.0 - EPSILON)
+                        ):
                             visible = False
                             break
 
         # 3. Covered Check (Must be visible)
         covered = False
         if visible:
-            neighbors = [(target_x - 1, target_y), (target_x + 1, target_y),
-                         (target_x, target_y - 1), (target_x, target_y + 1)]
+            neighbors = [
+                (target_x - 1, target_y),
+                (target_x + 1, target_y),
+                (target_x, target_y - 1),
+                (target_x, target_y + 1),
+            ]
             target_dist = (target_x - start_x) ** 2 + (target_y - start_y) ** 2
             for nx, ny in neighbors:
                 if (nx, ny) in self.walls:
@@ -171,66 +200,92 @@ class Grid:
                         break
 
         if visualize_file:
-            with open(visualize_file, 'w') as f:
-                f.write(self.visualize(start=start_pos, target=target_pos, visible=visible, grazing=covered))
+            with open(visualize_file, "w") as f:
+                f.write(
+                    self.visualize(
+                        start=start_pos,
+                        target=target_pos,
+                        visible=visible,
+                        grazing=covered,
+                    )
+                )
 
         return visible, covered
 
     def _render_html(self, color_func, legend_html: str) -> str:
         html = ['<table style="border-collapse: collapse;">']
         for y in range(self.height):
-            html.append('  <tr>')
+            html.append("  <tr>")
             for x in range(self.width):
                 color = color_func((x, y))
-                html.append(f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>')
-            html.append('  </tr>')
-        html.append('</table>')
+                html.append(
+                    f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>'
+                )
+            html.append("  </tr>")
+        html.append("</table>")
 
         html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
         html.append(legend_html)
-        html.append('</div>')
+        html.append("</div>")
 
         return "\n".join(html)
 
-    def visualize(self, start: Optional[Point] = None, target: Optional[Point] = None, path: Optional[List[Point]] = None, visible: Optional[bool] = None, grazing: Optional[bool] = None) -> str:
+    def visualize(
+        self,
+        start: Optional[Point] = None,
+        target: Optional[Point] = None,
+        path: Optional[List[Point]] = None,
+        visible: Optional[bool] = None,
+        grazing: Optional[bool] = None,
+    ) -> str:
         path_set = set(path) if path else set()
 
         def get_color(p: Point) -> str:
-            if p == start: return "green"
-            if p == target: return "red"
-            if p in self.walls: return "black"
-            if p in path_set: return "blue"
+            if p == start:
+                return "green"
+            if p == target:
+                return "red"
+            if p in self.walls:
+                return "black"
+            if p in path_set:
+                return "blue"
             return "white"
 
         legend = [
-            '<strong>Legend:</strong><br>',
+            "<strong>Legend:</strong><br>",
             '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:red; border:1px solid #ccc;"></span> Target<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:blue; border:1px solid #ccc;"></span> Path<br>'
+            '<span style="display:inline-block; width:15px; height:15px; background-color:blue; border:1px solid #ccc;"></span> Path<br>',
         ]
         if visible is not None:
-            legend.append(f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}')
+            legend.append(
+                f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}'
+            )
             if grazing:
-                legend.append(' (Grazing)')
+                legend.append(" (Grazing)")
 
         return self._render_html(get_color, "\n".join(legend))
 
     def visualize_visibility(self, start: Point) -> str:
         def get_color(p: Point) -> str:
-            if p == start: return "green"
-            if p in self.walls: return "black"
+            if p == start:
+                return "green"
+            if p in self.walls:
+                return "black"
             visible, covered = self.get_line_of_sight(start, p)
-            if not visible: return "darkgray"
-            if covered: return "yellow"
+            if not visible:
+                return "darkgray"
+            if covered:
+                return "yellow"
             return "lightblue"
 
         legend = [
-            '<strong>Visibility Legend:</strong><br>',
+            "<strong>Visibility Legend:</strong><br>",
             '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:lightblue; border:1px solid #ccc;"></span> Visible<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Grazing<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>'
+            '<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>',
         ]
         return self._render_html(get_color, "\n".join(legend))
