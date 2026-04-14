@@ -97,7 +97,7 @@ def test_line_of_sight_covered():
     # Looking past a wall that is adjacent to the target
     visible, covered = grid.get_line_of_sight((0, 0), (2, 0))
     assert visible is True
-    # Depending on exact geometry, this might be grazing if the wall is adjacent to target
+    # Depending on exact geometry, this might be covered if the wall is adjacent to target
     # In this specific setup, (1,1) is not adjacent to (2,0). Let's use a wall at (2,1)
     grid = Grid()
     grid.add_wall((2, 1))

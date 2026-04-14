@@ -105,7 +105,7 @@ class Grid:
     ) -> Tuple[bool, bool]:
         """
         Calculates visibility based strictly on corner-to-corner math.
-        Returns (isVisible, isGrazing).
+        Returns (isVisible, isCovered).
         """
         start_x, start_y = start_pos
         target_x, target_y = target_pos
@@ -118,7 +118,7 @@ class Grid:
                             start=start_pos,
                             target=target_pos,
                             visible=True,
-                            grazing=False,
+                            covered=False,
                         )
                     )
             return True, False
@@ -206,7 +206,7 @@ class Grid:
                         start=start_pos,
                         target=target_pos,
                         visible=visible,
-                        grazing=covered,
+                        covered=covered,
                     )
                 )
 
@@ -236,7 +236,7 @@ class Grid:
         target: Optional[Point] = None,
         path: Optional[List[Point]] = None,
         visible: Optional[bool] = None,
-        grazing: Optional[bool] = None,
+        covered: Optional[bool] = None,
     ) -> str:
         path_set = set(path) if path else set()
 
@@ -262,8 +262,8 @@ class Grid:
             legend.append(
                 f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}'
             )
-            if grazing:
-                legend.append(" (Grazing)")
+            if covered:
+                legend.append(" (Covered)")
 
         return self._render_html(get_color, "\n".join(legend))
 
@@ -285,7 +285,7 @@ class Grid:
             '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:lightblue; border:1px solid #ccc;"></span> Visible<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Grazing<br>',
+            '<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Covered<br>',
             '<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>',
         ]
         return self._render_html(get_color, "\n".join(legend))
