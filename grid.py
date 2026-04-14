@@ -30,6 +30,46 @@ class Grid:
             return dx + dy - 1
         return dx + dy
 
+    def get_points_in_range(self, start: Point, max_range: int) -> Set[Point]:
+        """Finds all points within max_range, respecting walls. First step can be diagonal."""
+        if max_range < 0:
+            return set()
+            
+        # State: (point, cost, diagonal_used)
+        # We use a dictionary to track the minimum cost to reach a point with/without using a diagonal
+        visited = {}
+        queue = deque([(start, 0, False)])
+        
+        while queue:
+            curr, cost, diag_used = queue.popleft()
+            
+            state_key = (curr, diag_used)
+            if state_key in visited and visited[state_key] <= cost:
+                continue
+            visited[state_key] = cost
+            
+            if cost >= max_range:
+                continue
+                
+            x, y = curr
+            # Orthogonal moves
+            for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
+                n = (nx, ny)
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    if not self.is_movement_blocked(curr, n):
+                        queue.append((n, cost + 1, diag_used))
+            
+            # Diagonal moves (only allowed if not used yet)
+            if not diag_used:
+                for nx, ny in [(x + 1, y + 1), (x + 1, y - 1), (x - 1, y + 1), (x - 1, y - 1)]:
+                    n = (nx, ny)
+                    if 0 <= nx < self.width and 0 <= ny < self.height:
+                        # Check if diagonal movement is blocked by walls (corner cutting)
+                        if n not in self.walls:
+                            queue.append((n, cost + 1, True))
+
+        return {p for p, _ in visited.keys()}
+
     def is_movement_blocked(self, current: Point, next_pos: Point) -> bool:
         """Checks if movement between two adjacent spaces is blocked."""
         if next_pos in self.walls:
