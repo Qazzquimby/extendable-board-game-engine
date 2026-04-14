@@ -1,4 +1,4 @@
-from vision import Grid
+from grid import Grid
 
 def test_grid_pathfinding_open():
     grid = Grid()

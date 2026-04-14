@@ -157,7 +157,7 @@ class Grid:
                             visible = False
                             break
 
-        # 3. Grazing Check (Must be visible)
+        # 3. Covered Check (Must be visible)
         covered = False
         if visible:
             neighbors = [(target_x - 1, target_y), (target_x + 1, target_y),
@@ -234,4 +234,3 @@ class Grid:
             '<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>'
         ]
         return self._render_html(get_color, "\n".join(legend))
-

@@ -1,4 +1,4 @@
-from main import Engine, Entity, Action, ActionType, DamageEvent, HealEvent, InnateArmor, PaladinAura, Marksmanship, ShallowGrave, Taunted
+from engine import Engine, Entity, Action, ActionType, DamageEvent, HealEvent, InnateArmor, PaladinAura, Marksmanship, ShallowGrave, Taunted
 from mod_value import ModValue
 
 def test_marksmanship_conditional_irreducible():
