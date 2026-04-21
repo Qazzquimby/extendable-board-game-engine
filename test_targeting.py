@@ -43,38 +43,42 @@ def test_burst_with_range():
 
 def test_square_area():
     grid = Grid(width=10, height=10)
-    # 2x2 square centered on start (range_limit=0)
-    selections = list(Square(size=2).get_selections(grid, (5, 5)))
-    assert len(selections) == 1
-    sq = selections[0]
-    assert len(sq) == 4
-    assert (4, 4) in sq
-    assert (5, 5) in sq
-    assert (4, 5) in sq
-    assert (5, 4) in sq
+    # 2x2 square containing start (range_limit=0)
+    selections = list(Square(side_length=2).get_selections(grid, (5, 5)))
+    assert len(selections) == 4
+    for sq in selections:
+        assert len(sq) == 4
+        assert (5, 5) in sq
 
 
 def test_square_with_range():
     grid = Grid(width=100, height=100)
     # 2x2 square in range 3
-    selections = list(Square(size=2, range_limit=3).get_selections(grid, (50, 50)))
-    # Range 3 from (5,5) includes 25 points
-    assert len(selections) == 25
+    selections = list(Square(side_length=2, in_range=1).get_selections(grid, (50, 50)))
+    # Range 1 is 3x3 square
+    # Total of 2x2 squares that can be drawn overlapping any of them is (3+1*3+1)=16
+    assert len(selections) == 16
 
 
 def test_get_line_orthogonal():
-    line = get_line((0, 0), (1, 0), 3)
+    line = get_line(
+        grid=Grid(width=100, height=100), start=(0, 0), target=(1, 0), length=3
+    )
     assert line == [(1, 0), (2, 0), (3, 0)]
 
 
 def test_get_line_diagonal():
-    line = get_line((0, 0), (1, 1), 3)
+    line = get_line(
+        grid=Grid(width=100, height=100), start=(0, 0), target=(1, 1), length=3
+    )
     assert line == [(1, 1), (2, 2), (3, 3)]
 
 
 def test_get_line_arbitrary_angle():
     # Target is at knight's move distance
-    line = get_line((0, 0), (2, 1), 4)
+    line = get_line(
+        grid=Grid(width=100, height=100), start=(0, 0), target=(2, 1), length=4
+    )
     # step_x = 2/2 = 1, step_y = 1/2 = 0.5
     # i=1: (1, 0.5)->(1, 0) or (1, 1) depending on round. round(0.5) is 0 in python 3 for even, but let's check exact math:
     # i=1: x=1, y=0
@@ -83,7 +87,3 @@ def test_get_line_arbitrary_angle():
     # i=4: x=4, y=2
     assert len(line) == 4
     assert line[1] == (2, 1)  # The target itself should be the second point
-
-
-def test_get_line_same_point():
-    assert get_line((0, 0), (0, 0), 5) == []

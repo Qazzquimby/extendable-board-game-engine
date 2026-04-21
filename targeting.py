@@ -30,29 +30,38 @@ class Burst(Area):
 
 
 class Square(Area):
-    def __init__(self, size: int, range_limit: int = 0):
-        self.size = size
-        self.range_limit = range_limit
+    def __init__(self, side_length: int, in_range: int = 0):
+        self.side_length = side_length
+        self.in_range = in_range
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
-        centers = (
+        valid_starts = (
             {start}
-            if self.range_limit == 0
-            else grid.get_points_in_range(start, self.range_limit)
+            if self.in_range == 0
+            else grid.get_points_in_range(start, self.in_range)
         )
-        # todo this should allow for all squares that can be drawn at the start point, not only those centered on the start point.
-        offset = self.size // 2
-        for cx, cy in centers:
-            points = set()
-            for dx in range(-offset, self.size - offset):
-                for dy in range(-offset, self.size - offset):
-                    nx, ny = cx + dx, cy + dy
-                    if 0 <= nx < grid.width and 0 <= ny < grid.height:
-                        # Check if there's a valid path to the square's points (respecting walls)
-                        if (nx, ny) in grid.get_points_in_range((cx, cy), self.size):
-                            points.add((nx, ny))
-            if points:
-                yield points
+
+        seen_squares = set()
+
+        for start_x, start_y in valid_starts:
+            for leftmost in range(start_x - self.side_length + 1, start_x + 1):
+                for topmost in range(start_y - self.side_length + 1, start_y + 1):
+                    points = set()
+                    for offset_x in range(self.side_length):
+                        for offset_y in range(self.side_length):
+                            cell_x, cell_y = leftmost + offset_x, topmost + offset_y
+                            if 0 <= cell_x < grid.width and 0 <= cell_y < grid.height:
+                                # Check if there's a valid path to the square's points (respecting walls)
+                                if (cell_x, cell_y) in grid.get_points_in_range(
+                                    (start_x, start_y), self.side_length
+                                ):
+                                    points.add((cell_x, cell_y))
+
+                    if points:
+                        frozen_points = frozenset(points)
+                        if frozen_points not in seen_squares:
+                            seen_squares.add(frozen_points)
+                            yield points
 
 
 def get_line(grid: Grid, start: Point, target: Point, length: int) -> List[Point]:
