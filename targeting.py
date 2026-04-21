@@ -14,11 +14,17 @@ class Burst(Area):
     def __init__(self, radius: int, range_limit: int = 0):
         self.radius = radius
         self.range_limit = range_limit
+        # todo rather than using range_limit want to be able to define more detailed conditional logic.
+        #  'that includes you', in line 3, including any ally, etc. Too fragile to assume this way.
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         # If range_limit is 0, it's centered on the start point
-        centers = {start} if self.range_limit == 0 else grid.get_points_in_range(start, self.range_limit)
-        
+        centers = (
+            {start}
+            if self.range_limit == 0
+            else grid.get_points_in_range(start, self.range_limit)
+        )
+
         for center in centers:
             yield grid.get_points_in_range(center, self.radius)
 
@@ -29,8 +35,12 @@ class Square(Area):
         self.range_limit = range_limit
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
-        centers = {start} if self.range_limit == 0 else grid.get_points_in_range(start, self.range_limit)
-        
+        centers = (
+            {start}
+            if self.range_limit == 0
+            else grid.get_points_in_range(start, self.range_limit)
+        )
+        # todo this should allow for all squares that can be drawn at the start point, not only those centered on the start point.
         offset = self.size // 2
         for cx, cy in centers:
             points = set()
@@ -72,13 +82,13 @@ def get_line(grid: Grid, start: Point, target: Point, length: int) -> List[Point
         nx = round(x0 + step_x * i)
         ny = round(y0 + step_y * i)
         nxt = (nx, ny)
-        
+
         if not (0 <= nx < grid.width and 0 <= ny < grid.height):
             break
-            
+
         if grid.is_movement_blocked(curr, nxt):
             break
-            
+
         line.append(nxt)
         curr = nxt
 
