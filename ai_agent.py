@@ -18,7 +18,7 @@ class PlausibleAction:
 class GameStateEncoder(nn.Module):
     def __init__(self, hidden_dim: int = 64, num_heads: int = 4, num_layers: int = 2):
         super().__init__()
-        self.entity_dim = 4  # [x, y, hp, team]
+        self.entity_dim = 5  # [x, y, hp, team, entity_hash]
         self.hidden_dim = hidden_dim
 
         self.embedding = nn.Linear(self.entity_dim, hidden_dim)
@@ -100,37 +100,51 @@ class AIPolicyValueNet(nn.Module):
         return policy_scores_tensor, value
 
 
+def _get_hash(key) -> float:
+    hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
+    return float(hash_int % 10000) / 100.0
+
+
+def get_entity_hash(set_name: str, entity_name: str) -> float:
+    key = f"{set_name}__{entity_name}"
+    return _get_hash(key)
+
+
+def get_ability_hash(set_name: str, entity_name: str, ability_name: str) -> float:
+    key = f"{set_name}__{entity_name}__{ability_name}"
+    return _get_hash(key)
+
+
 def encode_state(engine: Engine) -> torch.Tensor:
     features = []
     for i in range(10):
         if i < len(engine.entities):
             e = engine.entities[i]
             features.extend(
-                [float(e.pos[0]), float(e.pos[1]), float(e.hp), float(e.team)]
+                [
+                    float(e.pos[0]),
+                    float(e.pos[1]),
+                    float(e.hp),
+                    float(e.team),
+                    get_entity_hash(set_name=e.set, entity_name=e.name),
+                ]
             )
         else:
-            features.extend([0.0, 0.0, 0.0, 0.0])
+            features.extend([0.0, 0.0, 0.0, 0.0, 0.0])
     return torch.tensor(features, dtype=torch.float32)
 
-# todo entities should also be hashed and embedded.
 
-def get_ability_hash(
-    ability: Ability, entity_name: str = "unknown", set_name: str = "development"
-) -> float:
-    """Generates a deterministic hash for an ability based on its set, unit, and name."""
-    key = f"{set_name}__{entity_name}__{ability.name}"
-    # Use MD5 to get a consistent integer, then normalize it to a reasonable float range
-    hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
-    return float(hash_int % 10000) / 100.0
-
-
-def encode_action(action: PlausibleAction, actor_name: str = "unknown") -> torch.Tensor:
-    ability_id = get_ability_hash(action.ability, actor_name)
+def encode_plausible_action(plausible_action: PlausibleAction) -> torch.Tensor:
+    ability_id = get_ability_hash(
+        set_name=plausible_action.ability.owner_entity.set,
+        entity_name=plausible_action.ability.owner_entity.name,
+        ability_name=plausible_action.ability.name,
+    )
     features = [
-        float(action.move_pos[0]),
-        float(action.move_pos[1]),
-        float(action.target.pos[0]),
-        float(action.target.pos[1]),
+        float(plausible_action.move_pos[0]),
+        float(plausible_action.move_pos[1]),
+        float(plausible_action.target.pos[0]),
+        float(plausible_action.target.pos[1]),
         ability_id,
     ]
     return torch.tensor(features, dtype=torch.float32)
@@ -141,20 +155,29 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     enemies = [e for e in engine.entities if e.team != actor.team]
     allies = [e for e in engine.entities if e.team == actor.team and e != actor]
 
+    speed = getattr(actor, "speed", 3)
+    if hasattr(engine, "grid") and engine.grid is not None:
+        reachable_points = engine.grid.get_points_in_range(actor.pos, speed)
+    else:
+        # Fallback if grid is not available
+        reachable_points = set()
+        for dx in range(-speed, speed + 1):
+            for dy in range(-speed, speed + 1):
+                if abs(dx) + abs(dy) <= speed:
+                    reachable_points.add((actor.pos[0] + dx, actor.pos[1] + dy))
+
     for ability in actor.abilities:
         attack_range = ability.steps[0].attack_range if ability.steps else 1
 
         for enemy in enemies:
             target_x, target_y = enemy.pos
-            # todo these are not accounting for speed or pathing limitations?? People can't just teleport wherever they want.
+
+            proposed_moves = []
 
             # Heuristic 1: As close as possible to enemy (adjacent)
-            proposed_moves = [
-                (target_x + 1, target_y),
-                (target_x - 1, target_y),
-                (target_x, target_y + 1),
-                (target_x, target_y - 1),
-            ]
+            # todo no you dundering oaf, as close as possible means as close as *possible*. Given your move speed and pathing options. All of these should be respective of your ability to move.
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                proposed_moves.append((target_x + dx, target_y + dy))
 
             # Heuristic 2: As far as possible from enemy while being in range
             proposed_moves.extend(
@@ -166,17 +189,38 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                 ]
             )
 
-            # Heuristic 3: Between ally and enemy (simple midpoint approximation)
-            # todo no, it should be as close to enemy as possible while being between ally and enemy.
+            # Heuristic 3: As close to enemy as possible while being between ally and enemy
             for ally in allies:
-                mid_x = (target_x + ally.pos[0]) // 2
-                mid_y = (target_y + ally.pos[1]) // 2
-                proposed_moves.append((mid_x, mid_y))
+                best_pos = None
+                best_dist = float("inf")
+                ally_dist_to_enemy = abs(ally.pos[0] - target_x) + abs(
+                    ally.pos[1] - target_y
+                )
 
-            # Deduplicate moves
+                for rp in reachable_points:
+                    dist_ally_to_rp = abs(ally.pos[0] - rp[0]) + abs(
+                        ally.pos[1] - rp[1]
+                    )
+                    dist_rp_to_enemy = abs(rp[0] - target_x) + abs(rp[1] - target_y)
+
+                    # Check if point is roughly between ally and enemy
+                    if dist_ally_to_rp + dist_rp_to_enemy <= ally_dist_to_enemy + 2:
+                        if dist_rp_to_enemy < best_dist:
+                            best_dist = dist_rp_to_enemy
+                            best_pos = rp
+
+                if best_pos:
+                    proposed_moves.append(best_pos)
+
+            # Deduplicate and filter by reachable points #todo you're not filtering by reachable points, each list is the reachable point that best meets the criteria.
             unique_moves = list(set(proposed_moves))
+            valid_moves = [m for m in unique_moves if m in reachable_points]
 
-            for move in unique_moves:
+            # Always allow staying in place if it's valid
+            if actor.pos not in valid_moves and actor.pos in reachable_points:
+                valid_moves.append(actor.pos)
+
+            for move in valid_moves:
                 actions.append(
                     PlausibleAction(move_pos=move, target=enemy, ability=ability)
                 )
@@ -195,7 +239,7 @@ class AIAgent:
             return None
 
         state_tensor = encode_state(engine)
-        action_tensors = [encode_action(a, actor.name) for a in actions]
+        action_tensors = [encode_plausible_action(a, actor.name) for a in actions]
 
         policy_scores, _ = self.net(state_tensor, action_tensors)
 

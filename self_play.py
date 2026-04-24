@@ -2,7 +2,12 @@ import random
 import torch
 from engine import Engine, DamageEvent
 from heroes import MeleeHero, RangedHero
-from ai_agent import AIAgent, encode_state, encode_action, generate_plausible_actions
+from ai_agent import (
+    AIAgent,
+    encode_state,
+    encode_plausible_action,
+    generate_plausible_actions,
+)
 
 
 def run_game():
@@ -32,7 +37,7 @@ def run_game():
             if not actions:
                 continue
 
-            action_tensors = [encode_action(a) for a in actions]
+            action_tensors = [encode_plausible_action(a) for a in actions]
 
             # todo replace this with temperature selection of scored actions
             if random.random() < 0.2:

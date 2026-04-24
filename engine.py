@@ -38,6 +38,7 @@ class AbilityStep:
 class Ability:
     name: str
     steps: List[AbilityStep]
+    owner_entity: "Entity"
     is_default: bool = False
 
 
@@ -173,6 +174,7 @@ class Entity:
         self, engine: Engine, name: str, hp: int, pos: tuple[int, int], team: int
     ):
         self.engine = engine
+        self.set = "development"
         self.name = name
         self.hp = hp
         self.pos = pos
