@@ -1,7 +1,6 @@
 import torch
 from ai_agent import (
     GameStateEncoder,
-    get_ability_hash,
     encode_plausible_action,
     generate_plausible_actions,
     PlausibleAction,
@@ -15,7 +14,7 @@ def test_game_state_encoder_transformer():
     dummy_state = torch.rand(50)
     output = encoder(dummy_state)
 
-    assert output.shape == (32,)
+    assert output.shape == (1, 32)
 
     # Test batching
     dummy_batch = torch.rand(5, 50)
@@ -24,17 +23,22 @@ def test_game_state_encoder_transformer():
 
 
 def test_ability_hashing():
-    ability1 = Ability(name="Slash", steps=[])
-    ability2 = Ability(name="Shoot", steps=[])
+    engine = Engine()
+    warrior = Entity(engine=engine, name="Warrior", hp=10, pos=(0, 0), team=1)
+    mage = Entity(engine=engine, name="Mage", hp=10, pos=(1, 1), team=1)
 
-    hash1 = get_ability_hash(ability1, "Warrior")
-    hash2 = get_ability_hash(ability2, "Warrior")
-    hash3 = get_ability_hash(ability1, "Mage")
+    ability1 = Ability(name="Slash", steps=[], owner=warrior)
+    ability2 = Ability(name="Shoot", steps=[], owner=warrior)
+    ability3 = Ability(name="Slash", steps=[], owner=mage)
+
+    hash1 = ability1.get_hash()
+    hash2 = ability2.get_hash()
+    hash3 = ability3.get_hash()
 
     assert isinstance(hash1, float)
     assert hash1 != hash2
     assert hash1 != hash3
-    assert hash1 == get_ability_hash(ability1, "Warrior")  # Deterministic
+    assert hash1 == ability1.get_hash()  # Deterministic
 
 
 def test_generate_plausible_actions():

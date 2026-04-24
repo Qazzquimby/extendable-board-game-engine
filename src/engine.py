@@ -38,8 +38,16 @@ class AbilityStep:
 class Ability:
     name: str
     steps: List[AbilityStep]
-    owner_entity: "Entity"  # todo should be given reference to owner
+    owner: Optional["Entity"] = None
     is_default: bool = False
+
+    def get_hash(self) -> float:
+        import hashlib
+        owner_set = self.owner.set if self.owner else "unknown"
+        owner_name = self.owner.name if self.owner else "unknown"
+        key = f"{owner_set}__{owner_name}__{self.name}"
+        hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
+        return float(hash_int % 10000) / 100.0
 
 
 # ==========================================
@@ -201,6 +209,12 @@ class Entity:
             "standard_actions": self.standard_actions,
             "free_actions": self.free_actions,
         }
+
+    def get_hash(self) -> float:
+        import hashlib
+        key = f"{self.set}__{self.name}"
+        hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
+        return float(hash_int % 10000) / 100.0
 
     # --- Engine Query Helpers ---
     def has_armor(self) -> bool:

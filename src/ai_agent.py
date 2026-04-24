@@ -100,35 +100,18 @@ class AIPolicyValueNet(nn.Module):
         return policy_scores_tensor, value
 
 
-def _get_hash(key) -> float:
-    hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
-    return float(hash_int % 10000) / 100.0
-
-
-# todo should be entity.hash()
-def get_entity_hash(set_name: str, entity_name: str) -> float:
-    key = f"{set_name}__{entity_name}"
-    return _get_hash(key)
-
-
-# todo should be ability.hash()
-def get_ability_hash(set_name: str, entity_name: str, ability_name: str) -> float:
-    key = f"{set_name}__{entity_name}__{ability_name}"
-    return _get_hash(key)
-
-
 def encode_state(engine: Engine) -> torch.Tensor:
     features = []
     for i in range(10):
         if i < len(engine.entities):
-            e = engine.entities[i]
+            entity = engine.entities[i]
             features.extend(
                 [
-                    float(e.pos[0]),
-                    float(e.pos[1]),
-                    float(e.hp),
-                    float(e.team),
-                    get_entity_hash(set_name=e.set, entity_name=e.name),
+                    float(entity.pos[0]),
+                    float(entity.pos[1]),
+                    float(entity.hp),
+                    float(entity.team),
+                    entity.get_hash(),
                 ]
             )
         else:
@@ -137,13 +120,7 @@ def encode_state(engine: Engine) -> torch.Tensor:
 
 
 def encode_plausible_action(plausible_action: PlausibleAction) -> torch.Tensor:
-    ability_id = (
-        get_ability_hash(  # todo should just be plausible_action.ability.get_hash()
-            set_name=plausible_action.ability.owner_entity.set,
-            entity_name=plausible_action.ability.owner_entity.name,
-            ability_name=plausible_action.ability.name,
-        )
-    )
+    ability_id = plausible_action.ability.get_hash()
     features = [
         float(plausible_action.move_pos[0]),
         float(plausible_action.move_pos[1]),
@@ -176,55 +153,54 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
         for enemy in enemies:
             target_x, target_y = enemy.pos
 
-            proposed_moves = []
+            if not reachable_points:
+                continue
 
-            # Heuristic 1: As close as possible to enemy (adjacent)
-            # todo no you dundering oaf, as close as possible means as close as *possible*. Given your move speed and pathing options. All of these should be respective of your ability to move.
-            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-                proposed_moves.append((target_x + dx, target_y + dy))
+            # todo replace points with point object that supports add and subtract operator
 
-            # Heuristic 2: As far as possible from enemy while being in range
-            proposed_moves.extend(
-                [
-                    (target_x + attack_range, target_y),
-                    (target_x - attack_range, target_y),
-                    (target_x, target_y + attack_range),
-                    (target_x, target_y - attack_range),
-                ]
+            # As close as possible to enemy, prefer walking shorter distance
+            best_close_to_enemy = min(
+                reachable_points,
+                key=lambda point: (
+                    (abs(point[0] - target_x) + abs(point[1] - target_y)) * 100
+                    + abs(point[0] - actor.pos[0])
+                    + abs(point[1] - actor.pos[1])
+                ),
             )
 
-            # Heuristic 3: As close to enemy as possible while being between ally and enemy
+            # Closest to attack_range
+            best_close_to_attack_range = min(
+                reachable_points,
+                key=lambda point: abs(
+                    abs(point[0] - target_x) + abs(point[1] - target_y) - attack_range
+                ),
+            )
+
+            proposed_moves = [best_close_to_enemy, best_close_to_attack_range]
+
+            # As close to enemy as possible while being between ally and enemy
             for ally in allies:
-                best_pos = None
-                best_dist = float("inf")
                 ally_dist_to_enemy = abs(ally.pos[0] - target_x) + abs(
                     ally.pos[1] - target_y
                 )
 
-                for rp in reachable_points:
-                    dist_ally_to_rp = abs(ally.pos[0] - rp[0]) + abs(
-                        ally.pos[1] - rp[1]
+                def betweenness_score(point):
+                    dist_ally_to_p = abs(ally.pos[0] - point[0]) + abs(
+                        ally.pos[1] - point[1]
                     )
-                    dist_rp_to_enemy = abs(rp[0] - target_x) + abs(rp[1] - target_y)
+                    dist_p_to_enemy = abs(point[0] - target_x) + abs(
+                        point[1] - target_y
+                    )
+                    detour = (dist_ally_to_p + dist_p_to_enemy) - ally_dist_to_enemy
+                    return detour * 10 + dist_p_to_enemy
 
-                    # Check if point is roughly between ally and enemy
-                    if dist_ally_to_rp + dist_rp_to_enemy <= ally_dist_to_enemy + 2:
-                        if dist_rp_to_enemy < best_dist:
-                            best_dist = dist_rp_to_enemy
-                            best_pos = rp
+                best_guard_ally = min(reachable_points, key=betweenness_score)
+                proposed_moves.append(best_guard_ally)
 
-                if best_pos:
-                    proposed_moves.append(best_pos)
-
-            # Deduplicate and filter by reachable points #todo you're not filtering by reachable points, each list is the reachable point that best meets the criteria.
+            proposed_moves.append(actor.pos)
             unique_moves = list(set(proposed_moves))
-            valid_moves = [m for m in unique_moves if m in reachable_points]
 
-            # Always allow staying in place if it's valid
-            if actor.pos not in valid_moves and actor.pos in reachable_points:
-                valid_moves.append(actor.pos)
-
-            for move in valid_moves:
+            for move in unique_moves:
                 actions.append(
                     PlausibleAction(move_pos=move, target=enemy, ability=ability)
                 )
