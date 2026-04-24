@@ -27,6 +27,18 @@ class Action:
     target: Optional["Entity"] = None
 
 
+@dataclass
+class AbilityStep:
+    attack_range: int = 1
+
+
+@dataclass
+class Ability:
+    name: str
+    steps: List[AbilityStep]
+    is_default: bool = False
+
+
 # ==========================================
 # ROUTER & SUBSCRIPTIONS
 # ==========================================
@@ -134,6 +146,7 @@ class Entity:
         self.pos = pos
         self.team = team
         self.modifiers: List["Modifier"] = []
+        self.abilities: List["Ability"] = []
         self.engine.add_entity(self)
 
     # --- Engine Query Helpers ---
