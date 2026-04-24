@@ -38,7 +38,7 @@ class AbilityStep:
 class Ability:
     name: str
     steps: List[AbilityStep]
-    owner_entity: "Entity"
+    owner_entity: "Entity"  # todo should be given reference to owner
     is_default: bool = False
 
 

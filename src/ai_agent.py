@@ -105,11 +105,13 @@ def _get_hash(key) -> float:
     return float(hash_int % 10000) / 100.0
 
 
+# todo should be entity.hash()
 def get_entity_hash(set_name: str, entity_name: str) -> float:
     key = f"{set_name}__{entity_name}"
     return _get_hash(key)
 
 
+# todo should be ability.hash()
 def get_ability_hash(set_name: str, entity_name: str, ability_name: str) -> float:
     key = f"{set_name}__{entity_name}__{ability_name}"
     return _get_hash(key)
@@ -135,10 +137,12 @@ def encode_state(engine: Engine) -> torch.Tensor:
 
 
 def encode_plausible_action(plausible_action: PlausibleAction) -> torch.Tensor:
-    ability_id = get_ability_hash(
-        set_name=plausible_action.ability.owner_entity.set,
-        entity_name=plausible_action.ability.owner_entity.name,
-        ability_name=plausible_action.ability.name,
+    ability_id = (
+        get_ability_hash(  # todo should just be plausible_action.ability.get_hash()
+            set_name=plausible_action.ability.owner_entity.set,
+            entity_name=plausible_action.ability.owner_entity.name,
+            ability_name=plausible_action.ability.name,
+        )
     )
     features = [
         float(plausible_action.move_pos[0]),
