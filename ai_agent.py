@@ -22,7 +22,6 @@ class GameStateEncoder(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(10 * 4, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim)
         )
-        # todo handle like other project with table to transformer
 
     def forward(self, state_tensor: torch.Tensor) -> torch.Tensor:
         return self.net(state_tensor)
@@ -88,9 +87,14 @@ def encode_state(engine: Engine) -> torch.Tensor:
     return torch.tensor(features, dtype=torch.float32)
 
 
+# todo this shouldnt be using plausibleaction, it should be using Ability.
+#  record a mapping of set_name__unit_name__ability_name -> hash.
+#  Heroes should similarly have set_name__unit_name --> hash
+# Current set name is development
 def encode_action(action: PlausibleAction) -> torch.Tensor:
     # Stub ability ID based on name length
     # TODO: Implement proper ability embedding instead of name length stub
+    #
     ability_id = float(len(action.ability.name))
     features = [
         float(action.move_pos[0]),
@@ -110,8 +114,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
         attack_range = ability.steps[0].attack_range if ability.steps else 1
 
         for enemy in enemies:
-            # todo replace
-            # Propose moving to spaces exactly 'attack_range' away orthogonally
+            # todo replace entirely
             # TODO: Generate move destinations based on heuristics:
             # - As close as possible to [enemy]
             # - As close as possible to [enemy] while being [ally] and [that enemy]
