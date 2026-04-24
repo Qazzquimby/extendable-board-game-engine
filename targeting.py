@@ -1,4 +1,4 @@
-from typing import Tuple, Set, List, Iterator
+from typing import Tuple, Set, List, Iterator, Callable, Optional
 from grid import Grid
 
 Point = Tuple[int, int]
@@ -11,11 +11,10 @@ class Area:
 
 
 class Burst(Area):
-    def __init__(self, radius: int, range_limit: int = 0):
+    def __init__(self, radius: int, range_limit: int = 0, condition: Optional[Callable[[Set[Point]], bool]] = None):
         self.radius = radius
         self.range_limit = range_limit
-        # todo rather than using range_limit want to be able to define more detailed conditional logic.
-        #  'that includes you', in line 3, including any ally, etc. Too fragile to assume this way.
+        self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         # If range_limit is 0, it's centered on the start point
@@ -26,13 +25,16 @@ class Burst(Area):
         )
 
         for center in centers:
-            yield grid.get_points_in_range(center, self.radius)
+            selection = grid.get_points_in_range(center, self.radius)
+            if self.condition is None or self.condition(selection):
+                yield selection
 
 
 class Square(Area):
-    def __init__(self, side_length: int, in_range: int = 0):
+    def __init__(self, side_length: int, in_range: int = 0, condition: Optional[Callable[[Set[Point]], bool]] = None):
         self.side_length = side_length
         self.in_range = in_range
+        self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
@@ -61,7 +63,8 @@ class Square(Area):
                         frozen_points = frozenset(points)
                         if frozen_points not in seen_squares:
                             seen_squares.add(frozen_points)
-                            yield points
+                            if self.condition is None or self.condition(points):
+                                yield points
 
 
 def get_line(grid: Grid, start: Point, target: Point, length: int) -> List[Point]:

@@ -24,6 +24,17 @@ def test_burst_area():
     assert len(burst_radius_0) == 1
 
 
+def test_burst_with_condition():
+    grid = Grid(width=10, height=10)
+    # Burst 1 in range 2, but must include (5, 7)
+    condition = lambda area: (5, 7) in area
+    selections = list(Burst(radius=1, range_limit=2, condition=condition).get_selections(grid, (5, 5)))
+    
+    assert len(selections) > 0
+    for sel in selections:
+        assert (5, 7) in sel
+
+
 def test_burst_with_range():
     grid = Grid(width=10, height=10)
     # Burst 1 in range 2
