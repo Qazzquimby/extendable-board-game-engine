@@ -1,6 +1,8 @@
+import random
+import copy
 from enum import Enum, auto
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Type, Any
+from typing import Callable, List, Optional, Type, Any, Dict
 
 from mod_value import ModValue
 
@@ -128,15 +130,42 @@ def query(event_type: Type, target_self: bool = True) -> Callable:
 
 
 class Engine:
-    def __init__(self) -> None:
+    def __init__(self, seed: int = 42) -> None:
         self.router = Router()
         self.entities: List["Entity"] = []
-        # TODO: Implement Turn Management (Rounds, Turns, Sequence of Play)
-        # TODO: Implement State Serialization (deep copy, JSON/dict export)
-        # TODO: Centralize and seed RNG for determinism
+        self.rng = random.Random(seed)
+        self.round_num: int = 1
+        self.current_team: int = 1
+        self.active_entity: Optional["Entity"] = None
 
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
+
+    def next_turn(self) -> None:
+        if not self.entities:
+            return
+        if self.active_entity is None:
+            self.active_entity = self.entities[0]
+        else:
+            idx = self.entities.index(self.active_entity)
+            if idx + 1 < len(self.entities):
+                self.active_entity = self.entities[idx + 1]
+            else:
+                self.active_entity = self.entities[0]
+                self.round_num += 1
+        self.current_team = self.active_entity.team
+        self.active_entity.start_turn()
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "round_num": self.round_num,
+            "current_team": self.current_team,
+            "active_entity": self.active_entity.name if self.active_entity else None,
+            "entities": [e.to_dict() for e in self.entities],
+        }
+
+    def clone(self) -> "Engine":
+        return copy.deepcopy(self)
 
 
 class Entity:
@@ -150,8 +179,26 @@ class Entity:
         self.team = team
         self.modifiers: List["Modifier"] = []
         self.abilities: List["Ability"] = []
-        # TODO: Track available actions per turn (Move Action, Standard Action, Free Actions)
+        self.move_actions: int = 0
+        self.standard_actions: int = 0
+        self.free_actions: int = 0
         self.engine.add_entity(self)
+
+    def start_turn(self) -> None:
+        self.move_actions = 1
+        self.standard_actions = 1
+        self.free_actions = 99  # Arbitrary large number
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "hp": self.hp,
+            "pos": self.pos,
+            "team": self.team,
+            "move_actions": self.move_actions,
+            "standard_actions": self.standard_actions,
+            "free_actions": self.free_actions,
+        }
 
     # --- Engine Query Helpers ---
     def has_armor(self) -> bool:

@@ -171,3 +171,69 @@ def test_modvalue_irreducible():
     mod.is_irreducible = True
     # Irreducible ignores the -2 and the resistance
     assert mod.value == 4
+
+
+def test_engine_turn_management():
+    engine = Engine()
+    e1 = Entity(engine, "Hero1", hp=10, pos=(0, 0), team=1)
+    e2 = Entity(engine, "Hero2", hp=10, pos=(1, 1), team=2)
+
+    assert engine.round_num == 1
+    assert engine.active_entity is None
+
+    # First turn
+    engine.next_turn()
+    assert engine.active_entity == e1
+    assert engine.current_team == 1
+    assert e1.move_actions == 1
+    assert e1.standard_actions == 1
+
+    # Second turn
+    engine.next_turn()
+    assert engine.active_entity == e2
+    assert engine.current_team == 2
+
+    # Next round
+    engine.next_turn()
+    assert engine.active_entity == e1
+    assert engine.round_num == 2
+
+
+def test_engine_serialization():
+    engine = Engine()
+    e1 = Entity(engine, "Hero1", hp=10, pos=(0, 0), team=1)
+    engine.next_turn()
+
+    state = engine.to_dict()
+    assert state["round_num"] == 1
+    assert state["current_team"] == 1
+    assert state["active_entity"] == "Hero1"
+    assert len(state["entities"]) == 1
+    
+    e1_state = state["entities"][0]
+    assert e1_state["name"] == "Hero1"
+    assert e1_state["hp"] == 10
+    assert e1_state["pos"] == (0, 0)
+    assert e1_state["move_actions"] == 1
+
+
+def test_engine_clone():
+    engine = Engine()
+    e1 = Entity(engine, "Hero1", hp=10, pos=(0, 0), team=1)
+    engine.next_turn()
+
+    cloned_engine = engine.clone()
+    assert cloned_engine is not engine
+    assert len(cloned_engine.entities) == 1
+    assert cloned_engine.entities[0] is not e1
+    assert cloned_engine.entities[0].name == "Hero1"
+    assert cloned_engine.active_entity == cloned_engine.entities[0]
+
+
+def test_engine_rng_seed():
+    engine1 = Engine(seed=42)
+    engine2 = Engine(seed=42)
+    engine3 = Engine(seed=99)
+
+    assert engine1.rng.random() == engine2.rng.random()
+    assert engine1.rng.random() != engine3.rng.random()

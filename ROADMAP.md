@@ -2,8 +2,6 @@
 
 *All features must be tested and type hinted.*
 
-- **Turn Management:** Implement the sequence of play (Rounds, Turns, Move/Standard/Free Actions, Tapping/Untapping).
-
 - **Action Space Definition:** Create a discrete, enumerable action space for player agents.
 Add 'plausible action' generation for AI, enumerating reasonable movements+action targetings given the hero and ability's constraints.
 Combinations of move destination and ability targets. Move destination takes from
