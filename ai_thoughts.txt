@@ -1,0 +1,21 @@
+Want a rule based hero ai that can improve from tuning and understand context somewhat.
+
+
+
+For a human-run board game, system is to use AI cards drawn and reshuffled, with cards for different abilities. Cards have logic like "Move 3 toward and attack nearest enemy. Else move between nearest ally and their nearest enemy."
+
+This kind of simples rules for mindless ability use unfortunately prevents a lot of interesting synergy and counters.
+For example, when to use a 1/game reflect defense normally depends on what options the opponent still has, so it can be saved for a powerful ability. Which character should receive a speed buff?
+
+Options
+
+- Manually write if else logic. Can improve it over time and use simulation to find the best.
+    - Can also use something like genetic algorithms and simulation to find improvements
+
+- Units, abilities, etc get encoded (embedding plus attributes through linears).
+On a heroes turn, generate a list of plausible moves (similar to the ability cards above) and run ability embedding concat summed target embeddings through a model to calculate goodness.
+Kind of a dominion value network.
+This could also do MCTS if it's efficient and has needed hidden info handling.
+What to train off of? Whether the game eventually lead to a win is very weak signal. Could do a full alphazero.
+Could train value prediction and train it to prefer abilities that improve value prediction.
+Could also just try them all and take the one that improves value pred most but that'd be slower at runtime.
