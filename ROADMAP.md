@@ -1,7 +1,10 @@
 # Development Roadmap
 
-All features must be tested and type hinted.
+*All features must be tested and type hinted.*
 
+- **Turn Management:** Implement the sequence of play (Rounds, Turns, Move/Standard/Free Actions, Tapping/Untapping).
+
+- **Action Space Definition:** Create a discrete, enumerable action space for player agents.
 Add 'plausible action' generation for AI, enumerating reasonable movements+action targetings given the hero and ability's constraints.
 Combinations of move destination and ability targets. Move destination takes from
 - As close as possible to [enemy]
@@ -10,7 +13,10 @@ Combinations of move destination and ability targets. Move destination takes fro
 - As far as possible from [enemy] while being in range of current ability
 Each for all targets and deduplicated. There's a PlausibleAction for each destination+distinct set of ability targets.
 Some abilities don't have targets or have multiple/an area effect. Sometimes a character can't move. Move speed is limited.
+PlausibleActions are an AI aide. Naturally they're composed of smaller effects. A PlausibleAction could potentially be interrupted, in which case a new PlausibleAction would be calculated from the new state.
 
+- **State Serialization:** Implement deep copying and JSON/dict export of the full game state (entities, positions, modifiers, hp).
+- **Event Logging:** Build a history/replay system that logs all events and state changes for debugging and training analysis.
 Save game logs in an interpretable state which can be later visualized.
 
 Produce a log visualizer. Aim to stick loosely to these dependencies
@@ -70,23 +76,5 @@ Produce a log visualizer. Aim to stick loosely to these dependencies
     "react-window": "^2.2.7",
     "recharts": "^3.6.0"
 
-- **Event System Enhancements:** Add support for replacement events, deterministic ability ordering, and conditional modifiers.
-- **Turn Management:** Implement the sequence of play (Rounds, Turns, Move/Standard/Free Actions, Tapping/Untapping).
-
-## Phase 2: Observability & State Management (AlphaZero Prep)
-- **State Serialization:** Implement deep copying and JSON/dict export of the full game state (entities, positions, modifiers, hp).
-- **Action Space Definition:** Create a discrete, enumerable action space for RL agents (e.g., Move(x,y), UseAbility(id, target_x, target_y)).
 - **Determinism & RNG:** Centralize and seed all random number generation (attack rolls, crits) to ensure reproducible rollouts.
-- **Event Logging:** Build a history/replay system that logs all events and state changes for debugging and training analysis.
-
-## Phase 3: AlphaZero Integration
-- **Environment Wrapper:** Create an OpenAI Gym or PettingZoo compatible interface for the engine.
-- **Heuristic Bots:** Develop simple rule-based bots (like the Axe bot in `sample_heroes.yaml`) for baseline testing and sanity checks.
-- **MCTS & Neural Net:** Implement Monte Carlo Tree Search and a neural network architecture for state evaluation and policy prediction.
-- **Self-Play Loop:** Build the self-play data generation and training pipeline.
-
-## Phase 4: Godot Playability
-- **API / Binding Layer:** Expose the Python engine to Godot (via WebSockets, REST, or GDExtension/Python bindings).
-- **Visual Event Queue:** Modify the engine's router to yield animation-friendly events (e.g., `DamageEvent` triggers a visual hit reaction before state updates).
-- **UI Translation:** Map Godot UI interactions (clicks, drags) to Engine `Action` objects.
-- **State Synchronization:** Ensure the Godot client can perfectly reconstruct the visual board from the engine's serialized state.
+- **Event System Enhancements:** Add support for replacement events, deterministic ability ordering, and conditional modifiers.
