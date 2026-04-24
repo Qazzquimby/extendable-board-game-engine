@@ -21,6 +21,7 @@ def run_game():
     agent = AIAgent()
     logs = []
 
+    # TODO: Replace this simple loop with proper Sequence of Play (Rounds, Turns, Actions)
     for turn in range(50):  # Max 50 turns to prevent infinite loops
         for actor in engine.entities:
             if actor.hp <= 0:
@@ -44,6 +45,7 @@ def run_game():
                     chosen_action = actions[chosen_idx]
 
             # Execute action (stub implementation)
+            # TODO: Replace stub execution with proper Engine event system (MoveAction, StandardAction)
             actor.pos = chosen_action.move_pos
             if chosen_action.ability.name != "Do Nothing":
                 DamageEvent(engine, actor, chosen_action.target, 2).resolve()

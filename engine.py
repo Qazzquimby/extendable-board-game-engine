@@ -131,6 +131,9 @@ class Engine:
     def __init__(self) -> None:
         self.router = Router()
         self.entities: List["Entity"] = []
+        # TODO: Implement Turn Management (Rounds, Turns, Sequence of Play)
+        # TODO: Implement State Serialization (deep copy, JSON/dict export)
+        # TODO: Centralize and seed RNG for determinism
 
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
@@ -147,6 +150,7 @@ class Entity:
         self.team = team
         self.modifiers: List["Modifier"] = []
         self.abilities: List["Ability"] = []
+        # TODO: Track available actions per turn (Move Action, Standard Action, Free Actions)
         self.engine.add_entity(self)
 
     # --- Engine Query Helpers ---
@@ -304,13 +308,3 @@ class Taunted(Modifier):
     @query(QueryCanMove)
     def prevent_move(self, q):
         q.result = False
-
-
-# todo
-# heroes with legal actions
-# grid movement
-# vision
-# ability ordering
-# replacement events
-# conditional modifiers and ordering
-# godot UI

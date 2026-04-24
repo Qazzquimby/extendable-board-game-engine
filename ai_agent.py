@@ -18,6 +18,7 @@ class GameStateEncoder(nn.Module):
     def __init__(self, hidden_dim: int = 64):
         super().__init__()
         # Simple flat encoding: [x, y, hp, team] per entity. Max 10 entities for stub.
+        # TODO: Replace flat encoding with Transformer architecture (Gamestate -> Transformer -> Encoded Context Vector)
         self.net = nn.Sequential(
             nn.Linear(10 * 4, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, hidden_dim)
         )
@@ -89,6 +90,7 @@ def encode_state(engine: Engine) -> torch.Tensor:
 
 def encode_action(action: PlausibleAction) -> torch.Tensor:
     # Stub ability ID based on name length
+    # TODO: Implement proper ability embedding instead of name length stub
     ability_id = float(len(action.ability.name))
     features = [
         float(action.move_pos[0]),
@@ -110,6 +112,11 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
         for enemy in enemies:
             # todo replace
             # Propose moving to spaces exactly 'attack_range' away orthogonally
+            # TODO: Generate move destinations based on heuristics:
+            # - As close as possible to [enemy]
+            # - As close as possible to [enemy] while being [ally] and [that enemy]
+            # - As close as possible to [objective]
+            # - As far as possible from [enemy] while being in range of current ability
             target_x, target_y = enemy.pos
             proposed_moves = [
                 (target_x + attack_range, target_y),
