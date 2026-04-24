@@ -108,6 +108,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
         attack_range = ability.steps[0].attack_range if ability.steps else 1
 
         for enemy in enemies:
+            # todo replace
             # Propose moving to spaces exactly 'attack_range' away orthogonally
             target_x, target_y = enemy.pos
             proposed_moves = [
