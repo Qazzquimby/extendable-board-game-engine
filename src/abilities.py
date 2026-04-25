@@ -38,8 +38,7 @@ class TargetArea(Targeting):
     """Targets an area on the grid."""
 
     area: "Area"
-    range_to_center: int = 0
-    # todo See grid.py for areas. There is no area that needs a 'center'
+    range: int = 0
 
 
 # ==========================================

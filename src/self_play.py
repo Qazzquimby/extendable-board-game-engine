@@ -1,27 +1,33 @@
 import random
+from typing import List, Type
+
 import torch
-from engine import Engine, DamageEvent
+
+from engine import Engine, Entity
+from grid import Grid
 from heroes import MeleeHero, RangedHero
 from ai_agent import (
     AIAgent,
     encode_state,
-    encode_plausible_action,
-    generate_plausible_actions,
 )
+from point import Point
 
 
 def run_game():
-    engine = Engine()
+    engine = Engine(grid=Grid(20, 20))
 
     # Randomize teams slightly
-    team_0_classes = [random.choice([MeleeHero, RangedHero]) for _ in range(2)]
-    team_1_classes = [random.choice([MeleeHero, RangedHero]) for _ in range(2)]
+    team_0_classes: List[Type[Entity]] = [
+        random.choice([MeleeHero, RangedHero]) for _ in range(2)
+    ]
+    team_1_classes: List[Type[Entity]] = [
+        random.choice([MeleeHero, RangedHero]) for _ in range(2)
+    ]
 
-    team_0_classes[0](engine, "H1", 10, (0, 0), 0)
-    team_0_classes[1](engine, "H2", 10, (0, 1), 0)
-
-    team_1_classes[0](engine, "H3", 10, (9, 9), 1)
-    team_1_classes[1](engine, "H4", 10, (9, 8), 1)
+    team_0_classes[0](engine=engine, name="H1", hp=10, speed=3, pos=Point(0, 0), team=0)
+    team_0_classes[1](engine=engine, name="H2", hp=10, speed=3, pos=Point(0, 1), team=0)
+    team_1_classes[0](engine=engine, name="H3", hp=10, speed=3, pos=Point(9, 9), team=1)
+    team_1_classes[1](engine=engine, name="H4", hp=10, speed=3, pos=Point(9, 8), team=1)
 
     agent = AIAgent()
     logs = []
@@ -33,53 +39,41 @@ def run_game():
             engine.next_turn()
             continue
 
-        state_tensor = encode_state(engine)
-        actions = generate_plausible_actions(actor, engine)
-        if not actions:
-            engine.next_turn()
-            continue
+        chosen_action = agent.select_action(actor=actor, engine=engine)
 
-            action_tensors = [encode_plausible_action(a) for a in actions]
+        # Execute action (stub implementation)
+        actor.pos = chosen_action.move_pos
+        # todo actually perform the ability
 
-            with torch.no_grad():
-                policy_scores, _ = agent.net(state_tensor, action_tensors)
-                temperature = 1.0
-                probs = torch.softmax(policy_scores / temperature, dim=0)
-                chosen_idx = torch.multinomial(probs, 1).item()
-                chosen_action = actions[chosen_idx]
+        # Check win condition
+        team_0_alive = any(e.hp > 0 for e in engine.entities if e.team == 0)
+        team_1_alive = any(e.hp > 0 for e in engine.entities if e.team == 1)
+        done = not (team_0_alive and team_1_alive)
 
-            # Execute action (stub implementation)
-            actor.pos = chosen_action.move_pos
-            # todo perform the ability
+        reward = 0.0
+        if done:
+            if team_0_alive:
+                reward = 1.0 if actor.team == 0 else -1.0
+            elif team_1_alive:
+                reward = 1.0 if actor.team == 1 else -1.0
 
-            # Check win condition
-            team_0_alive = any(e.hp > 0 for e in engine.entities if e.team == 0)
-            team_1_alive = any(e.hp > 0 for e in engine.entities if e.team == 1)
-            done = not (team_0_alive and team_1_alive)
-
-            reward = 0.0
-            if done:
-                if team_0_alive:
-                    reward = 1.0 if actor.team == 0 else -1.0
-                elif team_1_alive:
-                    reward = 1.0 if actor.team == 1 else -1.0
-
-            next_state_tensor = encode_state(engine)
-            logs.append(
-                (
-                    state_tensor,
-                    action_tensors,
-                    chosen_idx,
-                    next_state_tensor,
-                    reward,
-                    done,
-                )
+        next_state_tensor = encode_state(engine)
+        # todo, no, we want interpretable logs for playback. Should be saved to json files, not pt
+        logs.append(
+            (
+                state_tensor,
+                action_tensors,
+                chosen_idx,
+                next_state_tensor,
+                reward,
+                done,
             )
+        )
 
-            if done:
-                break
+        if done:
+            break
 
-            engine.next_turn()
+        engine.next_turn()
 
     return logs
 

@@ -5,7 +5,8 @@ from ai_agent import (
     generate_plausible_actions,
     PlausibleAction,
 )
-from engine import Engine, Entity, Ability, AbilityStep
+from abilities import Ability, TargetUnit
+from engine import Engine, Entity
 from grid import Grid
 from point import Point
 
@@ -24,32 +25,12 @@ def test_game_state_encoder_transformer():
     assert output_batch.shape == (5, 32)
 
 
-def test_ability_hashing():
-    engine = Engine()
-    warrior = Entity(
-        engine=engine, name="Warrior", hp=10, speed=3, pos=Point(0, 0), team=1
-    )
-    mage = Entity(engine=engine, name="Mage", hp=10, speed=3, pos=Point(1, 1), team=1)
-
-    ability1 = Ability(name="Slash", steps=[], owner=warrior)
-    ability2 = Ability(name="Shoot", steps=[], owner=warrior)
-    ability3 = Ability(name="Slash", steps=[], owner=mage)
-
-    hash1 = ability1.get_hash()
-    hash2 = ability2.get_hash()
-    hash3 = ability3.get_hash()
-
-    assert isinstance(hash1, float)
-    assert hash1 != hash2
-    assert hash1 != hash3
-    assert hash1 == ability1.get_hash()  # Deterministic
-
 
 def test_generate_plausible_actions():
     engine = Engine(grid=Grid(100, 100))
 
     actor = Entity(engine, "Hero1", hp=10, speed=3, pos=Point(0, 0), team=1)
-    actor.abilities.append(Ability(name="Strike", steps=[AbilityStep(attack_range=2)]))
+    actor.abilities.append(Ability(name="Strike", targeting=TargetUnit(range=2)))
 
     enemy = Entity(engine, "Enemy1", hp=10, speed=3, pos=Point(5, 5), team=2)
     ally = Entity(engine, "Ally1", hp=10, speed=3, pos=Point(2, 2), team=1)

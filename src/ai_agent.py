@@ -143,7 +143,12 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     )
 
     for ability in actor.abilities:
-        pass  # todo get all combinations of possible included targets within range or area. All target either with range or area or self, etc.
+        # todo always include a universal 'pass' action which can be done after any movement.
+
+        # todo get all combinations of possible included targets within range or area.
+        #  All target either with range or area or self, etc.
+        #  Use subclass method, not this getattr.
+        attack_range = getattr(ability.targeting, "range", 0)
 
         for enemy in enemies:
 
@@ -189,6 +194,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                     PlausibleAction(move_pos=move, target=enemy, ability=ability)
                 )
 
+    assert actions  # given pass action there should be no way to not have at least one option
     return actions
 
 
@@ -197,18 +203,23 @@ class AIAgent:
         self.net = AIPolicyValueNet()
         self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
 
-    def select_action(self, actor: Entity, engine: Engine) -> Optional[PlausibleAction]:
+    def select_action(
+        self, actor: Entity, engine: Engine, temperature=1.0
+    ) -> PlausibleAction:
         actions = generate_plausible_actions(actor, engine)
-        if not actions:
-            return None
 
         state_tensor = encode_state(engine)
         action_tensors = [encode_plausible_action(a, actor.name) for a in actions]
 
-        policy_scores, _ = self.net(state_tensor, action_tensors)
+        with torch.no_grad():
+            policy_scores, _ = self.net(state_tensor, action_tensors)
+            if temperature <= 0:
+                chosen_index = torch.argmax(policy_scores).item()
+            else:
+                probs = torch.softmax(policy_scores / temperature, dim=0)
+                chosen_index = torch.multinomial(probs, 1).item()
 
-        best_idx = torch.argmax(policy_scores).item()
-        return actions[best_idx]
+        return actions[chosen_index]
 
     def train_step(
         self,
