@@ -26,16 +26,18 @@ def run_game():
     agent = AIAgent()
     logs = []
 
-    # TODO: Replace this simple loop with proper Sequence of Play (Rounds, Turns, Actions)
-    for turn in range(50):  # Max 50 turns to prevent infinite loops
-        for actor in engine.entities:
-            if actor.hp <= 0:
-                continue
+    engine.next_turn()
+    while engine.round_num < 50:
+        actor = engine.active_entity
+        if actor.hp <= 0:
+            engine.next_turn()
+            continue
 
-            state_tensor = encode_state(engine)
-            actions = generate_plausible_actions(actor, engine)
-            if not actions:
-                continue
+        state_tensor = encode_state(engine)
+        actions = generate_plausible_actions(actor, engine)
+        if not actions:
+            engine.next_turn()
+            continue
 
             action_tensors = [encode_plausible_action(a) for a in actions]
 
@@ -47,10 +49,8 @@ def run_game():
                 chosen_action = actions[chosen_idx]
 
             # Execute action (stub implementation)
-            # TODO: Replace stub execution with proper Engine event system (MoveAction, StandardAction)
             actor.pos = chosen_action.move_pos
-            if chosen_action.ability.name != "Do Nothing":
-                DamageEvent(engine, actor, chosen_action.target, 2).resolve()
+            # todo perform the ability
 
             # Check win condition
             team_0_alive = any(e.hp > 0 for e in engine.entities if e.team == 0)
@@ -78,8 +78,8 @@ def run_game():
 
             if done:
                 break
-        if done:
-            break
+
+            engine.next_turn()
 
     return logs
 
