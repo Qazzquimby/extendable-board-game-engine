@@ -1,11 +1,11 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from engine import Engine, Entity
-from abilities import Ability
+from abilities import Ability, TargetArea, TargetSelf, TargetUnit
 from point import Point
 
 
@@ -142,59 +142,74 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
         actor.pos, actor.speed, occupied_points
     )
 
+    # todo, no. Get all the possible movements, and from each you get all the possible action-targetings. You can move towards one enemy and shoot another. Not all abilities even target enemies.
     for ability in actor.abilities:
-        # todo always include a universal 'pass' action which can be done after any movement.
+        if isinstance(ability.targeting, (TargetUnit, TargetArea)):
+            attack_range = ability.targeting.range
+            for enemy in enemies:
+                # As close as possible to enemy, prefer walking shorter distance
+                best_close_to_enemy = min(
+                    reachable_points,
+                    key=lambda point: (
+                        point.get_distance(enemy.pos) * 100
+                        + point.get_distance(actor.pos)
+                    ),
+                )
 
-        # todo get all combinations of possible included targets within range or area.
-        #  All target either with range or area or self, etc.
-        #  Use subclass method, not this getattr.
-        attack_range = getattr(ability.targeting, "range", 0)
+                # Closest to attack_range
+                best_close_to_attack_range = min(
+                    reachable_points,
+                    key=lambda point: abs(point.get_distance(enemy.pos) - attack_range)
+                    * 100
+                    + point.get_distance(actor.pos),
+                )
 
-        for enemy in enemies:
+                proposed_moves = [best_close_to_enemy, best_close_to_attack_range]
 
-            if not reachable_points:
-                continue
+                # As close to enemy as possible while being between ally and enemy
+                for ally in allies:
+                    ally_dist_to_enemy = ally.pos.get_distance(enemy.pos)
 
-            # As close as possible to enemy, prefer walking shorter distance
-            best_close_to_enemy = min(
-                reachable_points,
-                key=lambda point: (
-                    point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos)
-                ),
-            )
+                    def betweenness_score(point: Point):
+                        distance_to_ally = point.get_distance(ally.pos)
+                        distance_to_enemy = point.get_distance(enemy.pos)
+                        detour = (
+                            distance_to_ally + distance_to_enemy
+                        ) - ally_dist_to_enemy
+                        return detour * 10 + distance_to_enemy
 
-            # Closest to attack_range
-            best_close_to_attack_range = min(
-                reachable_points,
-                key=lambda point: abs(point.get_distance(enemy.pos) - attack_range)
-                * 100
-                + point.get_distance(actor.pos),
-            )
+                    best_guard_ally = min(reachable_points, key=betweenness_score)
+                    proposed_moves.append(best_guard_ally)
 
-            proposed_moves = [best_close_to_enemy, best_close_to_attack_range]
+                proposed_moves.append(actor.pos)
+                unique_moves = list(set(proposed_moves))
 
-            # As close to enemy as possible while being between ally and enemy
-            for ally in allies:
-                ally_dist_to_enemy = ally.pos.get_distance(enemy.pos)
+                for move in unique_moves:
+                    actions.append(
+                        PlausibleAction(move_pos=move, target=enemy, ability=ability)
+                    )
+        elif isinstance(ability.targeting, TargetSelf):
+            # For self-targeting, there's no specific enemy to move towards.
+            # A simple heuristic: stay put. And maybe move towards nearest enemy.
+            unique_moves = {actor.pos}
+            if enemies:
+                nearest_enemy = min(
+                    enemies, key=lambda e: actor.pos.get_distance(e.pos)
+                )
 
-                def betweenness_score(point: Point):
-                    distance_to_ally = point.get_distance(ally.pos)
-                    distance_to_enemy = point.get_distance(enemy.pos)
-                    detour = (distance_to_ally + distance_to_enemy) - ally_dist_to_enemy
-                    return detour * 10 + distance_to_enemy
-
-                best_guard_ally = min(reachable_points, key=betweenness_score)
-                proposed_moves.append(best_guard_ally)
-
-            proposed_moves.append(actor.pos)
-            unique_moves = list(set(proposed_moves))
+                best_move = min(
+                    reachable_points,
+                    key=lambda p: p.get_distance(nearest_enemy.pos) * 100
+                    + p.get_distance(actor.pos),
+                )
+                unique_moves.add(best_move)
 
             for move in unique_moves:
                 actions.append(
-                    PlausibleAction(move_pos=move, target=enemy, ability=ability)
+                    PlausibleAction(move_pos=move, target=actor, ability=ability)
                 )
 
-    assert actions  # given pass action there should be no way to not have at least one option
+    assert actions
     return actions
 
 
@@ -204,12 +219,17 @@ class AIAgent:
         self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
 
     def select_action(
-        self, actor: Entity, engine: Engine, temperature=1.0
-    ) -> PlausibleAction:
-        actions = generate_plausible_actions(actor, engine)
+        self,
+        actor: Entity,
+        engine: Engine,
+        plausible_actions: List[PlausibleAction],
+        temperature=1.0,
+    ) -> Tuple[PlausibleAction, int]:
+        if not plausible_actions:
+            raise ValueError("Cannot select an action from an empty list.")
 
         state_tensor = encode_state(engine)
-        action_tensors = [encode_plausible_action(a, actor.name) for a in actions]
+        action_tensors = [encode_plausible_action(a) for a in plausible_actions]
 
         with torch.no_grad():
             policy_scores, _ = self.net(state_tensor, action_tensors)
@@ -219,7 +239,7 @@ class AIAgent:
                 probs = torch.softmax(policy_scores / temperature, dim=0)
                 chosen_index = torch.multinomial(probs, 1).item()
 
-        return actions[chosen_index]
+        return plausible_actions[chosen_index], chosen_index
 
     def train_step(
         self,

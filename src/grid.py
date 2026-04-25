@@ -77,7 +77,9 @@ class Grid:
 
         return {point for point, _ in visited.keys()}
 
-    def get_movable_spaces(self, start: Point, max_movement: int, occupied_points: Set[Point]) -> Set[Point]:
+    def get_movable_spaces(
+        self, start: Point, max_movement: int, occupied_points: Set[Point]
+    ) -> Set[Point]:
         """Finds all points reachable within max_movement using orthogonal steps, respecting walls and occupied spaces."""
         if max_movement < 0:
             return set()
@@ -95,12 +97,16 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if n not in occupied_points and not self.is_movement_blocked(curr, n):
+                    if n not in occupied_points and not self.is_movement_blocked(
+                        curr, n
+                    ):
                         if n not in visited or visited[n] > cost + 1:
                             visited[n] = cost + 1
                             queue.append((n, cost + 1))
 
-        return set(visited.keys())
+        reachable_points = set(visited.keys())
+        assert reachable_points  # should always at least include starting space
+        return reachable_points
 
     def is_movement_blocked(self, current: Point, next_pos: Point) -> bool:
         """Checks if movement between two adjacent spaces is blocked."""
