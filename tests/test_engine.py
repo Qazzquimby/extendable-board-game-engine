@@ -12,12 +12,13 @@ from engine import (
     Taunted,
 )
 from mod_value import ModValue
+from point import Point
 
 
 def test_marksmanship_conditional_irreducible():
     engine = Engine()
-    drow = Entity(engine, "Drow", hp=8, pos=(0, 0), team=1)
-    axe = Entity(engine, "Axe", hp=10, pos=(0, 4), team=2)  # Range 4
+    drow = Entity(engine, "Drow", hp=8, speed=3, pos=Point(0, 0), team=1)
+    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 4), team=2)  # Range 4
     axe.add_modifier(InnateArmor())
     drow.add_modifier(Marksmanship())
 
@@ -30,11 +31,11 @@ def test_marksmanship_conditional_irreducible():
 
 def test_marksmanship_disabled_by_adjacent_enemy():
     engine = Engine()
-    drow = Entity(engine, "Drow", hp=8, pos=(0, 0), team=1)
+    drow = Entity(engine, "Drow", hp=8, speed=3, pos=Point(0, 0), team=1)
     flanker = Entity(
-        engine, "Flanker", hp=5, pos=(0, 1), team=2
+        engine, "Flanker", hp=5, speed=3, pos=Point(0, 1), team=2
     )  # Range 1, adjacent enemy
-    axe = Entity(engine, "Axe", hp=10, pos=(0, 4), team=2)
+    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 4), team=2)
 
     axe.add_modifier(InnateArmor())
     drow.add_modifier(Marksmanship())
@@ -47,7 +48,7 @@ def test_marksmanship_disabled_by_adjacent_enemy():
 
 def test_shallow_grave_multipliers_and_caps():
     engine = Engine()
-    dazzle = Entity(engine, "Dazzle", hp=5, pos=(0, 0), team=1)
+    dazzle = Entity(engine, "Dazzle", hp=5, speed=3, pos=Point(0, 0), team=1)
     dazzle.add_modifier(ShallowGrave())
 
     # Heal for 2 -> +50% multiplier -> 3
@@ -61,8 +62,8 @@ def test_shallow_grave_multipliers_and_caps():
 
 def test_taunted_legal_actions_override():
     engine = Engine()
-    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=1)
-    enemy = Entity(engine, "Enemy", hp=5, pos=(1, 0), team=2)
+    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 0), team=1)
+    enemy = Entity(engine, "Enemy", hp=5, speed=3, pos=Point(1, 0), team=2)
 
     # Before taunt: can move and attack
     actions = enemy.get_legal_actions()
@@ -81,8 +82,8 @@ def test_taunted_legal_actions_override():
 
 def test_armor_and_damage():
     engine = Engine()
-    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=1)
-    enemy = Entity(engine, "Enemy", hp=10, pos=(1, 0), team=2)
+    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 0), team=1)
+    enemy = Entity(engine, "Enemy", hp=10, speed=3, pos=Point(1, 0), team=2)
 
     axe.add_modifier(InnateArmor())
 
@@ -93,7 +94,7 @@ def test_armor_and_damage():
 
 def test_shallow_grave_cap():
     engine = Engine()
-    dazzle = Entity(engine, "Dazzle", hp=8, pos=(0, 0), team=2)
+    dazzle = Entity(engine, "Dazzle", hp=8, speed=3, pos=Point(0, 0), team=2)
 
     dazzle.add_modifier(ShallowGrave())
 
@@ -106,9 +107,11 @@ def test_shallow_grave_cap():
 
 def test_paladin_aura_affects_others():
     engine = Engine()
-    reinhardt = Entity(engine, "Reinhardt", hp=12, pos=(0, 0), team=1)
-    ally = Entity(engine, "Ally", hp=5, pos=(0, 1), team=1)  # Distance 1
-    far_ally = Entity(engine, "FarAlly", hp=5, pos=(0, 3), team=1)  # Distance 3
+    reinhardt = Entity(engine, "Reinhardt", hp=12, speed=3, pos=Point(0, 0), team=1)
+    ally = Entity(engine, "Ally", hp=5, speed=3, pos=Point(0, 1), team=1)  # Distance 1
+    far_ally = Entity(
+        engine, "FarAlly", hp=5, speed=3, pos=Point(0, 3), team=1
+    )  # Distance 3
 
     reinhardt.add_modifier(PaladinAura())
 
@@ -123,8 +126,8 @@ def test_paladin_aura_affects_others():
 
 def test_taunted_dataclass():
     engine = Engine()
-    axe = Entity(engine, "Axe", hp=10, pos=(0, 0), team=2)
-    enemy = Entity(engine, "Enemy", hp=5, pos=(1, 0), team=1)
+    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 0), team=2)
+    enemy = Entity(engine, "Enemy", hp=5, speed=3, pos=Point(1, 0), team=1)
 
     # Apply taunt using dataclass initialization
     enemy.add_modifier(Taunted(taunter=axe))
@@ -175,8 +178,8 @@ def test_modvalue_irreducible():
 
 def test_engine_turn_management():
     engine = Engine()
-    e1 = Entity(engine, "Hero1", hp=10, pos=(0, 0), team=1)
-    e2 = Entity(engine, "Hero2", hp=10, pos=(1, 1), team=2)
+    e1 = Entity(engine, "Hero1", hp=10, speed=3, pos=Point(0, 0), team=1)
+    e2 = Entity(engine, "Hero2", hp=10, speed=3, pos=Point(1, 1), team=2)
 
     assert engine.round_num == 1
     assert engine.active_entity is None
@@ -201,7 +204,7 @@ def test_engine_turn_management():
 
 def test_engine_serialization():
     engine = Engine()
-    e1 = Entity(engine, "Hero1", hp=10, pos=(0, 0), team=1)
+    e1 = Entity(engine, "Hero1", hp=10, speed=3, pos=Point(0, 0), team=1)
     engine.next_turn()
 
     state = engine.to_dict()
@@ -209,7 +212,7 @@ def test_engine_serialization():
     assert state["current_team"] == 1
     assert state["active_entity"] == "Hero1"
     assert len(state["entities"]) == 1
-    
+
     e1_state = state["entities"][0]
     assert e1_state["name"] == "Hero1"
     assert e1_state["hp"] == 10
@@ -219,7 +222,7 @@ def test_engine_serialization():
 
 def test_engine_clone():
     engine = Engine()
-    e1 = Entity(engine, "Hero1", hp=10, pos=(0, 0), team=1)
+    e1 = Entity(engine, "Hero1", hp=10, speed=3, pos=Point(0, 0), team=1)
     engine.next_turn()
 
     cloned_engine = engine.clone()

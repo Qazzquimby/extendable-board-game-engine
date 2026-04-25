@@ -10,7 +10,12 @@ class Area:
 
 
 class Burst(Area):
-    def __init__(self, radius: int, range_limit: int = 0, condition: Optional[Callable[[Set[Point]], bool]] = None):
+    def __init__(
+        self,
+        radius: int,
+        range_limit: int = 0,
+        condition: Optional[Callable[[Set[Point]], bool]] = None,
+    ):
         self.radius = radius
         self.range_limit = range_limit
         self.condition = condition
@@ -30,7 +35,12 @@ class Burst(Area):
 
 
 class Square(Area):
-    def __init__(self, side_length: int, in_range: int = 0, condition: Optional[Callable[[Set[Point]], bool]] = None):
+    def __init__(
+        self,
+        side_length: int,
+        in_range: int = 0,
+        condition: Optional[Callable[[Set[Point]], bool]] = None,
+    ):
         self.side_length = side_length
         self.in_range = in_range
         self.condition = condition
@@ -44,19 +54,19 @@ class Square(Area):
 
         seen_squares = set()
 
-        for start_x, start_y in valid_starts:
-            for leftmost in range(start_x - self.side_length + 1, start_x + 1):
-                for topmost in range(start_y - self.side_length + 1, start_y + 1):
+        for start in valid_starts:
+            for leftmost in range(start.x - self.side_length + 1, start.x + 1):
+                for topmost in range(start.y - self.side_length + 1, start.y + 1):
                     points = set()
                     for offset_x in range(self.side_length):
                         for offset_y in range(self.side_length):
-                            cell_x, cell_y = leftmost + offset_x, topmost + offset_y
-                            if 0 <= cell_x < grid.width and 0 <= cell_y < grid.height:
+                            cell = Point(leftmost + offset_x, topmost + offset_y)
+                            if 0 <= cell.x < grid.width and 0 <= cell.y < grid.height:
                                 # Check if there's a valid path to the square's points (respecting walls)
-                                if (cell_x, cell_y) in grid.get_points_in_range(
-                                    (start_x, start_y), self.side_length
+                                if cell in grid.get_points_in_range(
+                                    start, self.side_length
                                 ):
-                                    points.add((cell_x, cell_y))
+                                    points.add(cell)
 
                     if points:
                         frozen_points = frozenset(points)
