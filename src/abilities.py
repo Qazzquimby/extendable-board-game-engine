@@ -1,55 +1,98 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from engine import Entity, Engine
+    from engine import Entity
+    from point import Point
+    from targeting import Area
+
+
+# ==========================================
+# TARGETING
+# ==========================================
 
 
 @dataclass
-class AbilityStep:
+class Targeting:
+    """Base class for how an ability finds its targets."""
+
+    pass
+
+
+@dataclass
+class TargetSelf(Targeting):
+    """Targets the ability's owner."""
+
+    pass
+
+
+@dataclass
+class TargetUnit(Targeting):
+    """Targets a single unit within a given range."""
+
+    range: int
+
+
+@dataclass
+class TargetArea(Targeting):
+    """Targets an area on the grid."""
+
+    area: "Area"
+    range_to_center: int = 0
+    # todo See grid.py for areas. There is no area that needs a 'center'
+
+
+# ==========================================
+# EFFECTS
+# ==========================================
+
+
+@dataclass
+class Effect:
     """Base class for all ability effects."""
 
     pass
 
 
-# todo, what, you're saying every step will choose its own target? Every step has a range and picks someone?
-#  Please find a reasonable implementation for scripting abilities such that the abilities in the sample characters can be faithfully written.
-
-
 @dataclass
-class DamageStep(AbilityStep):
+class DamageEffect(Effect):
     amount: int
-    attack_range: int = 1
     undefendable: bool = False
     irreducible: bool = False
 
 
 @dataclass
-class HealStep(AbilityStep):
+class HealEffect(Effect):
     amount: int
-    range: int = 1
 
 
 @dataclass
-class MoveStep(AbilityStep):
+class MoveEffect(Effect):
     distance: int
 
 
 @dataclass
-class ApplyModifierStep(AbilityStep):
+class ApplyModifierEffect(Effect):
     modifier_class: type
-    range: int = 1
+
+
+# ==========================================
+# ABILITY
+# ==========================================
 
 
 @dataclass
 class Ability:
     name: str
-    steps: List[AbilityStep] = field(default_factory=list)
+    targeting: Targeting
+    effects: List[Effect] = field(default_factory=list)
     owner: Optional["Entity"] = None
     is_default: bool = False
     cost_standard_action: bool = True
     cost_move_action: bool = False
-    target: Optional["Entity"] = None
+    target: Optional[Union["Entity", "Point"]] = (
+        None  # For pre-determined targets like with Taunt
+    )
 
     def get_hash(self) -> float:
         import hashlib

@@ -11,6 +11,7 @@ from engine import (
 )
 from mod_value import ModValue
 from point import Point
+from heroes import MeleeHero
 
 
 def test_marksmanship_conditional_irreducible():
@@ -61,20 +62,23 @@ def test_shallow_grave_multipliers_and_caps():
 def test_taunted_legal_actions_override():
     engine = Engine()
     axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 0), team=1)
-    enemy = Entity(engine, "Enemy", hp=5, speed=3, pos=Point(1, 0), team=2)
+    enemy = MeleeHero(engine, "Enemy", hp=5, pos=Point(1, 0), team=2)
 
-    # Before taunt: can move and attack
+    # Before taunt: can move, has 2 abilities
+    assert enemy.can_move() is True
     actions = enemy.get_legal_actions()
     assert len(actions) == 2
-    assert any(a.name == "Basic Move" for a in actions)
+    assert any(a.name == "Melee Attack" for a in actions)
+    assert any(a.name == "Do Nothing" for a in actions)
 
     # Apply Taunt
     enemy.add_modifier(Taunted(taunter=axe))
 
-    # After taunt: Only 1 legal action (Attack Axe)
+    # After taunt: Only 1 legal action (default attack on Axe), cannot move
+    assert enemy.can_move() is False
     actions = enemy.get_legal_actions()
     assert len(actions) == 1
-    assert actions[0].name == "Default Attack"
+    assert actions[0].name == "Melee Attack"
     assert actions[0].target == axe
 
 

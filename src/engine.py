@@ -7,7 +7,7 @@ from typing import Callable, List, Optional, Type, Any, Dict
 from grid import Grid
 from mod_value import ModValue
 from point import Point
-from abilities import Ability, MoveStep, DamageStep
+from abilities import Ability
 
 # ==========================================
 # ENUMS & TYPES
@@ -211,19 +211,9 @@ class Entity:
         return False
 
     def get_legal_actions(self) -> List[Ability]:
-        # Default behavior: Can move, can attack
-        default_actions = [
-            Ability(
-                name="Basic Move", steps=[MoveStep(distance=self.speed)], owner=self
-            ),
-            Ability(
-                name="Default Attack",
-                steps=[DamageStep(amount=2, attack_range=1)],
-                owner=self,
-                is_default=True,
-            ),
-        ]  # todo do not stub like this. Everyone has basic move, but there is no universal default attack. Subclass has abilities.
-        q = QueryLegalActions(self, result=default_actions)
+        # Returns all abilities the entity has. Modifiers can alter this list.
+        # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.
+        q = QueryLegalActions(self, result=list(self.abilities))
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
@@ -352,15 +342,17 @@ class Taunted(Modifier):
 
     @query(QueryLegalActions)
     def force_attack(self, q: QueryLegalActions) -> None:
-        # Overrides the default result entirely
-        q.result = [  # No, it forces them to use an ability tagged with default. There is no "Default Attack".
-            Ability(
-                name="Default Attack",
-                target=self.taunter,
-                owner=self.owner,
-                is_default=True,
-            )
-        ]
+        # Overrides the result to only allow default abilities targeting the taunter.
+        forced_actions = []
+        for ability in self.owner.abilities:
+            if ability.is_default:
+                # Create a copy to not modify the base ability
+                import copy
+
+                action = copy.deepcopy(ability)
+                action.target = self.taunter
+                forced_actions.append(action)
+        q.result = forced_actions
 
     @query(QueryCanMove)
     def prevent_move(self, q):
