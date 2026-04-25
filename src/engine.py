@@ -4,7 +4,9 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Type, Any, Dict
 
+from grid import Grid
 from mod_value import ModValue
+from point import Point
 
 # ==========================================
 # ENUMS & TYPES
@@ -43,6 +45,7 @@ class Ability:
 
     def get_hash(self) -> float:
         import hashlib
+
         owner_set = self.owner.set if self.owner else "unknown"
         owner_name = self.owner.name if self.owner else "unknown"
         key = f"{owner_set}__{owner_name}__{self.name}"
@@ -139,12 +142,13 @@ def query(event_type: Type, target_self: bool = True) -> Callable:
 
 
 class Engine:
-    def __init__(self, seed: int = 42) -> None:
+    def __init__(self, seed: int = 42, grid: Grid = None) -> None:
         self.router = Router()
         self.entities: List["Entity"] = []
         self.rng = random.Random(seed)
         self.round_num: int = 1
         self.current_team: int = 1
+        self.grid: Grid = grid
         self.active_entity: Optional["Entity"] = None
 
     def add_entity(self, entity: "Entity") -> None:
@@ -179,16 +183,21 @@ class Engine:
 
 class Entity:
     def __init__(
-        self, engine: Engine, name: str, hp: int, pos: tuple[int, int], team: int
+        self, engine: Engine, name: str, hp: int, speed: int, pos: Point, team: int
     ):
         self.engine = engine
         self.set = "development"
         self.name = name
+
         self.hp = hp
-        self.pos = pos
+        self.speed = speed
+
+        self.pos: Point = pos
         self.team = team
+
         self.modifiers: List["Modifier"] = []
         self.abilities: List["Ability"] = []
+
         self.move_actions: int = 0
         self.standard_actions: int = 0
         self.free_actions: int = 0
@@ -212,6 +221,7 @@ class Entity:
 
     def get_hash(self) -> float:
         import hashlib
+
         key = f"{self.set}__{self.name}"
         hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
         return float(hash_int % 10000) / 100.0

@@ -1,15 +1,15 @@
+from typing import List, Tuple, Optional
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import hashlib
-from typing import List, Tuple, Optional
 
 from engine import Engine, Entity, Ability
-from heroes import MeleeHero, RangedHero
+from point import Point
 
 
 class PlausibleAction:
-    def __init__(self, move_pos: Tuple[int, int], target: Entity, ability: Ability):
+    def __init__(self, move_pos: Point, target: Entity, ability: Ability):
         self.move_pos = move_pos
         self.target = target
         self.ability = ability
@@ -136,63 +136,44 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     enemies = [e for e in engine.entities if e.team != actor.team]
     allies = [e for e in engine.entities if e.team == actor.team and e != actor]
 
-    speed = getattr(actor, "speed", 3)
-    if hasattr(engine, "grid") and engine.grid is not None:
-        reachable_points = engine.grid.get_points_in_range(actor.pos, speed)
-    else:
-        # Fallback if grid is not available
-        reachable_points = set()
-        for dx in range(-speed, speed + 1):
-            for dy in range(-speed, speed + 1):
-                if abs(dx) + abs(dy) <= speed:
-                    reachable_points.add((actor.pos[0] + dx, actor.pos[1] + dy))
+    # todo moving is not the same as seeing. Want entity.get_movable_spaces. Obviously people can walk over corners. May be affected by terrain.
+    reachable_points = engine.grid.get_points_in_range(actor.pos, actor.speed)
 
     for ability in actor.abilities:
         attack_range = ability.steps[0].attack_range if ability.steps else 1
 
         for enemy in enemies:
-            target_x, target_y = enemy.pos
 
             if not reachable_points:
                 continue
-
-            # todo replace points with point object that supports add and subtract operator
 
             # As close as possible to enemy, prefer walking shorter distance
             best_close_to_enemy = min(
                 reachable_points,
                 key=lambda point: (
-                    (abs(point[0] - target_x) + abs(point[1] - target_y)) * 100
-                    + abs(point[0] - actor.pos[0])
-                    + abs(point[1] - actor.pos[1])
+                    point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos)
                 ),
             )
 
             # Closest to attack_range
             best_close_to_attack_range = min(
                 reachable_points,
-                key=lambda point: abs(
-                    abs(point[0] - target_x) + abs(point[1] - target_y) - attack_range
-                ),
+                key=lambda point: abs(point.get_distance(enemy.pos) - attack_range)
+                * 100
+                + point.get_distance(actor.pos),
             )
 
             proposed_moves = [best_close_to_enemy, best_close_to_attack_range]
 
             # As close to enemy as possible while being between ally and enemy
             for ally in allies:
-                ally_dist_to_enemy = abs(ally.pos[0] - target_x) + abs(
-                    ally.pos[1] - target_y
-                )
+                ally_dist_to_enemy = ally.pos.get_distance(enemy.pos)
 
-                def betweenness_score(point):
-                    dist_ally_to_p = abs(ally.pos[0] - point[0]) + abs(
-                        ally.pos[1] - point[1]
-                    )
-                    dist_p_to_enemy = abs(point[0] - target_x) + abs(
-                        point[1] - target_y
-                    )
-                    detour = (dist_ally_to_p + dist_p_to_enemy) - ally_dist_to_enemy
-                    return detour * 10 + dist_p_to_enemy
+                def betweenness_score(point: Point):
+                    distance_to_ally = point.get_distance(ally.pos)
+                    distance_to_enemy = point.get_distance(enemy.pos)
+                    detour = (distance_to_ally + distance_to_enemy) - ally_dist_to_enemy
+                    return detour * 10 + distance_to_enemy
 
                 best_guard_ally = min(reachable_points, key=betweenness_score)
                 proposed_moves.append(best_guard_ally)

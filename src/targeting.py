@@ -1,7 +1,6 @@
 from typing import Tuple, Set, List, Iterator, Callable, Optional
 from grid import Grid
-
-Point = Tuple[int, int]
+from point import Point
 
 
 class Area:
