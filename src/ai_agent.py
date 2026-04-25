@@ -137,7 +137,12 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     allies = [e for e in engine.entities if e.team == actor.team and e != actor]
 
     # todo moving is not the same as seeing. Want entity.get_movable_spaces. Obviously people can walk over corners. May be affected by terrain.
-    reachable_points = engine.grid.get_points_in_range(actor.pos, actor.speed)
+    occupied_points = {e.pos for e in engine.entities if e != actor}
+    reachable_points = {
+        p
+        for p in engine.grid.get_points_in_range(actor.pos, actor.speed)
+        if p not in occupied_points
+    }
 
     for ability in actor.abilities:
         attack_range = ability.steps[0].attack_range if ability.steps else 1

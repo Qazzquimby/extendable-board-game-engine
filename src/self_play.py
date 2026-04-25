@@ -39,15 +39,12 @@ def run_game():
 
             action_tensors = [encode_plausible_action(a) for a in actions]
 
-            # todo replace this with temperature selection of scored actions
-            if random.random() < 0.2:
-                chosen_idx = random.randint(0, len(actions) - 1)
+            with torch.no_grad():
+                policy_scores, _ = agent.net(state_tensor, action_tensors)
+                temperature = 1.0
+                probs = torch.softmax(policy_scores / temperature, dim=0)
+                chosen_idx = torch.multinomial(probs, 1).item()
                 chosen_action = actions[chosen_idx]
-            else:
-                with torch.no_grad():
-                    policy_scores, _ = agent.net(state_tensor, action_tensors)
-                    chosen_idx = torch.argmax(policy_scores).item()
-                    chosen_action = actions[chosen_idx]
 
             # Execute action (stub implementation)
             # TODO: Replace stub execution with proper Engine event system (MoveAction, StandardAction)
