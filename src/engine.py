@@ -7,6 +7,7 @@ from typing import Callable, List, Optional, Type, Any, Dict
 from grid import Grid
 from mod_value import ModValue
 from point import Point
+from abilities import Ability, MoveStep, DamageStep
 
 # ==========================================
 # ENUMS & TYPES
@@ -17,40 +18,6 @@ class EventPhase(Enum):
     BEFORE = auto()
     AFTER = auto()
     QUERY = auto()
-
-
-class ActionType(Enum):
-    BASIC_MOVE = auto()
-    DEFAULT = auto()
-    NON_DEFAULT = auto()
-
-
-@dataclass
-class Action:
-    action_type: ActionType
-    target: Optional["Entity"] = None
-
-
-@dataclass
-class AbilityStep:
-    attack_range: int = 1
-
-
-@dataclass
-class Ability:
-    name: str
-    steps: List[AbilityStep]
-    owner: Optional["Entity"] = None
-    is_default: bool = False
-
-    def get_hash(self) -> float:
-        import hashlib
-
-        owner_set = self.owner.set if self.owner else "unknown"
-        owner_name = self.owner.name if self.owner else "unknown"
-        key = f"{owner_set}__{owner_name}__{self.name}"
-        hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
-        return float(hash_int % 10000) / 100.0
 
 
 # ==========================================
@@ -243,9 +210,19 @@ class Entity:
                 return True
         return False
 
-    def get_legal_actions(self) -> List[Action]:
+    def get_legal_actions(self) -> List[Ability]:
         # Default behavior: Can move, can attack
-        default_actions = [Action(ActionType.BASIC_MOVE), Action(ActionType.DEFAULT)]
+        default_actions = [
+            Ability(
+                name="Basic Move", steps=[MoveStep(distance=self.speed)], owner=self
+            ),
+            Ability(
+                name="Default Attack",
+                steps=[DamageStep(amount=2, attack_range=1)],
+                owner=self,
+                is_default=True,
+            ),
+        ]  # todo do not stub like this. Everyone has basic move, but there is no universal default attack. Subclass has abilities.
         q = QueryLegalActions(self, result=default_actions)
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
@@ -315,7 +292,7 @@ class QueryHasArmor:
 
 
 class QueryLegalActions:
-    def __init__(self, target: Entity, result: List[Action]):
+    def __init__(self, target: Entity, result: List[Ability]):
         self.target = target
         self.result = result
 
@@ -376,7 +353,14 @@ class Taunted(Modifier):
     @query(QueryLegalActions)
     def force_attack(self, q: QueryLegalActions) -> None:
         # Overrides the default result entirely
-        q.result = [Action(ActionType.DEFAULT, target=self.taunter)]
+        q.result = [  # No, it forces them to use an ability tagged with default. There is no "Default Attack".
+            Ability(
+                name="Default Attack",
+                target=self.taunter,
+                owner=self.owner,
+                is_default=True,
+            )
+        ]
 
     @query(QueryCanMove)
     def prevent_move(self, q):

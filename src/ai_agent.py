@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from engine import Engine, Entity, Ability
+from engine import Engine, Entity
+from abilities import Ability
 from point import Point
 
 
@@ -137,10 +138,12 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     allies = [e for e in engine.entities if e.team == actor.team and e != actor]
 
     occupied_points = {e.pos for e in engine.entities if e != actor}
-    reachable_points = engine.grid.get_movable_spaces(actor.pos, actor.speed, occupied_points)
+    reachable_points = engine.grid.get_movable_spaces(
+        actor.pos, actor.speed, occupied_points
+    )
 
     for ability in actor.abilities:
-        attack_range = ability.steps[0].attack_range if ability.steps else 1
+        pass  # todo get all combinations of possible included targets within range or area. All target either with range or area or self, etc.
 
         for enemy in enemies:
 

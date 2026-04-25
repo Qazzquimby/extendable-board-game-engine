@@ -1,8 +1,6 @@
 from engine import (
     Engine,
     Entity,
-    Action,
-    ActionType,
     DamageEvent,
     HealEvent,
     InnateArmor,
@@ -68,7 +66,7 @@ def test_taunted_legal_actions_override():
     # Before taunt: can move and attack
     actions = enemy.get_legal_actions()
     assert len(actions) == 2
-    assert Action(ActionType.BASIC_MOVE) in actions
+    assert any(a.name == "Basic Move" for a in actions)
 
     # Apply Taunt
     enemy.add_modifier(Taunted(taunter=axe))
@@ -76,7 +74,7 @@ def test_taunted_legal_actions_override():
     # After taunt: Only 1 legal action (Attack Axe)
     actions = enemy.get_legal_actions()
     assert len(actions) == 1
-    assert actions[0].action_type == ActionType.DEFAULT
+    assert actions[0].name == "Default Attack"
     assert actions[0].target == axe
 
 
