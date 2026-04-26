@@ -133,7 +133,6 @@ def encode_plausible_action(plausible_action: PlausibleAction) -> torch.Tensor:
 
 
 def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleAction]:
-    actions = []
     enemies = [e for e in engine.entities if e.team != actor.team]
     allies = [e for e in engine.entities if e.team == actor.team and e != actor]
 
@@ -141,74 +140,97 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     reachable_points = engine.grid.get_movable_spaces(
         actor.pos, actor.speed, occupied_points
     )
+    reachable_points.add(actor.pos)
 
-    # todo, no. Get all the possible movements, and from each you get all the possible action-targetings. You can move towards one enemy and shoot another. Not all abilities even target enemies.
-    for ability in actor.abilities:
-        if isinstance(ability.targeting, (TargetUnit, TargetArea)):
-            attack_range = ability.targeting.range
-            for enemy in enemies:
-                # As close as possible to enemy, prefer walking shorter distance
-                best_close_to_enemy = min(
-                    reachable_points,
-                    key=lambda point: (
-                        point.get_distance(enemy.pos) * 100
-                        + point.get_distance(actor.pos)
-                    ),
-                )
+    # 1. Generate a set of interesting move positions.
+    proposed_moves = {actor.pos}
+    if reachable_points:
+        # For each enemy, find a good position to approach
+        for enemy in enemies:
+            best_close_to_enemy = min(
+                reachable_points,
+                key=lambda point: (
+                    point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos)
+                ),
+            )
+            proposed_moves.add(best_close_to_enemy)
 
-                # Closest to attack_range
-                best_close_to_attack_range = min(
-                    reachable_points,
-                    key=lambda point: abs(point.get_distance(enemy.pos) - attack_range)
-                    * 100
-                    + point.get_distance(actor.pos),
-                )
+            # For each ability that can target units/areas, find a spot at optimal range
+            for ability in actor.abilities:
+                attack_range = 0
+                if isinstance(ability.targeting, TargetUnit):
+                    attack_range = ability.targeting.range
+                elif isinstance(ability.targeting, TargetArea):
+                    if hasattr(ability.targeting.area, "range_limit"):
+                        attack_range = ability.targeting.area.range_limit
+                    elif hasattr(ability.targeting.area, "in_range"):
+                        attack_range = ability.targeting.area.in_range
 
-                proposed_moves = [best_close_to_enemy, best_close_to_attack_range]
-
-                # As close to enemy as possible while being between ally and enemy
-                for ally in allies:
-                    ally_dist_to_enemy = ally.pos.get_distance(enemy.pos)
-
-                    def betweenness_score(point: Point):
-                        distance_to_ally = point.get_distance(ally.pos)
-                        distance_to_enemy = point.get_distance(enemy.pos)
-                        detour = (
-                            distance_to_ally + distance_to_enemy
-                        ) - ally_dist_to_enemy
-                        return detour * 10 + distance_to_enemy
-
-                    best_guard_ally = min(reachable_points, key=betweenness_score)
-                    proposed_moves.append(best_guard_ally)
-
-                proposed_moves.append(actor.pos)
-                unique_moves = list(set(proposed_moves))
-
-                for move in unique_moves:
-                    actions.append(
-                        PlausibleAction(move_pos=move, target=enemy, ability=ability)
+                if attack_range > 0:
+                    best_at_range = min(
+                        reachable_points,
+                        key=lambda point: abs(
+                            point.get_distance(enemy.pos) - attack_range
+                        )
+                        * 100
+                        + point.get_distance(actor.pos),
                     )
-        elif isinstance(ability.targeting, TargetSelf):
-            # For self-targeting, there's no specific enemy to move towards.
-            # A simple heuristic: stay put. And maybe move towards nearest enemy.
-            unique_moves = {actor.pos}
+                    proposed_moves.add(best_at_range)
+
+        # For each ally, find a good position to "guard" them from nearest enemy
+        for ally in allies:
             if enemies:
-                nearest_enemy = min(
-                    enemies, key=lambda e: actor.pos.get_distance(e.pos)
+                nearest_enemy_to_ally = min(
+                    enemies, key=lambda e: ally.pos.get_distance(e.pos)
                 )
+                ally_dist_to_enemy = ally.pos.get_distance(nearest_enemy_to_ally.pos)
 
-                best_move = min(
-                    reachable_points,
-                    key=lambda p: p.get_distance(nearest_enemy.pos) * 100
-                    + p.get_distance(actor.pos),
-                )
-                unique_moves.add(best_move)
+                def betweenness_score(point: Point):
+                    distance_to_ally = point.get_distance(ally.pos)
+                    distance_to_enemy = point.get_distance(nearest_enemy_to_ally.pos)
+                    detour = (distance_to_ally + distance_to_enemy) - ally_dist_to_enemy
+                    return detour * 10 + distance_to_enemy
 
-            for move in unique_moves:
-                actions.append(
-                    PlausibleAction(move_pos=move, target=actor, ability=ability)
-                )
+                best_guard_ally = min(reachable_points, key=betweenness_score)
+                proposed_moves.add(best_guard_ally)
 
+    # 2. For each move position, find all possible actions
+    actions_map = {}  # Use dict to store unique actions
+    for move_pos in proposed_moves:
+        for ability in actor.abilities:
+            if isinstance(ability.targeting, TargetUnit):
+                attack_range = ability.targeting.range
+                # Target anyone in range. Could be friend or foe.
+                for target in engine.entities:
+                    if target == actor:
+                        continue
+                    if move_pos.get_distance(target.pos) <= attack_range:
+                        key = (move_pos, target.pos, ability.get_hash())
+                        if key not in actions_map:
+                            actions_map[key] = PlausibleAction(
+                                move_pos=move_pos, target=target, ability=ability
+                            )
+            elif isinstance(ability.targeting, TargetArea):
+                attack_range = 0
+                attack_range = ability.targeting.area.range
+
+                # Heuristic: target enemies
+                for target in enemies:
+                    if move_pos.get_distance(target.pos) <= attack_range:
+                        key = (move_pos, target.pos, ability.get_hash())
+                        if key not in actions_map:
+                            actions_map[key] = PlausibleAction(
+                                move_pos=move_pos, target=target, ability=ability
+                            )
+            elif isinstance(ability.targeting, TargetSelf):
+                target = actor
+                key = (move_pos, target.pos, ability.get_hash())
+                if key not in actions_map:
+                    actions_map[key] = PlausibleAction(
+                        move_pos=move_pos, target=target, ability=ability
+                    )
+
+    actions = list(actions_map.values())
     assert actions
     return actions
 
