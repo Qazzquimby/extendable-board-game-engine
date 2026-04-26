@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, TYPE_CHECKING
 from jaxtyping import Float
 
 import torch
@@ -19,38 +19,32 @@ class PlausibleAction:
 
 
 class GameStateEncoder(nn.Module):
-    def __init__(self, hidden_dim: int = 64, num_heads: int = 4, num_layers: int = 2):
+    def __init__(self, emb_size: int = 64, num_heads: int = 4, num_layers: int = 4):
         super().__init__()
-        self.entity_dim = 5  # [x, y, hp, team, entity_hash]
-        self.hidden_dim = hidden_dim
+        self.entity_features_size = 5  # [entity_hash, x, y, hp, team]
+        self.enc_size = emb_size
 
-        self.embedding = nn.Linear(self.entity_dim, hidden_dim)
+        self.entity_linear = nn.Linear(self.entity_features_size, emb_size)
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=hidden_dim, nhead=num_heads, batch_first=True
+            d_model=emb_size, nhead=num_heads, batch_first=True
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-
-        # Pool the sequence into a single context vector
         self.pooling = nn.AdaptiveAvgPool1d(1)
 
-    def forward(self, state_tensor: torch.Tensor) -> torch.Tensor:
-        # state_tensor shape: (batch_size, num_entities * entity_dim) or (num_entities * entity_dim)
-        if state_tensor.dim() == 1:
-            state_tensor = state_tensor.unsqueeze(0)
-
-        batch_size = state_tensor.size(0)
-        # Reshape to (batch_size, num_entities, entity_dim)
-        seq = state_tensor.view(batch_size, -1, self.entity_dim)
-
-        embedded = self.embedding(seq)
-        transformed = self.transformer(embedded)
-
-        # Pool across the sequence dimension (entities)
-        # transformed shape: (batch_size, num_entities, hidden_dim)
-        # transpose for pooling: (batch_size, hidden_dim, num_entities)
-        pooled = self.pooling(transformed.transpose(1, 2)).squeeze(-1)
-        # (batch, hidden_dim)
+    def forward(
+        self, entity_features: Float[Tensor, "batch entities features"]
+    ) -> Float[Tensor, "batch enc"]:
+        entities_encoded: Float[Tensor, "batch entities enc"] = self.entity_linear(
+            entity_features
+        )
+        transformed: Float[Tensor, "batch entities enc"] = self.transformer(
+            entities_encoded
+        )
+        pooled: Float[Tensor, "batch enc"] = self.pooling(transformed)
         return pooled
+
+    if TYPE_CHECKING:
+        __call__ = forward
 
 
 class ActionEncoder(nn.Module):
@@ -63,6 +57,9 @@ class ActionEncoder(nn.Module):
 
     def forward(self, action_tensor: torch.Tensor) -> torch.Tensor:
         return self.net(action_tensor)
+
+    if TYPE_CHECKING:
+        __call__ = forward
 
 
 class AIPolicyValueNet(nn.Module):
@@ -80,13 +77,15 @@ class AIPolicyValueNet(nn.Module):
         )
 
     def forward(
-        self, state_tensor: torch.Tensor, action_tensors: List[torch.Tensor]
+        self,
+        entity_features: Float[Tensor, "batch features"],
+        action_features: Float[Tensor, "batch features"],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        state_emb = self.state_encoder(state_tensor)
+        state_emb = self.state_encoder(entity_features)
         value = self.value_head(state_emb)
 
         policy_scores = []
-        for act_tensor in action_tensors:
+        for act_tensor in action_features:
             act_emb = self.action_encoder(act_tensor)
             combined = torch.cat([state_emb, act_emb], dim=-1)
             score = self.policy_head(combined)
@@ -99,29 +98,34 @@ class AIPolicyValueNet(nn.Module):
 
         return policy_scores_tensor, value
 
+    if TYPE_CHECKING:
+        __call__ = forward
 
-def get_entity_features(engine: Engine) -> Float[Tensor, "batch features"]:
-    features = []
+
+def get_entity_features(engine: Engine) -> Float[Tensor, "batch entities features"]:
+    # right now batch is 1
+    entity_features = []
     for entity in engine.entities:
-        features.append(
+        entity_features.append(
             [
+                entity.get_hash(),
                 float(entity.pos[0]),
                 float(entity.pos[1]),
                 float(entity.hp),
                 float(entity.team),
-                entity.get_hash(),
             ],
         )
-    return torch.tensor(features, dtype=torch.float32).refine_names("batch", "features")
+    return torch.tensor([entity_features], dtype=torch.float32)
 
 
 def get_plausible_action_features(
     plausible_actions: List[PlausibleAction],
-) -> Float[Tensor, "batch features"]:
-    features = []
+) -> Float[Tensor, "batch actions features"]:
+    # right now batch is 1
+    action_features = []
     for plausible_action in plausible_actions:
         ability_id = plausible_action.ability.get_hash()
-        features.append(
+        action_features.append(
             [
                 float(plausible_action.move_pos[0]),
                 float(plausible_action.move_pos[1]),
@@ -130,7 +134,7 @@ def get_plausible_action_features(
                 ability_id,
             ]
         )
-    return torch.tensor(features, dtype=torch.float32).refine_names("batch", "features")
+    return torch.tensor([action_features], dtype=torch.float32)
 
 
 def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleAction]:
@@ -253,16 +257,16 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
 
 class AIAgent:
     def __init__(self):
-        self.net = AIPolicyValueNet()
+        self.net: AIPolicyValueNet = AIPolicyValueNet()
         self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
 
     def select_action(
         self,
-        actor: Entity,  # todo unused
+        actor: Entity,  # todo unused why?
         engine: Engine,
         plausible_actions: List[PlausibleAction],
         temperature=1.0,
-    ) -> Tuple[PlausibleAction, int]:
+    ) -> PlausibleAction:
         entity_features = get_entity_features(engine)
         action_features = get_plausible_action_features(plausible_actions)
 
@@ -273,8 +277,8 @@ class AIAgent:
             else:
                 probs = torch.softmax(policy_scores / temperature, dim=0)
                 chosen_index = torch.multinomial(probs, 1).item()
-
-        return plausible_actions[chosen_index], chosen_index
+        chosen_action = plausible_actions[chosen_index]
+        return chosen_action
 
     def train_step(
         self,

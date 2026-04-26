@@ -12,7 +12,7 @@ from point import Point
 
 
 def test_game_state_encoder_transformer():
-    encoder = GameStateEncoder(hidden_dim=32)
+    encoder = GameStateEncoder(emb_size=32)
     # 10 entities * 5 features = 50
     dummy_state = torch.rand(50)
     output = encoder(dummy_state)

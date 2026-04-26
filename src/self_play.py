@@ -40,7 +40,7 @@ def run_game(agent: AIAgent) -> List[dict]:
 
         before_state_dict = engine.to_dict()
         plausible_actions = generate_plausible_actions(actor, engine)
-        chosen_action, chosen_idx = agent.select_action(
+        chosen_action = agent.select_action(
             actor=actor, engine=engine, plausible_actions=plausible_actions
         )
 
