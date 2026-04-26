@@ -4,8 +4,10 @@ from point import Point
 
 
 class MeleeHero(Entity):
-    def __init__(self, engine: Engine, name: str, hp: int, pos: Point, team: int):
-        super().__init__(engine=engine, name=name, hp=hp, speed=3, pos=pos, team=team)
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(
+            engine=engine, name="Melee Hero", hp=10, speed=3, pos=pos, team=team
+        )
         self.abilities.append(
             Ability(
                 name="Melee Attack",
@@ -21,8 +23,10 @@ class MeleeHero(Entity):
 
 
 class RangedHero(Entity):
-    def __init__(self, engine: Engine, name: str, hp: int, pos: Point, team: int):
-        super().__init__(engine=engine, name=name, hp=hp, speed=3, pos=pos, team=team)
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(
+            engine=engine, name="Ranged Hero", hp=10, speed=3, pos=pos, team=team
+        )
         self.abilities.append(
             Ability(
                 name="Ranged Attack",

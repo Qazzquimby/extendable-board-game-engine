@@ -24,10 +24,10 @@ def run_game(agent: AIAgent) -> List[dict]:
         random.choice([MeleeHero, RangedHero]) for _ in range(2)
     ]
 
-    team_0_classes[0](engine=engine, name="H1", hp=10, speed=3, pos=Point(0, 0), team=0)
-    team_0_classes[1](engine=engine, name="H2", hp=10, speed=3, pos=Point(0, 1), team=0)
-    team_1_classes[0](engine=engine, name="H3", hp=10, speed=3, pos=Point(9, 9), team=1)
-    team_1_classes[1](engine=engine, name="H4", hp=10, speed=3, pos=Point(9, 8), team=1)
+    team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
+    team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
+    team_1_classes[0](engine=engine, pos=Point(9, 9), team=1)
+    team_1_classes[1](engine=engine, pos=Point(9, 8), team=1)
 
     logs = []
 

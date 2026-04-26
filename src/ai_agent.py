@@ -47,10 +47,7 @@ class GameStateEncoder(nn.Module):
         # transformed shape: (batch_size, num_entities, hidden_dim)
         # transpose for pooling: (batch_size, hidden_dim, num_entities)
         pooled = self.pooling(transformed.transpose(1, 2)).squeeze(-1)
-
-        # Return shape: (hidden_dim) if original was 1D, else (batch_size, hidden_dim)
-        if batch_size == 1 and state_tensor.dim() == 1:
-            return pooled.squeeze(0)
+        # (batch, hidden_dim)
         return pooled
 
 
@@ -101,35 +98,37 @@ class AIPolicyValueNet(nn.Module):
         return policy_scores_tensor, value
 
 
-def encode_state(engine: Engine) -> torch.Tensor:
+def get_entity_features(engine: Engine) -> torch.Tensor:
     features = []
-    for i in range(10):
-        if i < len(engine.entities):
-            entity = engine.entities[i]
-            features.extend(
-                [
-                    float(entity.pos[0]),
-                    float(entity.pos[1]),
-                    float(entity.hp),
-                    float(entity.team),
-                    entity.get_hash(),
-                ]
-            )
-        else:
-            features.extend([0.0, 0.0, 0.0, 0.0, 0.0])
-    return torch.tensor(features, dtype=torch.float32)
+    for entity in engine.entities:
+        features.append(
+            [
+                float(entity.pos[0]),
+                float(entity.pos[1]),
+                float(entity.hp),
+                float(entity.team),
+                entity.get_hash(),
+            ],
+        )
+    return torch.tensor(features, dtype=torch.float32).refine_names("batch", "features")
 
 
-def encode_plausible_action(plausible_action: PlausibleAction) -> torch.Tensor:
-    ability_id = plausible_action.ability.get_hash()
-    features = [
-        float(plausible_action.move_pos[0]),
-        float(plausible_action.move_pos[1]),
-        float(plausible_action.target.pos[0]),
-        float(plausible_action.target.pos[1]),
-        ability_id,
-    ]
-    return torch.tensor(features, dtype=torch.float32)
+def get_plausible_action_features(
+    plausible_actions: List[PlausibleAction],
+) -> torch.Tensor:
+    features = []
+    for plausible_action in plausible_actions:
+        ability_id = plausible_action.ability.get_hash()
+        features.append(
+            [
+                float(plausible_action.move_pos[0]),
+                float(plausible_action.move_pos[1]),
+                float(plausible_action.target.pos[0]),
+                float(plausible_action.target.pos[1]),
+                ability_id,
+            ]
+        )
+    return torch.tensor(features, dtype=torch.float32).refine_names("batch", "features")
 
 
 def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleAction]:
@@ -257,19 +256,16 @@ class AIAgent:
 
     def select_action(
         self,
-        actor: Entity,
+        actor: Entity,  # todo unused
         engine: Engine,
         plausible_actions: List[PlausibleAction],
         temperature=1.0,
     ) -> Tuple[PlausibleAction, int]:
-        if not plausible_actions:
-            raise ValueError("Cannot select an action from an empty list.")
-
-        state_tensor = encode_state(engine)
-        action_tensors = [encode_plausible_action(a) for a in plausible_actions]
+        entity_features = get_entity_features(engine)
+        action_tensors = [get_plausible_action_features(a) for a in plausible_actions]
 
         with torch.no_grad():
-            policy_scores, _ = self.net(state_tensor, action_tensors)
+            policy_scores, _ = self.net(entity_features, action_tensors)
             if temperature <= 0:
                 chosen_index = torch.argmax(policy_scores).item()
             else:
