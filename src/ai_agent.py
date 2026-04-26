@@ -1,8 +1,10 @@
 from typing import List, Tuple
+from jaxtyping import Float
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch import Tensor
 
 from engine import Engine, Entity
 from abilities import Ability, TargetArea, TargetSelf, TargetUnit
@@ -98,7 +100,7 @@ class AIPolicyValueNet(nn.Module):
         return policy_scores_tensor, value
 
 
-def get_entity_features(engine: Engine) -> torch.Tensor:
+def get_entity_features(engine: Engine) -> Float[Tensor, "batch features"]:
     features = []
     for entity in engine.entities:
         features.append(
@@ -115,7 +117,7 @@ def get_entity_features(engine: Engine) -> torch.Tensor:
 
 def get_plausible_action_features(
     plausible_actions: List[PlausibleAction],
-) -> torch.Tensor:
+) -> Float[Tensor, "batch features"]:
     features = []
     for plausible_action in plausible_actions:
         ability_id = plausible_action.ability.get_hash()
@@ -262,10 +264,10 @@ class AIAgent:
         temperature=1.0,
     ) -> Tuple[PlausibleAction, int]:
         entity_features = get_entity_features(engine)
-        action_tensors = [get_plausible_action_features(a) for a in plausible_actions]
+        action_features = get_plausible_action_features(plausible_actions)
 
         with torch.no_grad():
-            policy_scores, _ = self.net(entity_features, action_tensors)
+            policy_scores, _ = self.net(entity_features, action_features)
             if temperature <= 0:
                 chosen_index = torch.argmax(policy_scores).item()
             else:

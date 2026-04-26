@@ -1,6 +1,6 @@
 import json
 import random
-from typing import List, Type
+from typing import List, Type, Union
 
 from engine import DamageEvent, Engine, Entity, HealEvent
 from grid import Grid
@@ -17,10 +17,10 @@ def run_game(agent: AIAgent) -> List[dict]:
     engine = Engine(grid=Grid(20, 20))
 
     # Randomize teams slightly
-    team_0_classes: List[Type[Entity]] = [
+    team_0_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
         random.choice([MeleeHero, RangedHero]) for _ in range(2)
     ]
-    team_1_classes: List[Type[Entity]] = [
+    team_1_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
         random.choice([MeleeHero, RangedHero]) for _ in range(2)
     ]
 
@@ -40,10 +40,6 @@ def run_game(agent: AIAgent) -> List[dict]:
 
         before_state_dict = engine.to_dict()
         plausible_actions = generate_plausible_actions(actor, engine)
-        if not plausible_actions:
-            engine.next_turn()
-            continue
-
         chosen_action, chosen_idx = agent.select_action(
             actor=actor, engine=engine, plausible_actions=plausible_actions
         )
@@ -54,21 +50,26 @@ def run_game(agent: AIAgent) -> List[dict]:
         target = chosen_action.target
         for effect in ability.effects:
             if isinstance(effect, DamageEffect):
-                DamageEvent(engine, actor, target, effect.amount).resolve()
+                DamageEvent(
+                    engine=engine, source=actor, target=target, amount=effect.amount
+                ).resolve()
             elif isinstance(effect, HealEffect):
-                HealEvent(engine, target, effect.amount).resolve()
+                HealEvent(engine=engine, target=target, amount=effect.amount).resolve()
 
         # Check win condition
-        team_0_alive = any(e.hp > 0 for e in engine.entities if e.team == 0)
-        team_1_alive = any(e.hp > 0 for e in engine.entities if e.team == 1)
-        done = not (team_0_alive and team_1_alive)
+        time_up = engine.round_num > 6
+        team_0_living_members = [e.hp > 0 for e in engine.entities if e.team == 0]
+        team_1_living_members = [e.hp > 0 for e in engine.entities if e.team == 1]
+        done = time_up or not team_0_living_members or not team_1_living_members
 
         reward = 0.0
         if done:
-            if team_0_alive:
-                reward = 1.0 if actor.team == 0 else -1.0
-            elif team_1_alive:
-                reward = 1.0 if actor.team == 1 else -1.0
+            if len(team_0_living_members) > len(team_1_living_members):
+                reward = 1.0
+            elif len(team_1_living_members) > len(team_0_living_members):
+                reward = -1.0
+            else:
+                reward = 0.0
 
         log_entry = {
             "before_state": before_state_dict,
