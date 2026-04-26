@@ -159,12 +159,9 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
             for ability in actor.abilities:
                 attack_range = 0
                 if isinstance(ability.targeting, TargetUnit):
-                    attack_range = ability.targeting.range
+                    attack_range = ability.targeting.in_range
                 elif isinstance(ability.targeting, TargetArea):
-                    if hasattr(ability.targeting.area, "range_limit"):
-                        attack_range = ability.targeting.area.range_limit
-                    elif hasattr(ability.targeting.area, "in_range"):
-                        attack_range = ability.targeting.area.in_range
+                    attack_range = ability.targeting.area.in_range
 
                 if attack_range > 0:
                     best_at_range = min(
@@ -199,7 +196,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     for move_pos in proposed_moves:
         for ability in actor.abilities:
             if isinstance(ability.targeting, TargetUnit):
-                attack_range = ability.targeting.range
+                attack_range = ability.targeting.in_range
                 # Target anyone in range. Could be friend or foe.
                 for target in engine.entities:
                     if target == actor:
@@ -212,9 +209,9 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                             )
             elif isinstance(ability.targeting, TargetArea):
                 attack_range = 0
-                attack_range = ability.targeting.area.range
+                attack_range = ability.targeting.area.in_range
 
-                # Heuristic: target enemies
+                # todo get all distinct combinations of included units (ally and enemy)
                 for target in enemies:
                     if move_pos.get_distance(target.pos) <= attack_range:
                         key = (move_pos, target.pos, ability.get_hash())

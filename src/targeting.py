@@ -4,6 +4,9 @@ from point import Point
 
 
 class Area:
+    def __init__(self, in_range: int):
+        self.in_range = in_range
+
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         """Yields all possible valid area selections from the start point."""
         raise NotImplementedError
@@ -13,11 +16,12 @@ class Burst(Area):
     def __init__(
         self,
         radius: int,
-        range_limit: int = 0,
+        in_range: int = 0,
         condition: Optional[Callable[[Set[Point]], bool]] = None,
     ):
+        super().__init__(in_range=in_range)
         self.radius = radius
-        self.range_limit = range_limit
+        self.range_limit = in_range
         self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
@@ -41,6 +45,7 @@ class Square(Area):
         in_range: int = 0,
         condition: Optional[Callable[[Set[Point]], bool]] = None,
     ):
+        super().in_range(in_range=in_range)
         self.side_length = side_length
         self.in_range = in_range
         self.condition = condition

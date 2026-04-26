@@ -30,7 +30,7 @@ class TargetSelf(Targeting):
 class TargetUnit(Targeting):
     """Targets a single unit within a given range."""
 
-    range: int
+    in_range: int
 
 
 @dataclass
@@ -38,7 +38,6 @@ class TargetArea(Targeting):
     """Targets an area on the grid."""
 
     area: "Area"
-    range: int = 0
 
 
 # ==========================================

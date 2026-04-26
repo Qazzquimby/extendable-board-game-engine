@@ -9,7 +9,7 @@ class MeleeHero(Entity):
         self.abilities.append(
             Ability(
                 name="Melee Attack",
-                targeting=TargetUnit(range=1),
+                targeting=TargetUnit(in_range=1),
                 effects=[DamageEffect(amount=2)],
                 is_default=True,
                 owner=self,
@@ -26,7 +26,7 @@ class RangedHero(Entity):
         self.abilities.append(
             Ability(
                 name="Ranged Attack",
-                targeting=TargetUnit(range=3),
+                targeting=TargetUnit(in_range=3),
                 effects=[DamageEffect(amount=2)],
                 is_default=True,
                 owner=self,

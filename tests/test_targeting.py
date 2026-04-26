@@ -30,7 +30,7 @@ def test_burst_with_condition():
     # Burst 1 in range 2, but must include (5, 7)
     condition = lambda area: Point(5, 7) in area
     selections = list(
-        Burst(radius=1, range_limit=2, condition=condition).get_selections(
+        Burst(radius=1, in_range=2, condition=condition).get_selections(
             grid, Point(5, 5)
         )
     )
@@ -43,7 +43,7 @@ def test_burst_with_condition():
 def test_burst_with_range():
     grid = Grid(width=10, height=10)
     # Burst 1 in range 2
-    selections = list(Burst(radius=1, range_limit=2).get_selections(grid, Point(5, 5)))
+    selections = list(Burst(radius=1, in_range=2).get_selections(grid, Point(5, 5)))
     # Range 2 from (5,5) includes 13 points (1 center + 9 dist1 + 3*4 dist2)
     assert len(selections) == 21
 
