@@ -208,17 +208,35 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                                 move_pos=move_pos, target=target, ability=ability
                             )
             elif isinstance(ability.targeting, TargetArea):
-                attack_range = 0
-                attack_range = ability.targeting.area.in_range
+                area = ability.targeting.area
+                for area_points in area.get_selections(engine.grid, move_pos):
+                    affected_entities = {
+                        e for e in engine.entities if e.pos in area_points
+                    }
+                    if not affected_entities:
+                        continue
 
-                # todo get all distinct combinations of included units (ally and enemy)
-                for target in enemies:
-                    if move_pos.get_distance(target.pos) <= attack_range:
-                        key = (move_pos, target.pos, ability.get_hash())
-                        if key not in actions_map:
-                            actions_map[key] = PlausibleAction(
-                                move_pos=move_pos, target=target, ability=ability
-                            )
+                    # One action per unique set of affected entities
+                    key = (
+                        move_pos,
+                        frozenset(e.pos for e in affected_entities),
+                        ability.get_hash(),
+                    )
+                    if key not in actions_map:
+                        # Pick a primary target for PlausibleAction: closest to area centroid.
+                        centroid_x = sum(p.x for p in area_points) / len(area_points)
+                        centroid_y = sum(p.y for p in area_points) / len(area_points)
+                        centroid = Point(round(centroid_x), round(centroid_y))
+
+                        primary_target = min(
+                            affected_entities,
+                            key=lambda e: e.pos.get_distance(centroid),
+                        )
+                        actions_map[key] = PlausibleAction(
+                            move_pos=move_pos,
+                            target=primary_target,
+                            ability=ability,
+                        )
             elif isinstance(ability.targeting, TargetSelf):
                 target = actor
                 key = (move_pos, target.pos, ability.get_hash())
