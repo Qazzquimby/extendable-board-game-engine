@@ -1,4 +1,6 @@
 from typing import List, Tuple, TYPE_CHECKING
+
+from einops import einops
 from jaxtyping import Float
 
 import torch
@@ -68,7 +70,7 @@ class ActionEncoder(nn.Module):
         self.ability_embedding = nn.Embedding(ability_vocab_size, hidden_dim)
         # Action encoding: [move_x, move_y, target_x, target_y]
         self.other_features_linear = nn.Linear(4, hidden_dim)
-        self.final_linear = nn.Linear(hidden_dim * 2, hidden_dim)
+        self.final_linear = nn.Linear(hidden_dim, hidden_dim)
 
     def forward(
         self, action_tensor: Float[Tensor, "batch action feature"]
@@ -77,9 +79,11 @@ class ActionEncoder(nn.Module):
         action_other_features = action_tensor[..., 1:]
 
         ability_emb = self.ability_embedding(ability_id)
-        other_emb = self.other_features_linear(action_other_features)
-        combined = torch.cat([ability_emb, other_emb], dim=-1)
-        return self.final_linear(combined)
+        feature_enc = self.other_features_linear(action_other_features)
+        # combined_enc = torch.cat([ability_emb, feature_enc], dim=-1)
+        combined_enc = ability_emb + feature_enc
+        result = self.final_linear(combined_enc)
+        return result
 
     if TYPE_CHECKING:
         __call__ = forward
@@ -113,17 +117,12 @@ class AIPolicyValueNet(nn.Module):
         act_emb: Float[Tensor, "batch actions emb"] = self.action_encoder(
             action_features
         )
-        state_emb_expanded = state_emb.expand(act_emb.shape[0], -1)
+        state_emb_expanded = einops.repeat(
+            state_emb, "batch emb -> batch act emb", act=act_emb.shape[1]
+        )
         combined = torch.cat([state_emb_expanded, act_emb], dim=-1)
-        score = self.policy_head(combined)
-        policy_scores.append(score)
-
-        if policy_scores:
-            policy_scores_tensor = torch.cat(policy_scores)
-        else:
-            policy_scores_tensor = torch.tensor([])
-
-        return policy_scores_tensor, value
+        policy_scores = self.policy_head(combined)
+        return policy_scores, value
 
     if TYPE_CHECKING:
         __call__ = forward
@@ -312,7 +311,7 @@ class AIAgent:
 
     def select_action(
         self,
-        actor: Entity,  # todo unused why?
+        actor: Entity,  # todo unused why? Seems like it should be used by the model to predict policy scores
         engine: Engine,
         plausible_actions: List[PlausibleAction],
         temperature=1.0,
@@ -321,7 +320,9 @@ class AIAgent:
         action_features = get_plausible_action_features(plausible_actions)
 
         with torch.no_grad():
-            policy_scores, _ = self.net(entity_features, action_features)
+            policy_scores, _value = self.net(entity_features, action_features)
+            assert policy_scores.shape[0] == 1  # only batch size 1 right now
+            policy_scores = policy_scores.squeeze()
             if temperature <= 0:
                 chosen_index = torch.argmax(policy_scores).item()
             else:

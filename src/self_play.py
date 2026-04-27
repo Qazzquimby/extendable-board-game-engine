@@ -11,9 +11,10 @@ from ai_agent import (
 )
 from point import Point
 from abilities import DamageEffect, HealEffect
+from schemas import LogEntry
 
 
-def run_game(agent: AIAgent) -> List[dict]:
+def run_game(agent: AIAgent) -> List[LogEntry]:
     engine = Engine(grid=Grid(20, 20))
 
     # Randomize teams slightly
@@ -29,7 +30,7 @@ def run_game(agent: AIAgent) -> List[dict]:
     team_1_classes[0](engine=engine, pos=Point(9, 9), team=1)
     team_1_classes[1](engine=engine, pos=Point(9, 8), team=1)
 
-    logs = []
+    logs: List[LogEntry] = []
 
     engine.next_turn()
     while engine.round_num < 50:
@@ -71,18 +72,18 @@ def run_game(agent: AIAgent) -> List[dict]:
             else:
                 reward = 0.0
 
-        log_entry = {
-            "before_state": before_state_dict,
-            "action": {
+        log_entry = LogEntry(
+            before_state=before_state_dict,
+            action={
                 "actor": actor.name,
-                "move_pos": list(chosen_action.move_pos),
+                "move_pos": chosen_action.move_pos,
                 "target": chosen_action.target.name,
                 "ability": chosen_action.ability.name,
             },
-            "after_state": engine.to_dict(),
-            "reward": reward,
-            "done": done,
-        }
+            after_state=engine.to_dict(),
+            reward=reward,
+            done=done,
+        )
         logs.append(log_entry)
 
         if done:
@@ -102,5 +103,5 @@ if __name__ == "__main__":
         all_logs.extend(run_game(agent))
 
     with open("game_logs.json", "w") as f:
-        json.dump(all_logs, f, indent=2)
+        json.dump([log.model_dump(mode="json") for log in all_logs], f, indent=2)
     print(f"Saved {len(all_logs)} steps to game_logs.json")
