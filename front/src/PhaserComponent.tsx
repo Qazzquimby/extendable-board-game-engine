@@ -1,7 +1,8 @@
-import Phaser from 'phaser';
 import React, { useEffect, useRef } from 'react';
 import { GameScene } from './scenes/GameScene';
 import { EngineState } from './types';
+// import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 
 interface PhaserComponentProps {
   engineState: EngineState;

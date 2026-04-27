@@ -1,5 +1,5 @@
-import Phaser from 'phaser';
 import { EngineState, EntityState } from '../types';
+import * as Phaser from 'phaser';
 
 const TILE_SIZE = 50;
 const GRID_WIDTH = 10;
@@ -33,7 +33,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     public updateEngineState(state: EngineState) {
-        if (this.sys.isBooted) {
+        if (this.sys.isActive()) {
             this.drawState(state);
         } else {
             this.events.once(Phaser.Scenes.Events.CREATE, () => {
@@ -75,7 +75,7 @@ export class GameScene extends Phaser.Scene {
 
         const hpForeground = this.add.graphics();
         const hpPercent = entity.hp / 10; // Assuming max hp is 10
-        hpForeground.fillStyle(entity.team === 1 ? '#00cc00' : '#cc0000', 1);
+        hpForeground.fillStyle(entity.team === 1 ? 1 : 2, 1); // idk how colors are represented by single numbers
         hpForeground.fillRect(-hpBarWidth/2, hpBarY, hpBarWidth * hpPercent, hpBarHeight);
 
         const hpText = this.add.text(0, hpBarY + hpBarHeight/2, `${entity.hp}`, {
