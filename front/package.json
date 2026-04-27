@@ -1,5 +1,6 @@
 {
 	"dependencies": {
-		"json2ts": "^0.0.7"
+		"json2ts": "^0.0.7",
+		"phaser": "^4.0.0"
 	}
 }
