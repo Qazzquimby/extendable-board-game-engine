@@ -10,7 +10,7 @@ from engine import Engine, Entity
 from abilities import Ability, TargetArea, TargetSelf, TargetUnit
 from point import Point
 
-MAX_ENTITY_TYPES = 32  # will be increased
+MAX_ENTITY_TYPES = 1024  # increase
 MAX_ABILITY_TYPES = MAX_ENTITY_TYPES * 4
 
 
@@ -33,13 +33,12 @@ class GameStateEncoder(nn.Module):
         self.id_embedding = nn.Embedding(entity_vocab_size, emb_size)
         self.other_features_size = 4  # [x, y, hp, team]
         self.other_features_linear = nn.Linear(self.other_features_size, emb_size)
-        self.final_linear = nn.Linear(emb_size * 2, emb_size)
+        self.final_linear = nn.Linear(emb_size, emb_size)
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=emb_size, nhead=num_heads, batch_first=True
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.pooling = nn.AdaptiveAvgPool1d(1)
 
     def forward(
         self, entity_features: Float[Tensor, "batch entities features"]
@@ -48,14 +47,15 @@ class GameStateEncoder(nn.Module):
         entity_other_features = entity_features[:, :, 1:]
 
         id_emb = self.id_embedding(entity_ids)
-        other_emb = self.other_features_linear(entity_other_features)
-        combined_emb = torch.cat([id_emb, other_emb], dim=-1)
-        entities_encoded = self.final_linear(combined_emb)
+        features_enc = self.other_features_linear(entity_other_features)
+        # combined_enc = torch.cat([id_emb, features_enc], dim=-1)
+        combined_enc = id_emb + features_enc
+        entities_encoded = self.final_linear(combined_enc)
 
         transformed: Float[Tensor, "batch entities enc"] = self.transformer(
             entities_encoded
         )
-        pooled: Float[Tensor, "batch enc"] = self.pooling(transformed)
+        pooled: Float[Tensor, "batch enc"] = transformed.mean(dim=1)
         return pooled
 
     if TYPE_CHECKING:
@@ -70,7 +70,9 @@ class ActionEncoder(nn.Module):
         self.other_features_linear = nn.Linear(4, hidden_dim)
         self.final_linear = nn.Linear(hidden_dim * 2, hidden_dim)
 
-    def forward(self, action_tensor: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, action_tensor: Float[Tensor, "batch action feature"]
+    ) -> Float[Tensor, "batch action emb"]:
         ability_id = action_tensor[..., 0].long()
         action_other_features = action_tensor[..., 1:]
 
@@ -101,19 +103,20 @@ class AIPolicyValueNet(nn.Module):
 
     def forward(
         self,
-        entity_features: Float[Tensor, "batch features"],
-        action_features: Float[Tensor, "batch features"],
+        entity_features: Float[Tensor, "batch entities features"],
+        action_features: Float[Tensor, "batch actions features"],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        state_emb = self.state_encoder(entity_features)
-        value = self.value_head(state_emb)
+        state_emb: Float[Tensor, "batch emb"] = self.state_encoder(entity_features)
+        value: Float[Tensor, "batch 1"] = self.value_head(state_emb)
 
         policy_scores = []
-        for act_tensor in action_features:
-            act_emb = self.action_encoder(act_tensor)
-            state_emb_expanded = state_emb.expand(act_emb.shape[0], -1)
-            combined = torch.cat([state_emb_expanded, act_emb], dim=-1)
-            score = self.policy_head(combined)
-            policy_scores.append(score)
+        act_emb: Float[Tensor, "batch actions emb"] = self.action_encoder(
+            action_features
+        )
+        state_emb_expanded = state_emb.expand(act_emb.shape[0], -1)
+        combined = torch.cat([state_emb_expanded, act_emb], dim=-1)
+        score = self.policy_head(combined)
+        policy_scores.append(score)
 
         if policy_scores:
             policy_scores_tensor = torch.cat(policy_scores)
@@ -126,15 +129,13 @@ class AIPolicyValueNet(nn.Module):
         __call__ = forward
 
 
-def get_entity_features(
-    engine: Engine, agent: "AIAgent"
-) -> Float[Tensor, "batch entities features"]:
+def get_entity_features(engine: Engine) -> Float[Tensor, "batch entities features"]:
     # right now batch is 1
     entity_features = []
     for entity in engine.entities:
         entity_features.append(
             [
-                float(agent.get_entity_id(entity.name)),
+                float(entity.get_hash() % MAX_ENTITY_TYPES),
                 float(entity.pos[0]),
                 float(entity.pos[1]),
                 float(entity.hp),
@@ -145,19 +146,18 @@ def get_entity_features(
 
 
 def get_plausible_action_features(
-    plausible_actions: List[PlausibleAction], agent: "AIAgent"
+    plausible_actions: List[PlausibleAction],
 ) -> Float[Tensor, "batch actions features"]:
     # right now batch is 1
     action_features = []
     for plausible_action in plausible_actions:
-        ability_id = float(agent.get_ability_id(plausible_action.ability.name))
         action_features.append(
             [
+                float(plausible_action.ability.get_hash() % MAX_ABILITY_TYPES),
                 float(plausible_action.move_pos[0]),
                 float(plausible_action.move_pos[1]),
                 float(plausible_action.target.pos[0]),
                 float(plausible_action.target.pos[1]),
-                ability_id,
             ]
         )
     return torch.tensor([action_features], dtype=torch.float32)
@@ -293,7 +293,10 @@ class AIAgent:
         )
         self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
 
+    # todo make these robust so embeddings don't need to be retrained whenever the vocab changes
+    # Use md5 hash and modulo to emb size
     def get_entity_id(self, name: str) -> int:
+
         if name not in self.entity_vocab:
             assert len(self.entity_vocab) < MAX_ENTITY_TYPES
             self.entity_vocab[name] = self.next_entity_id
@@ -314,8 +317,8 @@ class AIAgent:
         plausible_actions: List[PlausibleAction],
         temperature=1.0,
     ) -> PlausibleAction:
-        entity_features = get_entity_features(engine, self)
-        action_features = get_plausible_action_features(plausible_actions, self)
+        entity_features = get_entity_features(engine)
+        action_features = get_plausible_action_features(plausible_actions)
 
         with torch.no_grad():
             policy_scores, _ = self.net(entity_features, action_features)
