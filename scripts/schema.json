@@ -1,0 +1,154 @@
+{
+  "$defs": {
+    "ActionState": {
+      "properties": {
+        "actor": {
+          "title": "Actor",
+          "type": "string"
+        },
+        "move_pos": {
+          "$ref": "#/$defs/Point"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "ability": {
+          "title": "Ability",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "move_pos",
+        "target",
+        "ability"
+      ],
+      "title": "ActionState",
+      "type": "object"
+    },
+    "EngineState": {
+      "properties": {
+        "round_num": {
+          "title": "Round Num",
+          "type": "integer"
+        },
+        "current_team": {
+          "title": "Current Team",
+          "type": "integer"
+        },
+        "active_entity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Entity"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/EntityState"
+          },
+          "title": "Entities",
+          "type": "array"
+        }
+      },
+      "required": [
+        "round_num",
+        "current_team",
+        "active_entity",
+        "entities"
+      ],
+      "title": "EngineState",
+      "type": "object"
+    },
+    "EntityState": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "hp": {
+          "title": "Hp",
+          "type": "integer"
+        },
+        "pos": {
+          "$ref": "#/$defs/Point"
+        },
+        "team": {
+          "title": "Team",
+          "type": "integer"
+        },
+        "move_actions": {
+          "title": "Move Actions",
+          "type": "integer"
+        },
+        "standard_actions": {
+          "title": "Standard Actions",
+          "type": "integer"
+        },
+        "free_actions": {
+          "title": "Free Actions",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "hp",
+        "pos",
+        "team",
+        "move_actions",
+        "standard_actions",
+        "free_actions"
+      ],
+      "title": "EntityState",
+      "type": "object"
+    },
+    "Point": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "title": "X",
+          "type": "integer"
+        },
+        {
+          "title": "Y",
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    }
+  },
+  "properties": {
+    "before_state": {
+      "$ref": "#/$defs/EngineState"
+    },
+    "action": {
+      "$ref": "#/$defs/ActionState"
+    },
+    "after_state": {
+      "$ref": "#/$defs/EngineState"
+    },
+    "reward": {
+      "title": "Reward",
+      "type": "number"
+    },
+    "done": {
+      "title": "Done",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "before_state",
+    "action",
+    "after_state",
+    "reward",
+    "done"
+  ],
+  "title": "LogEntry",
+  "type": "object"
+}
