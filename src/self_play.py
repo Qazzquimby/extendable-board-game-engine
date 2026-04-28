@@ -11,7 +11,7 @@ from ai_agent import (
 )
 from point import Point
 from abilities import DamageEffect, HealEffect
-from schemas import LogEntry
+from schemas import ActionState, LogEntry
 
 
 def run_game(agent: AIAgent) -> List[LogEntry]:
@@ -25,11 +25,11 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
         random.choice([MeleeHero, RangedHero]) for _ in range(2)
     ]
 
-    t0_0 = team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
-    t0_1 = team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
+    team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
+    team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
 
-    t1_0 = team_1_classes[0](engine=engine, pos=Point(5, 5), team=1)
-    t1_1 = team_1_classes[1](engine=engine, pos=Point(5, 4), team=1)
+    team_1_classes[0](engine=engine, pos=Point(5, 5), team=1)
+    team_1_classes[1](engine=engine, pos=Point(5, 4), team=1)
 
     logs: List[LogEntry] = []
 
@@ -40,7 +40,7 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
             engine.next_turn()
             continue
 
-        before_state_dict = engine.to_dict()
+        before_state = engine.to_model()
         plausible_actions = generate_plausible_actions(actor, engine)
         chosen_action = agent.select_action(
             actor=actor, engine=engine, plausible_actions=plausible_actions
@@ -80,16 +80,16 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
             target_id = chosen_action.target.id
 
         log_entry = LogEntry(
-            before_state=before_state_dict,
-            action={  # todo use pydantic not dict. Everything should be typed.
-                "actor": actor.id,
-                "move_pos": chosen_action.move_pos,
-                "path": path,
-                "target": target_id,
-                "ability": chosen_action.ability.name,
-                "movement_name": chosen_action.movement_name,
-            },
-            after_state=engine.to_dict(),
+            before_state=before_state,
+            action=ActionState(
+                actor=actor.id,
+                move_pos=chosen_action.move_pos,
+                path=path,
+                target=target_id,
+                ability=chosen_action.ability.name,
+                movement_name=chosen_action.movement_name,
+            ),
+            after_state=engine.to_model(),
             reward=reward,
             done=done,
         )

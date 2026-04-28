@@ -209,17 +209,17 @@ def test_engine_serialization():
     e1 = Entity(engine, "Hero1", hp=10, speed=3, pos=Point(0, 0), team=1)
     engine.next_turn()
 
-    state = engine.to_dict()
-    assert state["round_num"] == 1
-    assert state["current_team"] == 1
-    assert state["active_entity"] == "Hero1"
-    assert len(state["entities"]) == 1
+    state = engine.to_model()
+    assert state.round_num == 1
+    assert state.current_team == 1
+    assert state.active_entity == "Hero1"
+    assert len(state.entities) == 1
 
-    e1_state = state["entities"][0]
-    assert e1_state["name"] == "Hero1"
-    assert e1_state["hp"] == 10
-    assert e1_state["pos"] == (0, 0)
-    assert e1_state["move_actions"] == 1
+    e1_state = state.entities[0]
+    assert e1_state.name == "Hero1"
+    assert e1_state.hp == 10
+    assert e1_state.pos == (0, 0)
+    assert e1_state.move_actions == 1
 
 
 def test_engine_clone():

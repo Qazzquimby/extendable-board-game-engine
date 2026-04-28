@@ -25,8 +25,14 @@ MAX_ABILITY_TYPES = MAX_ENTITY_TYPES * 4
 
 class PlausibleAction:
     def __init__(
-        self, move_pos: Point, target: Entity, ability: Ability, movement_name: str = ""
+        self,
+        move_pos: Point,
+        target: Entity | None,
+        ability: Ability,
+        movement_name: str = "",
     ):
+        # todo right now aoe uses target None.
+        #  Probably better to have a list of targets. Ml will need adjusting
         self.move_pos = move_pos
         self.target = target
         self.ability = ability
@@ -43,7 +49,7 @@ class GameStateEncoder(nn.Module):
     ):
         super().__init__()
         self.id_embedding = nn.Embedding(entity_vocab_size, emb_size)
-        self.other_features_size = 4  # [x, y, hp, team]
+        self.other_features_size = 5  # [x, y, hp, team, is_actor]
         self.other_features_linear = nn.Linear(self.other_features_size, emb_size)
         self.final_linear = nn.Linear(emb_size, emb_size)
 
@@ -138,17 +144,20 @@ class AIPolicyValueNet(nn.Module):
         __call__ = forward
 
 
-def get_entity_features(engine: Engine) -> Float[Tensor, "batch entities features"]:
+def get_entity_features(
+    engine: Engine, actor: Entity
+) -> Float[Tensor, "batch entities features"]:
     # right now batch is 1
     entity_features = []
     for entity in engine.entities:
         entity_features.append(
             [
                 float(entity.get_hash() % MAX_ENTITY_TYPES),
-                float(entity.pos[0]),
-                float(entity.pos[1]),
+                float(entity.pos[0]) if entity.pos else -1.0,
+                float(entity.pos[1]) if entity.pos else -1.0,
                 float(entity.hp),
                 float(entity.team),
+                1.0 if entity == actor else 0.0,
             ],
         )
     return torch.tensor([entity_features], dtype=torch.float32)
@@ -160,23 +169,37 @@ def get_plausible_action_features(
     # right now batch is 1
     action_features = []
     for plausible_action in plausible_actions:
+        target_x = (
+            float(plausible_action.target.pos[0])
+            if plausible_action.target and plausible_action.target.pos
+            else -1.0
+        )
+        target_y = (
+            float(plausible_action.target.pos[1])
+            if plausible_action.target and plausible_action.target.pos
+            else -1.0
+        )
         action_features.append(
             [
                 float(plausible_action.ability.get_hash() % MAX_ABILITY_TYPES),
                 float(plausible_action.move_pos[0]),
                 float(plausible_action.move_pos[1]),
-                float(plausible_action.target.pos[0]),
-                float(plausible_action.target.pos[1]),
+                target_x,
+                target_y,
             ]
         )
     return torch.tensor([action_features], dtype=torch.float32)
 
 
 def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleAction]:
-    enemies = [e for e in engine.entities if e.team != actor.team]
-    allies = [e for e in engine.entities if e.team == actor.team and e != actor]
+    enemies = [e for e in engine.entities if e.team != actor.team and e.hp > 0]
+    allies = [
+        e for e in engine.entities if e.team == actor.team and e != actor and e.hp > 0
+    ]
 
-    occupied_points = {e.pos for e in engine.entities if e != actor}
+    occupied_points = {
+        e.pos for e in engine.entities if e != actor and e.pos is not None
+    }
     reachable_points = engine.grid.get_movable_spaces(
         actor.pos, actor.speed, occupied_points
     )
@@ -277,12 +300,6 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                         ability.get_hash(),
                     )
                     if key not in actions_map:
-                        # Pick a primary target for PlausibleAction: closest to area centroid.
-                        centroid = Point(
-                            sum(p.x for p in area_points) // len(area_points),
-                            sum(p.y for p in area_points) // len(area_points),
-                        )
-
                         if is_positive:
                             valid_targets = [
                                 e for e in affected_entities if e.team == actor.team
@@ -297,14 +314,9 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                         if not valid_targets:
                             continue
 
-                        # todo no there is no primary target. All targets in area are affected. Target is not singular it's a list.
-                        primary_target = min(
-                            valid_targets,
-                            key=lambda e: e.pos.get_distance(centroid),
-                        )
                         actions_map[key] = PlausibleAction(
                             move_pos=move_pos,
-                            target=primary_target,
+                            target=None,
                             ability=ability,
                             movement_name=movement_name,
                         )
@@ -326,41 +338,20 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
 
 class AIAgent:
     def __init__(self):
-        self.entity_vocab = {}
-        self.next_entity_id = 0
-        self.ability_vocab = {}
-        self.next_ability_id = 0
         self.net: AIPolicyValueNet = AIPolicyValueNet(
             entity_vocab_size=MAX_ENTITY_TYPES,
             ability_vocab_size=MAX_ABILITY_TYPES,
         )
         self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
 
-    # todo make these robust so embeddings don't need to be retrained whenever the vocab changes
-    # Use md5 hash and modulo to emb size
-    def get_entity_id(self, name: str) -> int:
-
-        if name not in self.entity_vocab:
-            assert len(self.entity_vocab) < MAX_ENTITY_TYPES
-            self.entity_vocab[name] = self.next_entity_id
-            self.next_entity_id += 1
-        return self.entity_vocab[name]
-
-    def get_ability_id(self, name: str) -> int:
-        if name not in self.ability_vocab:
-            assert len(self.ability_vocab) < MAX_ABILITY_TYPES
-            self.ability_vocab[name] = self.next_ability_id
-            self.next_ability_id += 1
-        return self.ability_vocab[name]
-
     def select_action(
         self,
-        actor: Entity,  # todo unused why? Seems like it should be used by the model to predict policy scores
+        actor: Entity,
         engine: Engine,
         plausible_actions: List[PlausibleAction],
         temperature=1.0,
     ) -> PlausibleAction:
-        entity_features = get_entity_features(engine)
+        entity_features = get_entity_features(engine, actor)
         action_features = get_plausible_action_features(plausible_actions)
 
         with torch.no_grad():

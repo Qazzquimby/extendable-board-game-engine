@@ -8,6 +8,7 @@ from grid import Grid
 from mod_value import ModValue
 from point import Point
 from abilities import Ability
+from schemas import EngineState, EntityState
 
 # ==========================================
 # ENUMS & TYPES
@@ -142,13 +143,13 @@ class Engine:
         self.current_team = self.active_entity.team
         self.active_entity.start_turn()
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "round_num": self.round_num,
-            "current_team": self.current_team,
-            "active_entity": self.active_entity.id if self.active_entity else None,
-            "entities": [e.to_dict() for e in self.entities],
-        }
+    def to_model(self) -> EngineState:
+        return EngineState(
+            round_num=self.round_num,
+            current_team=self.current_team,
+            active_entity=self.active_entity.id if self.active_entity else None,
+            entities=[e.to_model() for e in self.entities],
+        )
 
     def clone(self) -> "Engine":
         return copy.deepcopy(self)
@@ -182,17 +183,17 @@ class Entity:
         self.standard_actions = 1
         self.free_actions = 99  # Arbitrary large number
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "name": self.name,
-            "hp": self.hp,
-            "pos": self.pos,
-            "team": self.team,
-            "move_actions": self.move_actions,
-            "standard_actions": self.standard_actions,
-            "free_actions": self.free_actions,
-        }
+    def to_model(self) -> EntityState:
+        return EntityState(
+            id=self.id,
+            name=self.name,
+            hp=self.hp,
+            pos=self.pos,
+            team=self.team,
+            move_actions=self.move_actions,
+            standard_actions=self.standard_actions,
+            free_actions=self.free_actions,
+        )
 
     def get_hash(self) -> float:
         import hashlib
@@ -261,6 +262,9 @@ class DamageEvent:
 
         final_damage = max(0, self.amount.value)
         self.target.hp -= final_damage
+
+        if self.target.hp <= 0:
+            self.target.pos = None
 
         self.engine.router.publish(self, EventPhase.AFTER)
 

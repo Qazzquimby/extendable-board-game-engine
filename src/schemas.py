@@ -9,7 +9,7 @@ class EntityState(BaseModel):
     id: int
     name: str
     hp: int
-    pos: Point
+    pos: Optional[Point]
     team: int
     move_actions: int
     standard_actions: int
