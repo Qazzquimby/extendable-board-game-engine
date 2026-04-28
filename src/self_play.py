@@ -15,7 +15,7 @@ from schemas import LogEntry
 
 
 def run_game(agent: AIAgent) -> List[LogEntry]:
-    engine = Engine(grid=Grid(20, 20))
+    engine = Engine(grid=Grid(6, 6))
 
     # Randomize teams slightly
     team_0_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
@@ -28,8 +28,8 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
     t0_0 = team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
     t0_1 = team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
 
-    t1_0 = team_1_classes[0](engine=engine, pos=Point(9, 9), team=1)
-    t1_1 = team_1_classes[1](engine=engine, pos=Point(9, 8), team=1)
+    t1_0 = team_1_classes[0](engine=engine, pos=Point(5, 5), team=1)
+    t1_1 = team_1_classes[1](engine=engine, pos=Point(5, 4), team=1)
 
     logs: List[LogEntry] = []
 

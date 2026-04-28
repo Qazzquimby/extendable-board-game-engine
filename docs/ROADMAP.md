@@ -2,10 +2,10 @@
 
 *All features must be tested and type hinted.*
 
-Self play:
-tag abilities as positive and negative and only allow positive to target allies and negative to target enemies
-Make the board 6x6.
+Self play should not allow targeting dead heroes. Dead heroes should have a null position and not be drawn on the board.
+Move actions should include current space as an option, in case entity is already in optional space.
 
-In visualizer want to show full name "Blue Melee Hero 2" not only show number. Unique ID is good for strict logic but not display.
-Conversely in movement labels like 'guard melee hero' it doesn't show the ID being referred to making it hard to tell which melee hero is being guarded.
-Targeting is showing starting positions not position at time of action. Eg 'do nothing' is coded as self target and its drawing an arrow to where the actor started their turn.
+Visualizer doesn't show initial board state. Need to press next and then previous to see it.
+Game log needs to be able to provide the winning team of each game.
+
+Training should be set up.

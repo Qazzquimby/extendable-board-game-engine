@@ -9,7 +9,14 @@ import torch.optim as optim
 from torch import Tensor
 
 from engine import Engine, Entity
-from abilities import Ability, TargetArea, TargetSelf, TargetUnit
+from abilities import (
+    Ability,
+    TargetArea,
+    TargetSelf,
+    TargetUnit,
+    DamageEffect,
+    HealEffect,
+)
 from point import Point
 
 MAX_ENTITY_TYPES = 1024  # increase
@@ -17,7 +24,9 @@ MAX_ABILITY_TYPES = MAX_ENTITY_TYPES * 4
 
 
 class PlausibleAction:
-    def __init__(self, move_pos: Point, target: Entity, ability: Ability, movement_name: str = ""):
+    def __init__(
+        self, move_pos: Point, target: Entity, ability: Ability, movement_name: str = ""
+    ):
         self.move_pos = move_pos
         self.target = target
         self.ability = ability
@@ -184,7 +193,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                     point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos)
                 ),
             )
-            proposed_moves[best_close_to_enemy] = f"Approach {enemy.name}"
+            proposed_moves[best_close_to_enemy] = f"Approach {enemy.name} {enemy.id}"
 
             # For each ability that can target units/areas, find a spot at optimal range
             for ability in actor.abilities:
@@ -203,7 +212,9 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                         * 100
                         + point.get_distance(actor.pos),
                     )
-                    proposed_moves[best_at_range] = f"Range {attack_range} for {ability.name}"
+                    proposed_moves[best_at_range] = (
+                        f"Range {attack_range} for {ability.name}"
+                    )
 
         # For each ally, find a good position to "guard" them from nearest enemy
         for ally in allies:
@@ -220,23 +231,35 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                     return detour * 10 + distance_to_enemy
 
                 best_guard_ally = min(reachable_points, key=betweenness_score)
-                proposed_moves[best_guard_ally] = f"Guard {ally.name}"
+                proposed_moves[best_guard_ally] = (
+                    f"Guard {ally.name} {ally.id} from {nearest_enemy_to_ally.name} {nearest_enemy_to_ally.id}"
+                )
 
     # 2. For each move position, find all possible actions
     actions_map = {}  # Use dict to store unique actions
     for move_pos, movement_name in proposed_moves.items():
         for ability in actor.abilities:
+            is_positive = any(isinstance(e, HealEffect) for e in ability.effects)
+            is_negative = any(isinstance(e, DamageEffect) for e in ability.effects)
+
             if isinstance(ability.targeting, TargetUnit):
                 attack_range = ability.targeting.in_range
                 # Target anyone in range. Could be friend or foe.
                 for target in engine.entities:
                     if target == actor:
                         continue
+                    if not is_positive and target.team == actor.team:
+                        continue
+                    if not is_negative and target.team != actor.team:
+                        continue
                     if move_pos.get_distance(target.pos) <= attack_range:
                         key = (move_pos, target.pos, ability.get_hash())
                         if key not in actions_map:
                             actions_map[key] = PlausibleAction(
-                                move_pos=move_pos, target=target, ability=ability, movement_name=movement_name
+                                move_pos=move_pos,
+                                target=target,
+                                ability=ability,
+                                movement_name=movement_name,
                             )
             elif isinstance(ability.targeting, TargetArea):
                 area = ability.targeting.area
@@ -255,12 +278,28 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                     )
                     if key not in actions_map:
                         # Pick a primary target for PlausibleAction: closest to area centroid.
-                        centroid_x = sum(p.x for p in area_points) / len(area_points)
-                        centroid_y = sum(p.y for p in area_points) / len(area_points)
-                        centroid = Point(round(centroid_x), round(centroid_y))
+                        centroid = Point(
+                            sum(p.x for p in area_points) // len(area_points),
+                            sum(p.y for p in area_points) // len(area_points),
+                        )
 
+                        if is_positive:
+                            valid_targets = [
+                                e for e in affected_entities if e.team == actor.team
+                            ]
+                        elif is_negative:
+                            valid_targets = [
+                                e for e in affected_entities if e.team != actor.team
+                            ]
+                        else:
+                            valid_targets = list(affected_entities)
+
+                        if not valid_targets:
+                            continue
+
+                        # todo no there is no primary target. All targets in area are affected. Target is not singular it's a list.
                         primary_target = min(
-                            affected_entities,
+                            valid_targets,
                             key=lambda e: e.pos.get_distance(centroid),
                         )
                         actions_map[key] = PlausibleAction(
@@ -274,7 +313,10 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                 key = (move_pos, target.pos, ability.get_hash())
                 if key not in actions_map:
                     actions_map[key] = PlausibleAction(
-                        move_pos=move_pos, target=target, ability=ability, movement_name=movement_name
+                        move_pos=move_pos,
+                        target=target,
+                        ability=ability,
+                        movement_name=movement_name,
                     )
 
     actions = list(actions_map.values())

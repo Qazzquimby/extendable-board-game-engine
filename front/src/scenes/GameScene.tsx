@@ -2,8 +2,8 @@ import { EngineState, EntityState, ActionState } from '../types';
 import * as Phaser from 'phaser';
 
 const TILE_SIZE = 50;
-const GRID_WIDTH = 20;
-const GRID_HEIGHT = 20;
+const GRID_WIDTH = 6;
+const GRID_HEIGHT = 6;
 const HERO_EMOJIS: { [key: string]: string } = {
     "Melee Hero": "⚔️",
     "Ranged Hero": "🏹",
@@ -50,7 +50,11 @@ export class GameScene extends Phaser.Scene {
 
         const turnOrder = state.entities
             .filter(e => e.hp > 0)
-            .map(e => e.id === state.active_entity ? `> ${e.name} <` : e.name)
+            .map(e => {
+                const teamName = e.team === 1 ? 'Red' : 'Blue';
+                const fullName = `${teamName} ${e.name} ${e.id}`;
+                return e.id === state.active_entity ? `> ${fullName} <` : fullName;
+            })
             .join(' | ');
 
         const infoText = this.add.text(10, 10, `Round: ${state.round_num} | Current Team: ${state.current_team === 1 ? 'Red' : 'Blue'}\nTurn Order: ${turnOrder}`, {
@@ -73,7 +77,11 @@ export class GameScene extends Phaser.Scene {
                     activeEntityContainer = container;
                 }
                 if (action.target === entityState.id) {
-                    targetPos = entityState.pos as [number, number];
+                    if (action.target === action.actor) {
+                        targetPos = action.move_pos as [number, number];
+                    } else {
+                        targetPos = entityState.pos as [number, number];
+                    }
                 }
             } else if (isActive) {
                 activeEntityContainer = container;
