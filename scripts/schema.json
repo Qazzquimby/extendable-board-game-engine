@@ -107,7 +107,14 @@
           "type": "integer"
         },
         "pos": {
-          "$ref": "#/$defs/Point"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "team": {
           "title": "Team",

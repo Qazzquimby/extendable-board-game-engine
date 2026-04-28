@@ -269,6 +269,8 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                 attack_range = ability.targeting.in_range
                 # Target anyone in range. Could be friend or foe.
                 for target in engine.entities:
+                    if not target.pos:
+                        continue
                     if target == actor:
                         continue
                     if not is_positive and target.team == actor.team:

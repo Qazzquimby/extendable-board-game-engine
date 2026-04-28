@@ -11,10 +11,10 @@ from ai_agent import (
 )
 from point import Point
 from abilities import DamageEffect, HealEffect
-from schemas import ActionState, LogEntry
+from schemas import ActionState, LogEntry, GameLog
 
 
-def run_game(agent: AIAgent) -> List[LogEntry]:
+def run_game(agent: AIAgent) -> GameLog:
     engine = Engine(grid=Grid(6, 6))
 
     # Randomize teams slightly
@@ -66,14 +66,12 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
         team_1_living_members = [e.hp > 0 for e in engine.entities if e.team == 1]
         done = time_up or not team_0_living_members or not team_1_living_members
 
-        reward = 0.0
+        winner_team = None
         if done:
             if len(team_0_living_members) > len(team_1_living_members):
-                reward = 1.0
+                winner_team = 0
             elif len(team_1_living_members) > len(team_0_living_members):
-                reward = -1.0
-            else:
-                reward = 0.0
+                winner_team = 1
 
         target_id = None
         if chosen_action.ability.name != "Do nothing" and chosen_action.target:
@@ -90,7 +88,7 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
                 movement_name=chosen_action.movement_name,
             ),
             after_state=engine.to_model(),
-            reward=reward,
+            reward=0.0,
             done=done,
         )
         logs.append(log_entry)
@@ -100,17 +98,17 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
 
         engine.next_turn()
 
-    return logs
+    return GameLog(winner_team=winner_team, logs=logs)
 
 
 if __name__ == "__main__":
     agent = AIAgent()
-    all_logs = []
+    all_games = []
     num_games = 10
     for i in range(num_games):
         print(f"Playing game {i+1}/{num_games}...")
-        all_logs.extend(run_game(agent))
+        all_games.append(run_game(agent))
 
     with open("game_logs.json", "w") as f:
-        json.dump([log.model_dump(mode="json") for log in all_logs], f, indent=2)
-    print(f"Saved {len(all_logs)} steps to game_logs.json")
+        json.dump([game.model_dump(mode="json") for game in all_games], f, indent=2)
+    print(f"Saved {len(all_games)} games to game_logs.json")

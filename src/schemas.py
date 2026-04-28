@@ -38,3 +38,8 @@ class LogEntry(BaseModel):
     after_state: EngineState
     reward: float
     done: bool
+
+
+class GameLog(BaseModel):
+    winner_team: Optional[int]
+    logs: List[LogEntry]

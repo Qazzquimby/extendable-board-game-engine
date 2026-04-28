@@ -48,7 +48,7 @@ export interface EntityState {
   id: Id;
   name: Name;
   hp: Hp;
-  pos: Point;
+  pos: Point | null;
   team: Team;
   move_actions: MoveActions;
   standard_actions: StandardActions;
