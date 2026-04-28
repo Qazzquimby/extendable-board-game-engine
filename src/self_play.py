@@ -34,7 +34,7 @@ def run_game(agent: AIAgent) -> GameLog:
     logs: List[LogEntry] = []
 
     engine.next_turn()
-    while engine.round_num < 50:
+    while engine.round_num <= 6:
         actor = engine.active_entity
         if actor.hp <= 0:
             engine.next_turn()
@@ -61,7 +61,7 @@ def run_game(agent: AIAgent) -> GameLog:
                 HealEvent(engine=engine, target=target, amount=effect.amount).resolve()
 
         # Check win condition
-        time_up = engine.round_num > 6
+        time_up = engine.round_num >= 6
         team_0_living_members = [e.hp > 0 for e in engine.entities if e.team == 0]
         team_1_living_members = [e.hp > 0 for e in engine.entities if e.team == 1]
         done = time_up or not team_0_living_members or not team_1_living_members

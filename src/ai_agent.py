@@ -129,7 +129,6 @@ class AIPolicyValueNet(nn.Module):
         state_emb: Float[Tensor, "batch emb"] = self.state_encoder(entity_features)
         value: Float[Tensor, "batch 1"] = self.value_head(state_emb)
 
-        policy_scores = []
         act_emb: Float[Tensor, "batch actions emb"] = self.action_encoder(
             action_features
         )
@@ -371,7 +370,7 @@ class AIAgent:
     def train_step(
         self,
         state_tensor: torch.Tensor,
-        action_tensors: List[torch.Tensor],
+        action_tensor: torch.Tensor,
         chosen_action_idx: int,
         next_state_tensor: torch.Tensor,
         reward: float,
@@ -379,7 +378,7 @@ class AIAgent:
     ) -> float:
         self.optimizer.zero_grad()
 
-        policy_scores, value = self.net(state_tensor, action_tensors)
+        policy_scores, value = self.net(state_tensor, action_tensor)
 
         if done:
             target_value = torch.tensor([reward], dtype=torch.float32)

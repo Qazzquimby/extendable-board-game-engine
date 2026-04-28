@@ -1,39 +1,99 @@
 import json
-import torch
-from ai_agent import AIAgent
+
+from ai_agent import (
+    AIAgent,
+    get_entity_features,
+    get_plausible_action_features,
+    PlausibleAction,
+)
+from engine import Engine, Entity
+from abilities import Ability
+from schemas import GameLog, EngineState
+
+
+def state_to_engine(state: EngineState) -> Engine:
+    engine = Engine()
+    engine.round_num = state.round_num
+    engine.current_team = state.current_team
+
+    for ent_state in state.entities:
+        ent = Entity(
+            engine=engine,
+            name=ent_state.name,
+            hp=ent_state.hp,
+            speed=0,
+            pos=ent_state.pos,
+            team=ent_state.team,
+        )
+        ent.id = ent_state.id
+        if ent.id == state.active_entity:
+            engine.active_entity = ent
+    return engine
+
 
 def train():
+    agent = AIAgent()
+
     try:
         with open("game_logs.json", "r") as f:
-            games_data = json.load(f)
+            logs_data = json.load(f)
     except FileNotFoundError:
         print("No game_logs.json found. Run self_play.py first.")
         return
 
-    agent = AIAgent()
-    
-    print(f"Loaded {len(games_data)} games...")
-    total_loss = 0.0
-    total_steps = 0
-    
-    for game_data in games_data:
-        winner_team = game_data.get("winner_team")
-        logs = game_data.get("logs", [])
-        
-        for step_idx, log_entry in enumerate(logs):
-            # Currently loaded as raw dicts. 
-            # Needs to rebuild state and action tensors to actually call train_step()
-            # Placeholder for where the reconstructed tensors would be passed:
-            
-            # loss = agent.train_step(state_tensor, action_tensors, chosen_idx, next_state_tensor, step_reward, done)
-            # total_loss += loss
-            total_steps += 1
+    for game_dict in logs_data:
+        game = GameLog(**game_dict)
+        winner = game.winner_team
 
-    avg_loss = total_loss / total_steps if total_steps else 0
-    print(f"Average loss: {avg_loss:.4f} across {total_steps} total steps")
-    
-    torch.save(agent.net.state_dict(), "model.pt")
-    print("Saved trained model to model.pt")
+        for log in game.logs:
+            engine = state_to_engine(log.before_state)
+            next_engine = state_to_engine(log.after_state)
+
+            actor = engine.active_entity
+
+            state_tensor = get_entity_features(engine, actor)
+            next_state_tensor = get_entity_features(
+                next_engine, next_engine.active_entity
+            )
+
+            target_ent = None
+            if log.action.target is not None:
+                for e in engine.entities:
+                    if e.id == log.action.target:
+                        target_ent = e
+                        break
+
+            ability = Ability(name=log.action.ability, targeting=None)
+            ability.owner = actor
+
+            action = PlausibleAction(
+                move_pos=log.action.move_pos,
+                target=target_ent,
+                ability=ability,
+                movement_name=log.action.movement_name,
+            )
+
+            action_tensor = get_plausible_action_features([action])
+
+            # Assign reward based on winner if game is done
+            reward = log.reward
+            if log.done and winner is not None:
+                if actor and actor.team == winner:
+                    reward += 1.0
+                else:
+                    reward -= 1.0
+
+            agent.train_step(
+                state_tensor=state_tensor,
+                action_tensor=action_tensor,
+                chosen_action_idx=0,
+                next_state_tensor=next_state_tensor,
+                reward=reward,
+                done=log.done,
+            )
+
+    print("Training complete.")
+
 
 if __name__ == "__main__":
     train()
