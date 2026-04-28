@@ -45,6 +45,13 @@ export class GameScene extends Phaser.Scene {
     private drawState(state: EngineState) {
         this.entitiesGroup.clear(true, true);
 
+        const infoText = this.add.text(10, 10, `Round: ${state.round_num} | Current Team: ${state.current_team === 1 ? 'Red' : 'Blue'}`, {
+            fontSize: '16px',
+            color: '#000000',
+            backgroundColor: '#ffffff'
+        });
+        this.entitiesGroup.add(infoText);
+
         state.entities.forEach(entityState => {
             this.drawEntity(entityState);
         });

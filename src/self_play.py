@@ -74,13 +74,20 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
             else:
                 reward = 0.0
 
+        target_name = "None"
+        if chosen_action.ability.name != "Do nothing" and chosen_action.target:
+            target_team_str = "Red" if chosen_action.target.team == 1 else "Blue"
+            target_name = f"{chosen_action.target.name} ({target_team_str})"
+
+        actor_team_str = "Red" if actor.team == 1 else "Blue"
+
         log_entry = LogEntry(
             before_state=before_state_dict,
             action={
-                "actor": actor.name,
+                "actor": f"{actor.name} ({actor_team_str})",
                 "move_pos": chosen_action.move_pos,
                 "path": path,
-                "target": chosen_action.target.name,
+                "target": target_name,
                 "ability": chosen_action.ability.name,
             },
             after_state=engine.to_dict(),
