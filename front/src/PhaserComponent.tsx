@@ -8,8 +8,8 @@ interface PhaserComponentProps {
   engineState: EngineState;
 }
 
-const GRID_WIDTH = 10;
-const GRID_HEIGHT = 10;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
 const TILE_SIZE = 50;
 
 const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState }) => {

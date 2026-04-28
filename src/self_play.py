@@ -45,6 +45,8 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
             actor=actor, engine=engine, plausible_actions=plausible_actions
         )
 
+        path = engine.grid.get_path(actor.pos, chosen_action.move_pos)
+
         # Execute action
         actor.pos = chosen_action.move_pos
         ability = chosen_action.ability
@@ -77,6 +79,7 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
             action={
                 "actor": actor.name,
                 "move_pos": chosen_action.move_pos,
+                "path": path,
                 "target": chosen_action.target.name,
                 "ability": chosen_action.ability.name,
             },

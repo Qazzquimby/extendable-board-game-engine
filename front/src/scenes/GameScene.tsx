@@ -2,8 +2,8 @@ import { EngineState, EntityState } from '../types';
 import * as Phaser from 'phaser';
 
 const TILE_SIZE = 50;
-const GRID_WIDTH = 10;
-const GRID_HEIGHT = 10;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 20;
 const HERO_EMOJIS: { [key: string]: string } = {
     "Melee Hero": "⚔️",
     "Ranged Hero": "🏹",
@@ -75,7 +75,8 @@ export class GameScene extends Phaser.Scene {
 
         const hpForeground = this.add.graphics();
         const hpPercent = entity.hp / 10; // Assuming max hp is 10
-        hpForeground.fillStyle(entity.team === 1 ? 1 : 2, 1); // idk how colors are represented by single numbers
+        const teamColor = entity.team === 1 ? 0xff0000 : 0x0088ff;
+        hpForeground.fillStyle(teamColor, 1);
         hpForeground.fillRect(-hpBarWidth/2, hpBarY, hpBarWidth * hpPercent, hpBarHeight);
 
         const hpText = this.add.text(0, hpBarY + hpBarHeight/2, `${entity.hp}`, {
