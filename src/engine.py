@@ -117,6 +117,12 @@ class Engine:
         self.current_team: int = 1
         self.grid: Grid = grid
         self.active_entity: Optional["Entity"] = None
+        self._next_id: int = 1
+
+    def generate_id(self) -> int:
+        res = self._next_id
+        self._next_id += 1
+        return res
 
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
@@ -140,7 +146,7 @@ class Engine:
         return {
             "round_num": self.round_num,
             "current_team": self.current_team,
-            "active_entity": self.active_entity.name if self.active_entity else None,
+            "active_entity": self.active_entity.id if self.active_entity else None,
             "entities": [e.to_dict() for e in self.entities],
         }
 
@@ -153,6 +159,7 @@ class Entity:
         self, engine: Engine, name: str, hp: int, speed: int, pos: Point, team: int
     ):
         self.engine = engine
+        self.id = self.engine.generate_id()
         self.set = "development"
         self.name = name
 
@@ -177,6 +184,7 @@ class Entity:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "id": self.id,
             "name": self.name,
             "hp": self.hp,
             "pos": self.pos,

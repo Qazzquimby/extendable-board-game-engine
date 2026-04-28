@@ -52,7 +52,8 @@ function App() {
           {currentLogEntry && (
             <div>
               <h3>Action</h3>
-              <p>Actor: {currentLogEntry.action.actor} performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}. Movement: "{currentLogEntry.action.movement_name}" to [{String(currentLogEntry.action.move_pos)}]</p>
+              <p>Actor: {currentLogEntry.action.actor}</p>
+              <p>"{currentLogEntry.action.movement_name}" to [{String(currentLogEntry.action.move_pos)}], then performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
             </div>
           )}
           {stateToRender && <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action} />}

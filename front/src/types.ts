@@ -7,7 +7,8 @@
 
 export type RoundNum = number;
 export type CurrentTeam = number;
-export type ActiveEntity = string | null;
+export type ActiveEntity = number | null;
+export type Id = number;
 export type Name = string;
 export type Hp = number;
 /**
@@ -20,8 +21,8 @@ export type MoveActions = number;
 export type StandardActions = number;
 export type FreeActions = number;
 export type Entities = EntityState[];
-export type Actor = string;
-export type Target = string;
+export type Actor = number;
+export type Target = number | null;
 export type Ability = string;
 export type Path = Point[] | null;
 export type MovementName = string;
@@ -44,6 +45,7 @@ export interface EngineState {
   [k: string]: unknown;
 }
 export interface EntityState {
+  id: Id;
   name: Name;
   hp: Hp;
   pos: Point;

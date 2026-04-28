@@ -6,6 +6,7 @@ from point import Point
 
 
 class EntityState(BaseModel):
+    id: int
     name: str
     hp: int
     pos: Point
@@ -18,14 +19,14 @@ class EntityState(BaseModel):
 class EngineState(BaseModel):
     round_num: int
     current_team: int
-    active_entity: Optional[str]
+    active_entity: Optional[int]
     entities: List[EntityState]
 
 
 class ActionState(BaseModel):
-    actor: str
+    actor: int
     move_pos: Point
-    target: str
+    target: Optional[int]
     ability: str
     path: Optional[List[Point]] = None
     movement_name: str = ""

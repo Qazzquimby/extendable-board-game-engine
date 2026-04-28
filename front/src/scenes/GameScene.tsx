@@ -35,7 +35,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     public updateEngineState(state: EngineState, action?: ActionState) {
-        if (this.sys.isActive()) {
+        if (this.entitiesGroup && this.overlaysGroup) {
             this.drawState(state, action);
         } else {
             this.events.once(Phaser.Scenes.Events.CREATE, () => {
@@ -50,7 +50,7 @@ export class GameScene extends Phaser.Scene {
 
         const turnOrder = state.entities
             .filter(e => e.hp > 0)
-            .map(e => e.name === state.active_entity ? `> ${e.name} <` : e.name)
+            .map(e => e.id === state.active_entity ? `> ${e.name} <` : e.name)
             .join(' | ');
 
         const infoText = this.add.text(10, 10, `Round: ${state.round_num} | Current Team: ${state.current_team === 1 ? 'Red' : 'Blue'}\nTurn Order: ${turnOrder}`, {
@@ -65,12 +65,18 @@ export class GameScene extends Phaser.Scene {
         let targetPos: [number, number] | null = null;
 
         state.entities.forEach(entityState => {
-            const container = this.drawEntity(entityState, state.active_entity === entityState.name);
-            if (state.active_entity === entityState.name) {
+            const isActive = state.active_entity === entityState.id;
+            const container = this.drawEntity(entityState, isActive);
+            
+            if (action) {
+                if (action.actor === entityState.id) {
+                    activeEntityContainer = container;
+                }
+                if (action.target === entityState.id) {
+                    targetPos = entityState.pos as [number, number];
+                }
+            } else if (isActive) {
                 activeEntityContainer = container;
-            }
-            if (action && action.target.startsWith(entityState.name)) {
-                targetPos = entityState.pos as [number, number];
             }
         });
 
@@ -127,7 +133,8 @@ export class GameScene extends Phaser.Scene {
         const pixelX = x * TILE_SIZE + TILE_SIZE / 2;
         const pixelY = y * TILE_SIZE + TILE_SIZE / 2;
 
-        const emoji = HERO_EMOJIS[entity.name] || '❓';
+        const baseName = entity.name;
+        const emoji = HERO_EMOJIS[baseName] || '❓';
 
         const entityContainer = this.add.container(pixelX, pixelY);
 

@@ -4,14 +4,21 @@
       "properties": {
         "actor": {
           "title": "Actor",
-          "type": "string"
+          "type": "integer"
         },
         "move_pos": {
           "$ref": "#/$defs/Point"
         },
         "target": {
-          "title": "Target",
-          "type": "string"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Target"
         },
         "ability": {
           "title": "Ability",
@@ -60,7 +67,7 @@
         "active_entity": {
           "anyOf": [
             {
-              "type": "string"
+              "type": "integer"
             },
             {
               "type": "null"
@@ -87,6 +94,10 @@
     },
     "EntityState": {
       "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
         "name": {
           "title": "Name",
           "type": "string"
@@ -116,6 +127,7 @@
         }
       },
       "required": [
+        "id",
         "name",
         "hp",
         "pos",

@@ -25,10 +25,11 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
         random.choice([MeleeHero, RangedHero]) for _ in range(2)
     ]
 
-    team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
-    team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
-    team_1_classes[0](engine=engine, pos=Point(9, 9), team=1)
-    team_1_classes[1](engine=engine, pos=Point(9, 8), team=1)
+    t0_0 = team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
+    t0_1 = team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
+
+    t1_0 = team_1_classes[0](engine=engine, pos=Point(9, 9), team=1)
+    t1_1 = team_1_classes[1](engine=engine, pos=Point(9, 8), team=1)
 
     logs: List[LogEntry] = []
 
@@ -74,20 +75,17 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
             else:
                 reward = 0.0
 
-        target_name = "None"
+        target_id = None
         if chosen_action.ability.name != "Do nothing" and chosen_action.target:
-            target_team_str = "Red" if chosen_action.target.team == 1 else "Blue"
-            target_name = f"{chosen_action.target.name} ({target_team_str})"
-
-        actor_team_str = "Red" if actor.team == 1 else "Blue"
+            target_id = chosen_action.target.id
 
         log_entry = LogEntry(
             before_state=before_state_dict,
-            action={ # todo use pydantic not dict. Everything should be typed.
-                "actor": f"{actor.name} ({actor_team_str})",
+            action={  # todo use pydantic not dict. Everything should be typed.
+                "actor": actor.id,
                 "move_pos": chosen_action.move_pos,
                 "path": path,
-                "target": target_name,
+                "target": target_id,
                 "ability": chosen_action.ability.name,
                 "movement_name": chosen_action.movement_name,
             },
