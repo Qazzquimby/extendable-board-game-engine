@@ -146,6 +146,36 @@
       "title": "EntityState",
       "type": "object"
     },
+    "LogEntry": {
+      "properties": {
+        "before_state": {
+          "$ref": "#/$defs/EngineState"
+        },
+        "action": {
+          "$ref": "#/$defs/ActionState"
+        },
+        "after_state": {
+          "$ref": "#/$defs/EngineState"
+        },
+        "reward": {
+          "title": "Reward",
+          "type": "number"
+        },
+        "done": {
+          "title": "Done",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "before_state",
+        "action",
+        "after_state",
+        "reward",
+        "done"
+      ],
+      "title": "LogEntry",
+      "type": "object"
+    },
     "Point": {
       "maxItems": 2,
       "minItems": 2,
@@ -163,31 +193,29 @@
     }
   },
   "properties": {
-    "before_state": {
-      "$ref": "#/$defs/EngineState"
+    "winner_team": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Winner Team"
     },
-    "action": {
-      "$ref": "#/$defs/ActionState"
-    },
-    "after_state": {
-      "$ref": "#/$defs/EngineState"
-    },
-    "reward": {
-      "title": "Reward",
-      "type": "number"
-    },
-    "done": {
-      "title": "Done",
-      "type": "boolean"
+    "logs": {
+      "items": {
+        "$ref": "#/$defs/LogEntry"
+      },
+      "title": "Logs",
+      "type": "array"
     }
   },
   "required": [
-    "before_state",
-    "action",
-    "after_state",
-    "reward",
-    "done"
+    "winner_team",
+    "logs"
   ],
-  "title": "LogEntry",
+  "title": "GameLog",
   "type": "object"
 }

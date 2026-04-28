@@ -2,6 +2,5 @@
 
 *All features must be tested and type hinted.*
 
-Need to set up training based on the game logs.
-Train value prediction based on winner.
-Train plausible actions based on how they affect the value prediction.
+Handle line of sight in getting range. Can't draw line of sight through enemy entity.
+Verify that range tracking is allowing first space diagonal. I'm only seeing melee attacks from orthogonal adjacency.

@@ -33,6 +33,7 @@ def run_game(agent: AIAgent) -> GameLog:
 
     logs: List[LogEntry] = []
 
+    winner_team = None
     engine.next_turn()
     while engine.round_num <= 6:
         actor = engine.active_entity
@@ -62,11 +63,9 @@ def run_game(agent: AIAgent) -> GameLog:
 
         # Check win condition
         time_up = engine.round_num >= 6
-        team_0_living_members = [e.hp > 0 for e in engine.entities if e.team == 0]
-        team_1_living_members = [e.hp > 0 for e in engine.entities if e.team == 1]
+        team_0_living_members = [e for e in engine.entities if e.team == 0 and e.hp > 0]
+        team_1_living_members = [e for e in engine.entities if e.team == 1 and e.hp > 0]
         done = time_up or not team_0_living_members or not team_1_living_members
-
-        winner_team = None
         if done:
             if len(team_0_living_members) > len(team_1_living_members):
                 winner_team = 0

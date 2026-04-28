@@ -137,6 +137,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     private drawEntity(entity: EntityState, isActive: boolean) {
+        if (!entity.pos) return null;
         const [x, y] = entity.pos as [number, number];
         const pixelX = x * TILE_SIZE + TILE_SIZE / 2;
         const pixelY = y * TILE_SIZE + TILE_SIZE / 2;

@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Update vis" type="Multirun" separateTabs="false" reuseTabsWithFailures="false" startOneByOne="true" markFailedProcess="true" hideSuccessProcess="false" delayTime="10.0">
+    <runConfiguration name="generate_schema" type="Python" />
+    <runConfiguration name="self_play" type="Python" />
+    <runConfiguration name="update-types" type="npm" />
+    <runConfiguration name="dev" type="npm" />
+    <method v="2" />
+  </configuration>
+</component>

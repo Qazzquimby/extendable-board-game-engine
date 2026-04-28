@@ -1,10 +1,26 @@
-import { useState } from 'react';
-import { LogEntry } from './types';
+import { useState, useEffect } from 'react';
+import { GameLog, LogEntry } from './types';
 import PhaserComponent from './PhaserComponent';
 
 function App() {
-  const [log, setLog] = useState<LogEntry[]>([]);
+  const [games, setGames] = useState<GameLog[]>([]);
+  const [currentGameIndex, setCurrentGameIndex] = useState(0);
   const [currentStep, setCurrentStep] = useState(0);
+
+  const currentGame = games[currentGameIndex];
+  const log = currentGame?.logs || [];
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        setCurrentStep((s) => Math.min(log.length - 1, s + 1));
+      } else if (e.key === 'ArrowLeft') {
+        setCurrentStep((s) => Math.max(0, s - 1));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [log.length]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -14,12 +30,13 @@ function App() {
         try {
           const content = e.target?.result;
           if (typeof content === 'string') {
-            const jsonLog = JSON.parse(content);
-            if (Array.isArray(jsonLog)) {
-                setLog(jsonLog);
+            const jsonGames = JSON.parse(content);
+            if (Array.isArray(jsonGames)) {
+                setGames(jsonGames);
+                setCurrentGameIndex(0);
                 setCurrentStep(0);
             } else {
-                alert("Log file is not a JSON array of log entries.");
+                alert("Log file is not a JSON array of games.");
             }
           }
         } catch (error) {
@@ -38,8 +55,25 @@ function App() {
     <div>
       <h1>Game Log Visualizer</h1>
       <input type="file" accept=".json,.jsonl" onChange={handleFileChange} />
-      {log.length > 0 && (
+      {games.length > 0 && (
         <>
+          <div style={{ margin: '10px 0' }}>
+            <label>
+              Select Game: 
+              <select 
+                value={currentGameIndex} 
+                onChange={(e) => {
+                  setCurrentGameIndex(Number(e.target.value));
+                  setCurrentStep(0);
+                }}
+                style={{ marginLeft: '10px' }}
+              >
+                {games.map((g, i) => (
+                  <option key={i} value={i}>Game {i + 1} {g.winner_team !== null ? `(Team ${g.winner_team} Won)` : '(Tie)'}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div>
             <button onClick={() => setCurrentStep(s => Math.max(0, s - 1))} disabled={currentStep === 0}>
               Previous
@@ -49,7 +83,7 @@ function App() {
               Next
             </button>
           </div>
-          {currentLogEntry && (
+          {currentLogEntry && 'action' in currentLogEntry && (
             <div>
               <h3>Action</h3>
               <p>Actor: {currentLogEntry.action.actor}</p>

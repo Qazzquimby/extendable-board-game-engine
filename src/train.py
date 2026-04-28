@@ -7,7 +7,7 @@ from ai_agent import (
     PlausibleAction,
 )
 from engine import Engine, Entity
-from abilities import Ability
+from abilities import Ability, Targeting
 from schemas import GameLog, EngineState
 
 
@@ -35,7 +35,7 @@ def train():
     agent = AIAgent()
 
     try:
-        with open("game_logs.json", "r") as f:
+        with open("../game_logs.json", "r") as f:
             logs_data = json.load(f)
     except FileNotFoundError:
         print("No game_logs.json found. Run self_play.py first.")
@@ -63,7 +63,8 @@ def train():
                         target_ent = e
                         break
 
-            ability = Ability(name=log.action.ability, targeting=None)
+            # actual targeting not required for training, since actual target is known
+            ability = Ability(name=log.action.ability, targeting=Targeting())
             ability.owner = actor
 
             action = PlausibleAction(

@@ -5,6 +5,7 @@
  * and run json-schema-to-typescript to regenerate this file.
  */
 
+export type WinnerTeam = number | null;
 export type RoundNum = number;
 export type CurrentTeam = number;
 export type ActiveEntity = number | null;
@@ -28,7 +29,13 @@ export type Path = Point[] | null;
 export type MovementName = string;
 export type Reward = number;
 export type Done = boolean;
+export type Logs = LogEntry[];
 
+export interface GameLog {
+  winner_team: WinnerTeam;
+  logs: Logs;
+  [k: string]: unknown;
+}
 export interface LogEntry {
   before_state: EngineState;
   action: ActionState;
