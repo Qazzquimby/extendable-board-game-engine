@@ -16,6 +16,26 @@
         "ability": {
           "title": "Ability",
           "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Point"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "movement_name": {
+          "default": "",
+          "title": "Movement Name",
+          "type": "string"
         }
       },
       "required": [

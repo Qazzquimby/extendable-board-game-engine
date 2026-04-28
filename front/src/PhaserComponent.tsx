@@ -1,18 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { GameScene } from './scenes/GameScene';
-import { EngineState } from './types';
+import { EngineState, ActionState } from './types';
 // import Phaser from 'phaser';
 import * as Phaser from 'phaser';
 
 interface PhaserComponentProps {
   engineState: EngineState;
+  action?: ActionState;
 }
 
 const GRID_WIDTH = 20;
 const GRID_HEIGHT = 20;
 const TILE_SIZE = 50;
 
-const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState }) => {
+const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action }) => {
   const gameContainer = useRef<HTMLDivElement>(null);
   const gameInstance = useRef<Phaser.Game | null>(null);
 
@@ -39,10 +40,10 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState }) => {
     if (gameInstance.current && engineState) {
         const scene = gameInstance.current.scene.getScene('GameScene') as GameScene;
         if (scene) {
-            scene.updateEngineState(engineState);
+            scene.updateEngineState(engineState, action);
         }
     }
-  }, [engineState]);
+  }, [engineState, action]);
 
   return <div ref={gameContainer} style={{ width: GRID_WIDTH * TILE_SIZE, height: GRID_HEIGHT * TILE_SIZE, margin: '20px 0' }}/>;
 };

@@ -17,10 +17,11 @@ MAX_ABILITY_TYPES = MAX_ENTITY_TYPES * 4
 
 
 class PlausibleAction:
-    def __init__(self, move_pos: Point, target: Entity, ability: Ability):
+    def __init__(self, move_pos: Point, target: Entity, ability: Ability, movement_name: str = ""):
         self.move_pos = move_pos
         self.target = target
         self.ability = ability
+        self.movement_name = movement_name
 
 
 class GameStateEncoder(nn.Module):
@@ -173,7 +174,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     reachable_points.add(actor.pos)
 
     # 1. Generate a set of interesting move positions.
-    proposed_moves = {actor.pos}
+    proposed_moves = {actor.pos: "Stay"}
     if reachable_points:
         # For each enemy, find a good position to approach
         for enemy in enemies:
@@ -183,7 +184,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                     point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos)
                 ),
             )
-            proposed_moves.add(best_close_to_enemy)
+            proposed_moves[best_close_to_enemy] = f"Approach {enemy.name}"
 
             # For each ability that can target units/areas, find a spot at optimal range
             for ability in actor.abilities:
@@ -202,7 +203,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                         * 100
                         + point.get_distance(actor.pos),
                     )
-                    proposed_moves.add(best_at_range)
+                    proposed_moves[best_at_range] = f"Range {attack_range} for {ability.name}"
 
         # For each ally, find a good position to "guard" them from nearest enemy
         for ally in allies:
@@ -219,11 +220,11 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                     return detour * 10 + distance_to_enemy
 
                 best_guard_ally = min(reachable_points, key=betweenness_score)
-                proposed_moves.add(best_guard_ally)
+                proposed_moves[best_guard_ally] = f"Guard {ally.name}"
 
     # 2. For each move position, find all possible actions
     actions_map = {}  # Use dict to store unique actions
-    for move_pos in proposed_moves:
+    for move_pos, movement_name in proposed_moves.items():
         for ability in actor.abilities:
             if isinstance(ability.targeting, TargetUnit):
                 attack_range = ability.targeting.in_range
@@ -235,7 +236,7 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                         key = (move_pos, target.pos, ability.get_hash())
                         if key not in actions_map:
                             actions_map[key] = PlausibleAction(
-                                move_pos=move_pos, target=target, ability=ability
+                                move_pos=move_pos, target=target, ability=ability, movement_name=movement_name
                             )
             elif isinstance(ability.targeting, TargetArea):
                 area = ability.targeting.area
@@ -266,13 +267,14 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                             move_pos=move_pos,
                             target=primary_target,
                             ability=ability,
+                            movement_name=movement_name,
                         )
             elif isinstance(ability.targeting, TargetSelf):
                 target = actor
                 key = (move_pos, target.pos, ability.get_hash())
                 if key not in actions_map:
                     actions_map[key] = PlausibleAction(
-                        move_pos=move_pos, target=target, ability=ability
+                        move_pos=move_pos, target=target, ability=ability, movement_name=movement_name
                     )
 
     actions = list(actions_map.values())

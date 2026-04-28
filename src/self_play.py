@@ -83,12 +83,13 @@ def run_game(agent: AIAgent) -> List[LogEntry]:
 
         log_entry = LogEntry(
             before_state=before_state_dict,
-            action={
+            action={ # todo use pydantic not dict. Everything should be typed.
                 "actor": f"{actor.name} ({actor_team_str})",
                 "move_pos": chosen_action.move_pos,
                 "path": path,
                 "target": target_name,
                 "ability": chosen_action.ability.name,
+                "movement_name": chosen_action.movement_name,
             },
             after_state=engine.to_dict(),
             reward=reward,

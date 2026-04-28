@@ -27,6 +27,8 @@ class ActionState(BaseModel):
     move_pos: Point
     target: str
     ability: str
+    path: Optional[List[Point]] = None
+    movement_name: str = ""
 
 
 class LogEntry(BaseModel):
