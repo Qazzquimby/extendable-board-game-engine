@@ -2,6 +2,7 @@ import json
 
 import torch
 
+import random
 from ai_agent import (
     AIAgent,
     get_entity_features,
@@ -47,12 +48,17 @@ def train():
         print("No game_logs.json found. Run self_play.py first.")
         return
 
+    data = []
+
     for game_dict in logs_data:
         game = GameLog(**game_dict)
 
         for log in game.logs:
             engine = state_to_engine(log.before_state)
             actor = engine.active_entity
+            if not actor:
+                continue
+
             state_tensor = get_entity_features(engine, actor)
 
             sim_actions = []
@@ -94,18 +100,61 @@ def train():
 
             reward = 1.0 if game.winner_team == actor.team else 0.0
 
-            # todo first fully train value, then train policy.
-            #  separate train and val
-            #  Put train items into batches rather than doing one step per game like this
-
-            agent.train_step(
-                state_tensor=state_tensor,
-                action_tensor=action_tensor,
-                next_states_tensor=next_states_tensor,
-                sim_dones=sim_dones,
-                sim_rewards=sim_rewards,
-                actual_reward=reward,
+            data.append(
+                {  # todo use pydantic
+                    "state_tensor": state_tensor,
+                    "action_tensor": action_tensor,
+                    "next_states_tensor": next_states_tensor,
+                    "sim_dones": sim_dones,
+                    "sim_rewards": sim_rewards,
+                    "actual_reward": reward,
+                }
             )
+
+    random.shuffle(data)
+    split_idx = int(len(data) * 0.8)
+    train_data = data[:split_idx]
+    val_data = data[split_idx:]
+
+    batch_size = 32
+
+    print("Training Value Network...")
+    for i in range(0, len(train_data), batch_size):
+        batch = train_data[i : i + batch_size]
+        states = torch.cat([d["state_tensor"] for d in batch], dim=0)
+        rewards = torch.tensor(
+            [[d["actual_reward"]] for d in batch], dtype=torch.float32
+        )
+        v_loss = agent.train_value_step(states, rewards)
+        if i % (batch_size * 10) == 0:
+            print(f"Batch {i//batch_size}, Value Loss: {v_loss}")
+
+    print("Training Policy Network...")
+    for i in range(0, len(train_data), batch_size):
+        batch = train_data[i : i + batch_size]
+
+        for d in batch:
+            state_val = agent.get_value(d["state_tensor"]).item()
+            next_vals = agent.get_value(d["next_states_tensor"]).squeeze(1).tolist()
+            if isinstance(next_vals, float):
+                next_vals = [next_vals]
+
+            target_policy_scores = torch.zeros(len(d["sim_dones"]), dtype=torch.float32)
+            for j, done in enumerate(d["sim_dones"]):
+                if done:
+                    target_policy_scores[j] = d["sim_rewards"][j] - state_val
+                else:
+                    target_policy_scores[j] = next_vals[j] - state_val
+
+            p_loss = agent.train_policy_step(
+                d["state_tensor"], d["action_tensor"], target_policy_scores
+            )
+
+        if i % (batch_size * 10) == 0:
+            print(f"Batch {i//batch_size}, Policy Loss: {p_loss}")
+
+    # Validation could be added here to compute loss on val_data
+    print(f"Validation set size: {len(val_data)}")
 
     agent.save()
     print("Training complete.")

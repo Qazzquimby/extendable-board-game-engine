@@ -100,12 +100,11 @@ def run_game(agent: AIAgent) -> GameLog:
                 )
             )
 
-        # Select the actual action (temperature 0 to exploit best policy action)
         chosen_action = agent.select_action(
             actor=actor,
             engine=engine,
             plausible_actions=plausible_actions,
-            temperature=0.0,
+            temperature=0.5,
         )
 
         path = engine.grid.get_path(actor.pos, chosen_action.move_pos)
@@ -165,7 +164,7 @@ if __name__ == "__main__":
     agent = AIAgent()
     agent.load()
     all_games = []
-    num_games = 10
+    num_games = 100
     for i in range(num_games):
         print(f"Playing game {i+1}/{num_games}...")
         all_games.append(run_game(agent))

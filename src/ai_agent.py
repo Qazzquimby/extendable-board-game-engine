@@ -379,42 +379,26 @@ class AIAgent:
         chosen_action = plausible_actions[chosen_index]
         return chosen_action
 
-    def train_step(
-        self,
-        state_tensor: torch.Tensor,
-        action_tensor: torch.Tensor,
-        next_states_tensor: torch.Tensor,
-        sim_dones: List[bool],
-        sim_rewards: List[float],
-        actual_reward: float,
-    ) -> float:
-        self.optimizer.zero_grad()
-
-        policy_scores, value = self.net(state_tensor, action_tensor)
-
-        # 1. Train Value Network to predict actual game outcome
-        target_value = torch.tensor([[actual_reward]], dtype=torch.float32)
-        value_loss = nn.MSELoss()(value, target_value)
-
-        # 2. Train Policy Network to predict advantage (V(next_state) - V(current_state))
+    def get_value(self, states_tensor: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
-            next_state_embs = self.net.state_encoder(next_states_tensor)
-            next_values = self.net.value_head(next_state_embs)
+            state_embs = self.net.state_encoder(states_tensor)
+            values = self.net.value_head(state_embs)
+        return values
 
-        target_policy_scores = torch.zeros(len(sim_dones), dtype=torch.float32)
-        for i, done in enumerate(sim_dones):
-            if done:
-                target_policy_scores[i] = sim_rewards[i] - value.item()
-            else:
-                target_policy_scores[i] = next_values[i].item() - value.item()
-
-        policy_scores_flat = policy_scores.view(-1)
-        policy_loss = nn.MSELoss()(policy_scores_flat, target_policy_scores)
-
-        loss = value_loss + policy_loss
-        print(f"Loss: {loss}. Value: {value_loss}. Policy: {policy_loss}")
-
+    def train_value_step(self, states_tensor: torch.Tensor, actual_rewards: torch.Tensor) -> float:
+        self.optimizer.zero_grad()
+        state_embs = self.net.state_encoder(states_tensor)
+        values = self.net.value_head(state_embs)
+        loss = nn.MSELoss()(values, actual_rewards)
         loss.backward()
         self.optimizer.step()
+        return loss.item()
 
+    def train_policy_step(self, states_tensor: torch.Tensor, actions_tensor: torch.Tensor, target_policy_scores: torch.Tensor) -> float:
+        self.optimizer.zero_grad()
+        policy_scores, _ = self.net(states_tensor, actions_tensor)
+        policy_scores_flat = policy_scores.view(-1)
+        loss = nn.MSELoss()(policy_scores_flat, target_policy_scores)
+        loss.backward()
+        self.optimizer.step()
         return loss.item()
