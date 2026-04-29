@@ -11,7 +11,7 @@ from ai_agent import (
 )
 from point import Point
 from abilities import DamageEffect, HealEffect
-from schemas import ActionState, LogEntry, GameLog
+from schemas import ActionState, LogEntry, GameLog, ActionSim
 
 
 def run_game(agent: AIAgent) -> GameLog:
@@ -43,13 +43,74 @@ def run_game(agent: AIAgent) -> GameLog:
 
         before_state = engine.to_model()
         plausible_actions = generate_plausible_actions(actor, engine)
+
+        simulations = []
+        for p_action in plausible_actions:
+            sim_engine = engine.clone()
+            sim_actor = next(e for e in sim_engine.entities if e.id == actor.id)
+            sim_target = next(
+                (
+                    e
+                    for e in sim_engine.entities
+                    if p_action.target and e.id == p_action.target.id
+                ),
+                None,
+            )
+
+            sim_actor.pos = p_action.move_pos
+            for effect in p_action.ability.effects:
+                if isinstance(effect, DamageEffect):
+                    DamageEvent(
+                        engine=sim_engine,
+                        source=sim_actor,
+                        target=sim_target,
+                        amount=effect.amount,
+                    ).resolve()
+                elif isinstance(effect, HealEffect):
+                    HealEvent(
+                        engine=sim_engine, target=sim_target, amount=effect.amount
+                    ).resolve()
+
+            sim_time_up = sim_engine.round_num >= 6
+            sim_t0 = [e for e in sim_engine.entities if e.team == 0 and e.hp > 0]
+            sim_t1 = [e for e in sim_engine.entities if e.team == 1 and e.hp > 0]
+            sim_done = sim_time_up or not sim_t0 or not sim_t1
+
+            sim_winner = None
+            if sim_done:
+                if len(sim_t0) > len(sim_t1):
+                    sim_winner = 0
+                elif len(sim_t1) > len(sim_t0):
+                    sim_winner = 1
+
+            sim_path = sim_engine.grid.get_path(actor.pos, p_action.move_pos)
+            simulations.append(
+                ActionSim(
+                    action=ActionState(
+                        actor=sim_actor.id,
+                        move_pos=p_action.move_pos,
+                        path=sim_path,
+                        target=sim_target.id if sim_target else None,
+                        ability=p_action.ability.name,
+                        movement_name=p_action.movement_name,
+                    ),
+                    after_state=sim_engine.to_model(),
+                    done=sim_done,
+                    winner_team=sim_winner,
+                )
+            )
+
+        # Select the actual action (temperature 0 to exploit best policy action)
         chosen_action = agent.select_action(
-            actor=actor, engine=engine, plausible_actions=plausible_actions
+            actor=actor,
+            engine=engine,
+            plausible_actions=plausible_actions,
+            temperature=0.0,
         )
 
         path = engine.grid.get_path(actor.pos, chosen_action.move_pos)
 
-        # Execute action
+        # Execute actual action
         actor.pos = chosen_action.move_pos
         ability = chosen_action.ability
         target = chosen_action.target
@@ -88,6 +149,7 @@ def run_game(agent: AIAgent) -> GameLog:
             ),
             after_state=engine.to_model(),
             done=done,
+            simulations=simulations,
         )
         logs.append(log_entry)
 

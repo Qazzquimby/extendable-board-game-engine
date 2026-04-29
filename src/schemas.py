@@ -32,11 +32,19 @@ class ActionState(BaseModel):
     movement_name: str = ""
 
 
+class ActionSim(BaseModel):
+    action: ActionState
+    after_state: EngineState
+    done: bool
+    winner_team: Optional[int] = None
+
+
 class LogEntry(BaseModel):
     before_state: EngineState
     action: ActionState
     after_state: EngineState
     done: bool
+    simulations: List[ActionSim] = []
 
 
 class GameLog(BaseModel):

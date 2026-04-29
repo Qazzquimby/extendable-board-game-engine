@@ -80,6 +80,10 @@ def train():
             action_tensor = get_plausible_action_features([action])
 
             reward = game.winner_team == actor.team
+            
+            # Use simulation results for policy training (future expansion). 
+            # For now, we still train on the single executed action.
+            # You can adapt `ai_agent.train_step` to process `log.simulations`.
 
             agent.train_step(
                 state_tensor=state_tensor,
