@@ -1,6 +1,7 @@
 import json
 
 import torch
+import torch.nn.functional as F
 
 import random
 from ai_agent import (
@@ -151,21 +152,21 @@ def train():
 
             for d in batch:
                 state_val = agent.get_value(d["state_tensor"]).item()
-                next_vals = agent.get_value(d["next_states_tensor"]).squeeze(1).tolist()
-                if isinstance(next_vals, float):
-                    next_vals = [next_vals]
+                next_vals = agent.get_value(d["next_states_tensor"]).squeeze(1)
 
-                target_policy_scores = torch.zeros(
-                    len(d["sim_dones"]), dtype=torch.float32
-                )
+                advantages = torch.zeros(len(d["sim_dones"]), dtype=torch.float32)
                 for j, done in enumerate(d["sim_dones"]):
                     if done:
-                        target_policy_scores[j] = d["sim_rewards"][j] - state_val
+                        advantages[j] = d["sim_rewards"][j] - state_val
                     else:
-                        target_policy_scores[j] = next_vals[j] - state_val
+                        advantages[j] = next_vals[j].item() - state_val
+
+                # Lower temperature makes the network strongly prefer the best moves
+                temperature = 0.1
+                target_probs = F.softmax(advantages / temperature, dim=0)
 
                 p_loss = agent.train_policy_step(
-                    d["state_tensor"], d["action_tensor"], target_policy_scores
+                    d["state_tensor"], d["action_tensor"], target_probs
                 )
                 losses.append(p_loss)
 

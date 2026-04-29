@@ -19,6 +19,8 @@ from abilities import (
 )
 from point import Point
 
+import torch.nn.functional as F
+
 MAX_ENTITY_TYPES = 1024  # increase
 MAX_ABILITY_TYPES = MAX_ENTITY_TYPES * 4
 
@@ -66,7 +68,6 @@ class GameStateEncoder(nn.Module):
 
         id_emb = self.id_embedding(entity_ids)
         features_enc = self.other_features_linear(entity_other_features)
-        # combined_enc = torch.cat([id_emb, features_enc], dim=-1)
         combined_enc = id_emb + features_enc
         entities_encoded = self.final_linear(combined_enc)
 
@@ -117,8 +118,8 @@ class AIPolicyValueNet(nn.Module):
             nn.Linear(hidden_dim, 32), nn.ReLU(), nn.Linear(32, 1)
         )
 
-        self.policy_head = nn.Sequential(
-            nn.Linear(hidden_dim * 2, 32), nn.ReLU(), nn.Linear(32, 1)
+        self.policy_head = nn.Sequential(  # global state, actor state, action
+            nn.Linear(hidden_dim * 3, 32), nn.ReLU(), nn.Linear(32, 1)
         )
 
     def forward(
@@ -126,16 +127,23 @@ class AIPolicyValueNet(nn.Module):
         entity_features: Float[Tensor, "batch entities features"],
         action_features: Float[Tensor, "batch actions features"],
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        state_emb: Float[Tensor, "batch emb"] = self.state_encoder(entity_features)
+        state_emb, all_entities_emb = self.state_encoder(
+            entity_features
+        )  # both are batch, emb
         value: Float[Tensor, "batch 1"] = self.value_head(state_emb)
+
+        actor_idx = torch.argmax(entity_features[:, :, -1], dim=1)
+        batch_indices = torch.arange(entity_features.size(0))
+        actor_emb = all_entities_emb[batch_indices, actor_idx]
 
         act_emb: Float[Tensor, "batch actions emb"] = self.action_encoder(
             action_features
         )
-        state_emb_expanded = einops.repeat(
-            state_emb, "batch emb -> batch act emb", act=act_emb.shape[1]
+        context_emb = torch.cat([state_emb, actor_emb], dim=-1)
+        context_expanded = einops.repeat(
+            context_emb, "batch emb -> batch act emb", act=act_emb.shape[1]
         )
-        combined = torch.cat([state_emb_expanded, act_emb], dim=-1)
+        combined = torch.cat([context_expanded, act_emb], dim=-1)
         policy_scores = self.policy_head(combined)
         return policy_scores, value
 
@@ -385,7 +393,9 @@ class AIAgent:
             values = self.net.value_head(state_embs)
         return values
 
-    def train_value_step(self, states_tensor: torch.Tensor, actual_rewards: torch.Tensor) -> float:
+    def train_value_step(
+        self, states_tensor: torch.Tensor, actual_rewards: torch.Tensor
+    ) -> float:
         self.optimizer.zero_grad()
         state_embs = self.net.state_encoder(states_tensor)
         values = self.net.value_head(state_embs)
@@ -394,11 +404,21 @@ class AIAgent:
         self.optimizer.step()
         return loss.item()
 
-    def train_policy_step(self, states_tensor: torch.Tensor, actions_tensor: torch.Tensor, target_policy_scores: torch.Tensor) -> float:
+    def train_policy_step(
+        self,
+        states_tensor: torch.Tensor,
+        actions_tensor: torch.Tensor,
+        target_probs: torch.Tensor,
+    ) -> float:
         self.optimizer.zero_grad()
-        policy_scores, _ = self.net(states_tensor, actions_tensor)
-        policy_scores_flat = policy_scores.view(-1)
-        loss = nn.MSELoss()(policy_scores_flat, target_policy_scores)
+        # policy_logits shape: (num_actions, 1) -> squeeze to (num_actions,)
+        policy_logits, _ = self.net(states_tensor, actions_tensor)
+        policy_logits = policy_logits.squeeze()
+
+        # CrossEntropyLoss in PyTorch can take probabilities as targets in newer versions
+        # We add a batch dimension of 1 since we are doing this per-state currently
+        loss = F.cross_entropy(policy_logits.unsqueeze(0), target_probs.unsqueeze(0))
+
         loss.backward()
         self.optimizer.step()
         return loss.item()
