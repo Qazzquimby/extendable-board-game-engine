@@ -164,7 +164,7 @@ if __name__ == "__main__":
     agent = AIAgent()
     agent.load()
     all_games = []
-    num_games = 100
+    num_games = 10
     for i in range(num_games):
         print(f"Playing game {i+1}/{num_games}...")
         all_games.append(run_game(agent))

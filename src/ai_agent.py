@@ -62,7 +62,7 @@ class GameStateEncoder(nn.Module):
 
     def forward(
         self, entity_features: Float[Tensor, "batch entities features"]
-    ) -> Float[Tensor, "batch enc"]:
+    ) -> Tuple[Float[Tensor, "batch enc"], Float[Tensor, "batch enc"]]:
         entity_ids = entity_features[:, :, 0].long()
         entity_other_features = entity_features[:, :, 1:]
 
@@ -75,7 +75,7 @@ class GameStateEncoder(nn.Module):
             entities_encoded
         )
         pooled: Float[Tensor, "batch enc"] = transformed.mean(dim=1)
-        return pooled
+        return pooled, transformed
 
     if TYPE_CHECKING:
         __call__ = forward
@@ -356,7 +356,7 @@ class AIAgent:
     def save(self, filepath: str = "model.pth") -> None:
         torch.save(self.net.state_dict(), filepath)
 
-    def load(self, filepath: str = "model.pth") -> None:
+    def load(self, filepath: str = "src/model.pth") -> None:
         import os
 
         if os.path.exists(filepath):
@@ -389,7 +389,7 @@ class AIAgent:
 
     def get_value(self, states_tensor: torch.Tensor) -> torch.Tensor:
         with torch.no_grad():
-            state_embs = self.net.state_encoder(states_tensor)
+            state_embs, _all_entities_emb = self.net.state_encoder(states_tensor)
             values = self.net.value_head(state_embs)
         return values
 
@@ -397,7 +397,7 @@ class AIAgent:
         self, states_tensor: torch.Tensor, actual_rewards: torch.Tensor
     ) -> float:
         self.optimizer.zero_grad()
-        state_embs = self.net.state_encoder(states_tensor)
+        state_embs, _all_entities_emb = self.net.state_encoder(states_tensor)
         values = self.net.value_head(state_embs)
         loss = nn.MSELoss()(values, actual_rewards)
         loss.backward()
