@@ -1,4 +1,5 @@
 import json
+import glob
 
 import torch
 import torch.nn.functional as F
@@ -42,12 +43,15 @@ def train():
     agent = AIAgent()
     agent.load()
 
-    try:
-        with open("../game_logs.json", "r") as f:
-            logs_data = json.load(f)
-    except FileNotFoundError:
-        print("No game_logs.json found. Run self_play.py first.")
+    log_files = glob.glob("../game_logs_*.json")
+    if not log_files:
+        print("No game_logs files found. Run self_play.py first.")
         return
+
+    logs_data = []
+    for log_file in log_files:
+        with open(log_file, "r") as f:
+            logs_data.extend(json.load(f))
 
     data = []
 

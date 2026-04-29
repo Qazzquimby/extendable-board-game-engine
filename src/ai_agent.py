@@ -356,7 +356,7 @@ class AIAgent:
     def save(self, filepath: str = "model.pth") -> None:
         torch.save(self.net.state_dict(), filepath)
 
-    def load(self, filepath: str = "src/model.pth") -> None:
+    def load(self, filepath: str = "model.pth") -> None:
         import os
 
         if os.path.exists(filepath):
@@ -415,8 +415,6 @@ class AIAgent:
         policy_logits, _ = self.net(states_tensor, actions_tensor)
         policy_logits = policy_logits.squeeze()
 
-        # CrossEntropyLoss in PyTorch can take probabilities as targets in newer versions
-        # We add a batch dimension of 1 since we are doing this per-state currently
         loss = F.cross_entropy(policy_logits.unsqueeze(0), target_probs.unsqueeze(0))
 
         loss.backward()

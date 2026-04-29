@@ -104,7 +104,7 @@ def run_game(agent: AIAgent) -> GameLog:
             actor=actor,
             engine=engine,
             plausible_actions=plausible_actions,
-            temperature=0.5,
+            temperature=0.1,
         )
 
         path = engine.grid.get_path(actor.pos, chosen_action.move_pos)
@@ -164,11 +164,24 @@ if __name__ == "__main__":
     agent = AIAgent()
     agent.load()
     all_games = []
-    num_games = 10
+    num_games = 10_000
+    file_idx = 0
     for i in range(num_games):
         print(f"Playing game {i+1}/{num_games}...")
         all_games.append(run_game(agent))
+        
+        if len(all_games) == 10:
+            filename = f"game_logs/{file_idx}.json"
+            with open(filename, "w") as f:
+                json.dump(
+                    [game.model_dump(mode="json") for game in all_games], f, indent=2
+                )
+            print(f"Saved 10 games to {filename}")
+            all_games = []
+            file_idx += 1
 
-    with open("game_logs.json", "w") as f:
-        json.dump([game.model_dump(mode="json") for game in all_games], f, indent=2)
-    print(f"Saved {len(all_games)} games to game_logs.json")
+    if all_games:
+        filename = f"game_logs/{file_idx}.json"
+        with open(filename, "w") as f:
+            json.dump([game.model_dump(mode="json") for game in all_games], f, indent=2)
+        print(f"Saved {len(all_games)} games to {filename}")
