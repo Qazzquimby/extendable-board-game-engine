@@ -1,5 +1,7 @@
 import json
 
+import torch
+
 from ai_agent import (
     AIAgent,
     get_entity_features,
@@ -50,48 +52,55 @@ def train():
 
         for log in game.logs:
             engine = state_to_engine(log.before_state)
-            next_engine = state_to_engine(log.after_state)
-
             actor = engine.active_entity
-
             state_tensor = get_entity_features(engine, actor)
-            next_state_tensor = get_entity_features(
-                next_engine, next_engine.active_entity
-            )
 
-            target_ent = None
-            if log.action.target is not None:
-                for e in engine.entities:
-                    if e.id == log.action.target:
-                        target_ent = e
-                        break
+            sim_actions = []
+            next_state_tensors = []
+            sim_dones = []
+            sim_rewards = []
 
-            # actual targeting not required for training, since actual target is known
-            ability = Ability(name=log.action.ability, targeting=Targeting())
-            ability.owner = actor
+            for sim in log.simulations:
+                target_ent = None
+                if sim.action.target is not None:
+                    for e in engine.entities:
+                        if e.id == sim.action.target:
+                            target_ent = e
+                            break
 
-            action = PlausibleAction(
-                move_pos=log.action.move_pos,
-                target=target_ent,
-                ability=ability,
-                movement_name=log.action.movement_name,
-            )
+                ability = Ability(name=sim.action.ability, targeting=Targeting())
+                ability.owner = actor
 
-            action_tensor = get_plausible_action_features([action])
+                sim_action = PlausibleAction(
+                    move_pos=sim.action.move_pos,
+                    target=target_ent,
+                    ability=ability,
+                    movement_name=sim.action.movement_name,
+                )
+                sim_actions.append(sim_action)
 
-            reward = game.winner_team == actor.team
-            
-            # Use simulation results for policy training (future expansion). 
-            # For now, we still train on the single executed action.
-            # You can adapt `ai_agent.train_step` to process `log.simulations`.
+                sim_next_engine = state_to_engine(sim.after_state)
+                next_state_tensors.append(
+                    get_entity_features(sim_next_engine, sim_next_engine.active_entity)
+                )
+                sim_dones.append(sim.done)
+                sim_rewards.append(1.0 if sim.winner_team == actor.team else 0.0)
+
+            if not sim_actions:
+                continue
+
+            action_tensor = get_plausible_action_features(sim_actions)
+            next_states_tensor = torch.cat(next_state_tensors, dim=0)
+
+            reward = 1.0 if game.winner_team == actor.team else 0.0
 
             agent.train_step(
                 state_tensor=state_tensor,
                 action_tensor=action_tensor,
-                chosen_action_idx=0,
-                next_state_tensor=next_state_tensor,
-                reward=reward,
-                done=log.done,
+                next_states_tensor=next_states_tensor,
+                sim_dones=sim_dones,
+                sim_rewards=sim_rewards,
+                actual_reward=reward,
             )
 
     agent.save()

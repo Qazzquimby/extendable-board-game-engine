@@ -350,6 +350,7 @@ class AIAgent:
 
     def load(self, filepath: str = "model.pth") -> None:
         import os
+
         if os.path.exists(filepath):
             self.net.load_state_dict(torch.load(filepath, weights_only=True))
             print(f"Loaded model from {filepath}")
@@ -382,28 +383,33 @@ class AIAgent:
         self,
         state_tensor: torch.Tensor,
         action_tensor: torch.Tensor,
-        chosen_action_idx: int,
-        next_state_tensor: torch.Tensor,
-        reward: float,
-        done: bool,
+        next_states_tensor: torch.Tensor,
+        sim_dones: List[bool],
+        sim_rewards: List[float],
+        actual_reward: float,
     ) -> float:
         self.optimizer.zero_grad()
 
         policy_scores, value = self.net(state_tensor, action_tensor)
 
-        if done:
-            target_value = torch.tensor([reward], dtype=torch.float32)
-        else:
-            _, next_value = self.net(next_state_tensor, [])
-            target_value = reward + 0.99 * next_value.detach()
-
+        # 1. Train Value Network to predict actual game outcome
+        target_value = torch.tensor([[actual_reward]], dtype=torch.float32)
         value_loss = nn.MSELoss()(value, target_value)
 
-        advantage = (target_value - value.detach()).item()
+        # 2. Train Policy Network to predict advantage (V(next_state) - V(current_state))
+        with torch.no_grad():
+            next_state_embs = self.net.state_encoder(next_states_tensor)
+            next_values = self.net.value_head(next_state_embs)
 
-        probs = torch.softmax(policy_scores, dim=0)
-        log_prob = torch.log(probs[chosen_action_idx] + 1e-8)
-        policy_loss = -log_prob * advantage
+        target_policy_scores = torch.zeros(len(sim_dones), dtype=torch.float32)
+        for i, done in enumerate(sim_dones):
+            if done:
+                target_policy_scores[i] = sim_rewards[i] - value.item()
+            else:
+                target_policy_scores[i] = next_values[i].item() - value.item()
+
+        policy_scores_flat = policy_scores.view(-1)
+        policy_loss = nn.MSELoss()(policy_scores_flat, target_policy_scores)
 
         loss = value_loss + policy_loss
         loss.backward()
