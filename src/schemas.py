@@ -36,7 +36,6 @@ class LogEntry(BaseModel):
     before_state: EngineState
     action: ActionState
     after_state: EngineState
-    reward: float
     done: bool
 
 

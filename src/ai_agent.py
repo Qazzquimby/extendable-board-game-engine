@@ -345,6 +345,17 @@ class AIAgent:
         )
         self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
 
+    def save(self, filepath: str = "model.pth") -> None:
+        torch.save(self.net.state_dict(), filepath)
+
+    def load(self, filepath: str = "model.pth") -> None:
+        import os
+        if os.path.exists(filepath):
+            self.net.load_state_dict(torch.load(filepath, weights_only=True))
+            print(f"Loaded model from {filepath}")
+        else:
+            print(f"No model found at {filepath}, starting fresh.")
+
     def select_action(
         self,
         actor: Entity,

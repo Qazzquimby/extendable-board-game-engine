@@ -87,7 +87,6 @@ def run_game(agent: AIAgent) -> GameLog:
                 movement_name=chosen_action.movement_name,
             ),
             after_state=engine.to_model(),
-            reward=0.0,
             done=done,
         )
         logs.append(log_entry)
@@ -102,6 +101,7 @@ def run_game(agent: AIAgent) -> GameLog:
 
 if __name__ == "__main__":
     agent = AIAgent()
+    agent.load()
     all_games = []
     num_games = 10
     for i in range(num_games):

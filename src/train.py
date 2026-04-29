@@ -10,6 +10,9 @@ from engine import Engine, Entity
 from abilities import Ability, Targeting
 from schemas import GameLog, EngineState
 
+# First train value prediction
+# Then train policy to prefer actions that lead to better value predictions
+
 
 def state_to_engine(state: EngineState) -> Engine:
     engine = Engine()
@@ -33,6 +36,7 @@ def state_to_engine(state: EngineState) -> Engine:
 
 def train():
     agent = AIAgent()
+    agent.load()
 
     try:
         with open("../game_logs.json", "r") as f:
@@ -43,7 +47,6 @@ def train():
 
     for game_dict in logs_data:
         game = GameLog(**game_dict)
-        winner = game.winner_team
 
         for log in game.logs:
             engine = state_to_engine(log.before_state)
@@ -76,13 +79,7 @@ def train():
 
             action_tensor = get_plausible_action_features([action])
 
-            # Assign reward based on winner if game is done
-            reward = log.reward
-            if log.done and winner is not None:
-                if actor and actor.team == winner:
-                    reward += 1.0
-                else:
-                    reward -= 1.0
+            reward = game.winner_team == actor.team
 
             agent.train_step(
                 state_tensor=state_tensor,
@@ -93,6 +90,7 @@ def train():
                 done=log.done,
             )
 
+    agent.save()
     print("Training complete.")
 
 
