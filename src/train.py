@@ -118,40 +118,63 @@ def train():
 
     batch_size = 32
 
+    VALUE_EPOCHS = 20
+    POLICY_EPOCHS = 20
+
     print("Training Value Network...")
-    for i in range(0, len(train_data), batch_size):
-        batch = train_data[i : i + batch_size]
-        states = torch.cat([d["state_tensor"] for d in batch], dim=0)
-        rewards = torch.tensor(
-            [[d["actual_reward"]] for d in batch], dtype=torch.float32
-        )
-        v_loss = agent.train_value_step(states, rewards)
-        if i % (batch_size * 10) == 0:
-            print(f"Batch {i//batch_size}, Value Loss: {v_loss}")
+    last_avg_loss = 999
+    for value_epoch in range(VALUE_EPOCHS):
+        print(f"epoch {value_epoch}")
+        losses = []
+        for i in range(0, len(train_data), batch_size):
+            batch = train_data[i : i + batch_size]
+            states = torch.cat([d["state_tensor"] for d in batch], dim=0)
+            rewards = torch.tensor(
+                [[d["actual_reward"]] for d in batch], dtype=torch.float32
+            )
+            v_loss = agent.train_value_step(states, rewards)
+            losses.append(v_loss)
+            if i % (batch_size * 10) == 0:
+                print(f"Batch {i//batch_size}, Value Loss: {v_loss}")
+        avg_loss = sum(losses) / len(losses)
+        if avg_loss > last_avg_loss:
+            break
+        last_avg_loss = avg_loss
 
     print("Training Policy Network...")
-    for i in range(0, len(train_data), batch_size):
-        batch = train_data[i : i + batch_size]
+    last_avg_loss = 999
+    for policy_epoch in range(POLICY_EPOCHS):
+        print(f"epoch {policy_epoch}")
+        losses = []
+        for i in range(0, len(train_data), batch_size):
+            batch = train_data[i : i + batch_size]
 
-        for d in batch:
-            state_val = agent.get_value(d["state_tensor"]).item()
-            next_vals = agent.get_value(d["next_states_tensor"]).squeeze(1).tolist()
-            if isinstance(next_vals, float):
-                next_vals = [next_vals]
+            for d in batch:
+                state_val = agent.get_value(d["state_tensor"]).item()
+                next_vals = agent.get_value(d["next_states_tensor"]).squeeze(1).tolist()
+                if isinstance(next_vals, float):
+                    next_vals = [next_vals]
 
-            target_policy_scores = torch.zeros(len(d["sim_dones"]), dtype=torch.float32)
-            for j, done in enumerate(d["sim_dones"]):
-                if done:
-                    target_policy_scores[j] = d["sim_rewards"][j] - state_val
-                else:
-                    target_policy_scores[j] = next_vals[j] - state_val
+                target_policy_scores = torch.zeros(
+                    len(d["sim_dones"]), dtype=torch.float32
+                )
+                for j, done in enumerate(d["sim_dones"]):
+                    if done:
+                        target_policy_scores[j] = d["sim_rewards"][j] - state_val
+                    else:
+                        target_policy_scores[j] = next_vals[j] - state_val
 
-            p_loss = agent.train_policy_step(
-                d["state_tensor"], d["action_tensor"], target_policy_scores
-            )
+                p_loss = agent.train_policy_step(
+                    d["state_tensor"], d["action_tensor"], target_policy_scores
+                )
+                losses.append(p_loss)
 
-        if i % (batch_size * 10) == 0:
-            print(f"Batch {i//batch_size}, Policy Loss: {p_loss}")
+            if i % (batch_size * 10) == 0:
+                print(f"Batch {i//batch_size}, Policy Loss: {p_loss}")
+        avg_loss = sum(losses) / len(losses)
+        if avg_loss > last_avg_loss:
+            break
+        last_avg_loss = avg_loss
 
     # Validation could be added here to compute loss on val_data
     print(f"Validation set size: {len(val_data)}")
