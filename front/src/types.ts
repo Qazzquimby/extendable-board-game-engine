@@ -27,8 +27,10 @@ export type Target = number | null;
 export type Ability = string;
 export type Path = Point[] | null;
 export type MovementName = string;
-export type Reward = number;
 export type Done = boolean;
+export type Done1 = boolean;
+export type WinnerTeam1 = number | null;
+export type Simulations = ActionSim[];
 export type Logs = LogEntry[];
 
 export interface GameLog {
@@ -40,8 +42,8 @@ export interface LogEntry {
   before_state: EngineState;
   action: ActionState;
   after_state: EngineState;
-  reward: Reward;
   done: Done;
+  simulations?: Simulations;
   [k: string]: unknown;
 }
 export interface EngineState {
@@ -69,5 +71,12 @@ export interface ActionState {
   ability: Ability;
   path?: Path;
   movement_name?: MovementName;
+  [k: string]: unknown;
+}
+export interface ActionSim {
+  action: ActionState;
+  after_state: EngineState;
+  done: Done1;
+  winner_team?: WinnerTeam1;
   [k: string]: unknown;
 }

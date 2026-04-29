@@ -94,6 +94,10 @@ def train():
 
             reward = 1.0 if game.winner_team == actor.team else 0.0
 
+            # todo first fully train value, then train policy.
+            #  separate train and val
+            #  Put train items into batches rather than doing one step per game like this
+
             agent.train_step(
                 state_tensor=state_tensor,
                 action_tensor=action_tensor,

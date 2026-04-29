@@ -343,7 +343,7 @@ class AIAgent:
             entity_vocab_size=MAX_ENTITY_TYPES,
             ability_vocab_size=MAX_ABILITY_TYPES,
         )
-        self.optimizer = optim.Adam(self.net.parameters(), lr=1e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=0.0001)
 
     def save(self, filepath: str = "model.pth") -> None:
         torch.save(self.net.state_dict(), filepath)
@@ -412,6 +412,8 @@ class AIAgent:
         policy_loss = nn.MSELoss()(policy_scores_flat, target_policy_scores)
 
         loss = value_loss + policy_loss
+        print(f"Loss: {loss}. Value: {value_loss}. Policy: {policy_loss}")
+
         loss.backward()
         self.optimizer.step()
 

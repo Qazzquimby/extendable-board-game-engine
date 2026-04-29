@@ -1,5 +1,38 @@
 {
   "$defs": {
+    "ActionSim": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ActionState"
+        },
+        "after_state": {
+          "$ref": "#/$defs/EngineState"
+        },
+        "done": {
+          "title": "Done",
+          "type": "boolean"
+        },
+        "winner_team": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Winner Team"
+        }
+      },
+      "required": [
+        "action",
+        "after_state",
+        "done"
+      ],
+      "title": "ActionSim",
+      "type": "object"
+    },
     "ActionState": {
       "properties": {
         "actor": {
@@ -157,20 +190,23 @@
         "after_state": {
           "$ref": "#/$defs/EngineState"
         },
-        "reward": {
-          "title": "Reward",
-          "type": "number"
-        },
         "done": {
           "title": "Done",
           "type": "boolean"
+        },
+        "simulations": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ActionSim"
+          },
+          "title": "Simulations",
+          "type": "array"
         }
       },
       "required": [
         "before_state",
         "action",
         "after_state",
-        "reward",
         "done"
       ],
       "title": "LogEntry",
