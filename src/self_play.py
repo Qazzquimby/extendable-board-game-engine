@@ -1,8 +1,11 @@
 import json
 import random
+from pathlib import Path
 from typing import List, Type, Union
 
-from engine import DamageEvent, Engine, Entity, HealEvent
+from tqdm import tqdm
+
+from engine import DamageEvent, Engine, HealEvent
 from grid import Grid
 from heroes import MeleeHero, RangedHero
 from ai_agent import (
@@ -165,18 +168,19 @@ if __name__ == "__main__":
     agent.load()
     all_games = []
     num_games = 10_000
-    file_idx = 0
-    for i in range(num_games):
-        print(f"Playing game {i+1}/{num_games}...")
+    existing_game_logs = Path("../game_logs").glob("*.json")
+    existing_game_log_Numbers = [int(f.stem) for f in existing_game_logs]
+
+    file_idx = max(existing_game_log_Numbers) + 1 if existing_game_log_Numbers else 0
+    for i in tqdm(range(num_games)):
         all_games.append(run_game(agent))
-        
+
         if len(all_games) == 10:
-            filename = f"game_logs/{file_idx}.json"
+            filename = f"../game_logs/{file_idx}.json"
             with open(filename, "w") as f:
                 json.dump(
                     [game.model_dump(mode="json") for game in all_games], f, indent=2
                 )
-            print(f"Saved 10 games to {filename}")
             all_games = []
             file_idx += 1
 

@@ -5,6 +5,9 @@ import torch
 import torch.nn.functional as F
 
 import random
+
+from tqdm import tqdm
+
 from ai_agent import (
     AIAgent,
     get_entity_features,
@@ -43,19 +46,20 @@ def train():
     agent = AIAgent()
     agent.load()
 
-    log_files = glob.glob("../game_logs_*.json")
+    log_files = glob.glob("../game_logs/*.json")
     if not log_files:
         print("No game_logs files found. Run self_play.py first.")
         return
 
     logs_data = []
-    for log_file in log_files:
+    for log_file in log_files[:-1]:
         with open(log_file, "r") as f:
             logs_data.extend(json.load(f))
 
     data = []
 
-    for game_dict in logs_data:
+    # todo can this be made faster or preprocessed once?
+    for game_dict in tqdm(logs_data, desc="Processing game logs"):
         game = GameLog(**game_dict)
 
         for log in game.logs:
@@ -126,12 +130,16 @@ def train():
     VALUE_EPOCHS = 20
     POLICY_EPOCHS = 20
 
+    # todo do value then policy each epoch. Save after each epoch
+    # todo use cuda
+    # todo avoid oom at policy optimizer step
+
     print("Training Value Network...")
     last_avg_loss = 999
     for value_epoch in range(VALUE_EPOCHS):
-        print(f"epoch {value_epoch}")
+        print(f"val epoch {value_epoch}")
         losses = []
-        for i in range(0, len(train_data), batch_size):
+        for i in tqdm(range(0, len(train_data), batch_size)):
             batch = train_data[i : i + batch_size]
             states = torch.cat([d["state_tensor"] for d in batch], dim=0)
             rewards = torch.tensor(
@@ -139,19 +147,18 @@ def train():
             )
             v_loss = agent.train_value_step(states, rewards)
             losses.append(v_loss)
-            if i % (batch_size * 10) == 0:
-                print(f"Batch {i//batch_size}, Value Loss: {v_loss}")
         avg_loss = sum(losses) / len(losses)
-        if avg_loss > last_avg_loss:
+        print(f"value avg loss {avg_loss}")
+        if avg_loss + 0.001 > last_avg_loss:
             break
         last_avg_loss = avg_loss
 
     print("Training Policy Network...")
     last_avg_loss = 999
     for policy_epoch in range(POLICY_EPOCHS):
-        print(f"epoch {policy_epoch}")
+        print(f"policy epoch {policy_epoch}")
         losses = []
-        for i in range(0, len(train_data), batch_size):
+        for i in tqdm(range(0, len(train_data), batch_size)):
             batch = train_data[i : i + batch_size]
 
             for d in batch:
@@ -166,7 +173,7 @@ def train():
                         advantages[j] = next_vals[j].item() - state_val
 
                 # Lower temperature makes the network strongly prefer the best moves
-                temperature = 0.1
+                temperature = 0.1  # todo what difference does this make in training?
                 target_probs = F.softmax(advantages / temperature, dim=0)
 
                 p_loss = agent.train_policy_step(
@@ -174,10 +181,9 @@ def train():
                 )
                 losses.append(p_loss)
 
-            if i % (batch_size * 10) == 0:
-                print(f"Batch {i//batch_size}, Policy Loss: {p_loss}")
         avg_loss = sum(losses) / len(losses)
-        if avg_loss > last_avg_loss:
+        print(f"avg policy loss {avg_loss}")
+        if avg_loss + 0.001 > last_avg_loss:
             break
         last_avg_loss = avg_loss
 
