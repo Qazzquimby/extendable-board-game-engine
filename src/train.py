@@ -1,5 +1,6 @@
 import json
 import glob
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
@@ -20,7 +21,7 @@ from pydantic import BaseModel, ConfigDict
 
 from engine import Engine, Entity
 from abilities import Ability, Targeting
-from schemas import GameLog, EngineState
+from schemas import GameLog, EngineState, LogEntry
 
 # First train value prediction
 # Then train policy to prefer actions that lead to better value predictions
@@ -55,7 +56,8 @@ def state_to_engine(state: EngineState) -> Engine:
             engine.active_entity = ent
     return engine
 
-def preprocess(preprocessed_file: str) -> list[TrainData]:
+
+def preprocess_game_logs(preprocessed_file: str) -> list[TrainData]:
     log_files = glob.glob("../game_logs/*.json")
     if not log_files:
         raise FileNotFoundError("No game_logs files found. Run self_play.py first.")
@@ -66,72 +68,79 @@ def preprocess(preprocessed_file: str) -> list[TrainData]:
             logs_data.extend(json.load(f))
 
     data = []
-
     for game_dict in tqdm(logs_data, desc="Processing game logs"):
-        game = GameLog(**game_dict)
+        data += preprocess_game(game=GameLog(**game_dict))
 
-        for log in game.logs:
-            engine = state_to_engine(log.before_state)
-            actor = engine.active_entity
-            if not actor:
-                continue
+    print(f"Saving preprocessed data to {preprocessed_file}...")
+    torch.save(data, preprocessed_file)
+    return data
 
-            state_tensor = get_entity_features(engine, actor)
 
-            sim_actions = []
-            next_state_tensors = []
-            sim_dones = []
-            sim_rewards = []
+def preprocess_game(game: GameLog) -> list[TrainData]:
+    data = []
+    for log in game.logs:
+        train_data_for_log = preprocess_log(game=game, log=log)
+        if train_data_for_log:
+            data.append(train_data_for_log)
+    return data
 
-            for sim in log.simulations:
-                target_ent = None
-                if sim.action.target is not None:
-                    for e in engine.entities:
-                        if e.id == sim.action.target:
-                            target_ent = e
-                            break
 
-                ability = Ability(name=sim.action.ability, targeting=Targeting())
-                ability.owner = actor
+def preprocess_log(game: GameLog, log: LogEntry) -> Optional[TrainData]:
+    engine = state_to_engine(log.before_state)
+    actor = engine.active_entity
+    if not actor:
+        return None
 
-                sim_action = PlausibleAction(
-                    move_pos=sim.action.move_pos,
-                    target=target_ent,
-                    ability=ability,
-                    movement_name=sim.action.movement_name,
-                )
-                sim_actions.append(sim_action)
+    state_tensor = get_entity_features(engine, actor)
 
-                sim_next_engine = state_to_engine(sim.after_state)
-                next_state_tensors.append(
-                    get_entity_features(sim_next_engine, sim_next_engine.active_entity)
-                )
-                sim_dones.append(sim.done)
-                sim_rewards.append(1.0 if sim.winner_team == actor.team else 0.0)
+    sim_actions = []
+    next_state_tensors = []
+    sim_dones = []
+    sim_rewards = []
 
-            if not sim_actions:
-                continue
+    for sim in log.simulations:
+        target_ent = None
+        if sim.action.target is not None:
+            for e in engine.entities:
+                if e.id == sim.action.target:
+                    target_ent = e
+                    break
 
-            action_tensor = get_plausible_action_features(sim_actions)
-            next_states_tensor = torch.cat(next_state_tensors, dim=0)
+        ability = Ability(name=sim.action.ability, targeting=Targeting())
+        ability.owner = actor
 
-            reward = 1.0 if game.winner_team == actor.team else 0.0
+        sim_action = PlausibleAction(
+            move_pos=sim.action.move_pos,
+            target=target_ent,
+            ability=ability,
+            movement_name=sim.action.movement_name,
+        )
+        sim_actions.append(sim_action)
 
-            data.append(
-                TrainData(
-                    state_tensor=state_tensor,
-                    action_tensor=action_tensor,
-                    next_states_tensor=next_states_tensor,
-                    sim_dones=sim_dones,
-                    sim_rewards=sim_rewards,
-                    actual_reward=reward,
-                )
+        sim_next_engine = state_to_engine(sim.after_state)
+        next_state_tensors.append(
+            get_entity_features(sim_next_engine, sim_next_engine.active_entity)
+        )
+        sim_dones.append(sim.done)
+        sim_rewards.append(1.0 if sim.winner_team == actor.team else 0.0)
 
-            )
+    if not sim_actions:
+        return None
 
-            print(f"Saving preprocessed data to {preprocessed_file}...")
-            torch.save(data, preprocessed_file)
-            return data
+    action_tensor = get_plausible_action_features(sim_actions)
+    next_states_tensor = torch.cat(next_state_tensors, dim=0)
+
+    reward = 1.0 if game.winner_team == actor.team else 0.0
+
+    return TrainData(
+        state_tensor=state_tensor,
+        action_tensor=action_tensor,
+        next_states_tensor=next_states_tensor,
+        sim_dones=sim_dones,
+        sim_rewards=sim_rewards,
+        actual_reward=reward,
+    )
+
 
 def train():
     agent = AIAgent()
@@ -145,7 +154,7 @@ def train():
         print(f"Loading preprocessed data from {preprocessed_file}...")
         data = torch.load(preprocessed_file, weights_only=False)
     else:
-        data = preprocess(preprocessed_file)
+        data = preprocess_game_logs(preprocessed_file)
 
     random.shuffle(data)
     split_idx = int(len(data) * 0.8)
@@ -158,7 +167,7 @@ def train():
     print("Training Network...")
     for epoch in range(EPOCHS):
         print(f"Epoch {epoch}")
-        
+
         # Value
         losses = []
         for i in tqdm(range(0, len(train_data), batch_size), desc="Value"):
@@ -169,7 +178,7 @@ def train():
             ).to(device)
             v_loss = agent.train_value_step(states, rewards)
             losses.append(v_loss)
-            
+
         print(f"value avg loss {sum(losses) / len(losses)}")
 
         # Policy
@@ -181,11 +190,13 @@ def train():
                 state_tensor = d.state_tensor.to(device)
                 next_states_tensor = d.next_states_tensor.to(device)
                 action_tensor = d.action_tensor.to(device)
-                
+
                 state_val = agent.get_value(state_tensor).item()
                 next_vals = agent.get_value(next_states_tensor).squeeze(1)
 
-                advantages = torch.zeros(len(d.sim_dones), dtype=torch.float32).to(device)
+                advantages = torch.zeros(len(d.sim_dones), dtype=torch.float32).to(
+                    device
+                )
                 for j, done in enumerate(d.sim_dones):
                     if done:
                         advantages[j] = d.sim_rewards[j] - state_val
@@ -199,9 +210,15 @@ def train():
                     state_tensor, action_tensor, target_probs
                 )
                 losses.append(p_loss)
-                
-                del state_tensor, next_states_tensor, action_tensor, advantages, target_probs
-            
+
+                del (
+                    state_tensor,
+                    next_states_tensor,
+                    action_tensor,
+                    advantages,
+                    target_probs,
+                )
+
             torch.cuda.empty_cache()
 
         print(f"avg policy loss {sum(losses) / len(losses)}")
