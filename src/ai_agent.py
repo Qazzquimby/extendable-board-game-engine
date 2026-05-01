@@ -395,7 +395,7 @@ class AIAgent:
 
     def train_value_step(
         self, states_tensor: torch.Tensor, actual_rewards: torch.Tensor
-    ) -> float:  # todo use cuda
+    ) -> float:
         self.optimizer.zero_grad()
         state_embs, _all_entities_emb = self.net.state_encoder(states_tensor)
         values = self.net.value_head(state_embs)
@@ -414,9 +414,10 @@ class AIAgent:
         # policy_logits shape: (num_actions, 1) -> squeeze to (num_actions,)
         policy_logits, _ = self.net(states_tensor, actions_tensor)
         policy_logits = policy_logits.squeeze()
+        policy_probs = torch.softmax(policy_logits, dim=0)
 
-        loss = F.cross_entropy(policy_logits.unsqueeze(0), target_probs.unsqueeze(0))
+        loss = F.cross_entropy(policy_probs.unsqueeze(0), target_probs.unsqueeze(0))
 
-        loss.backward()  # todo I assume the final action is taken by softmax so shouldnt we softmax the policy logits before taking loss? Else it's forcing it to learn the softmax step despite it making no difference to the performance
+        loss.backward()
         self.optimizer.step()
         return loss.item()

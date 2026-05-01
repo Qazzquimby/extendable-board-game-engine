@@ -14,12 +14,26 @@ from ai_agent import (
     get_plausible_action_features,
     PlausibleAction,
 )
+import os
+
+from pydantic import BaseModel, ConfigDict
+
 from engine import Engine, Entity
 from abilities import Ability, Targeting
 from schemas import GameLog, EngineState
 
 # First train value prediction
 # Then train policy to prefer actions that lead to better value predictions
+
+
+class TrainData(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    state_tensor: torch.Tensor
+    action_tensor: torch.Tensor
+    next_states_tensor: torch.Tensor
+    sim_dones: list[bool]
+    sim_rewards: list[float]
+    actual_reward: float
 
 
 def state_to_engine(state: EngineState) -> Engine:
@@ -41,15 +55,10 @@ def state_to_engine(state: EngineState) -> Engine:
             engine.active_entity = ent
     return engine
 
-
-def train():
-    agent = AIAgent()
-    agent.load()
-
+def preprocess(preprocessed_file: str) -> list[TrainData]:
     log_files = glob.glob("../game_logs/*.json")
     if not log_files:
-        print("No game_logs files found. Run self_play.py first.")
-        return
+        raise FileNotFoundError("No game_logs files found. Run self_play.py first.")
 
     logs_data = []
     for log_file in log_files[:-1]:
@@ -58,7 +67,6 @@ def train():
 
     data = []
 
-    # todo can this be made faster or preprocessed once?
     for game_dict in tqdm(logs_data, desc="Processing game logs"):
         game = GameLog(**game_dict)
 
@@ -110,87 +118,96 @@ def train():
             reward = 1.0 if game.winner_team == actor.team else 0.0
 
             data.append(
-                {  # todo use pydantic
-                    "state_tensor": state_tensor,
-                    "action_tensor": action_tensor,
-                    "next_states_tensor": next_states_tensor,
-                    "sim_dones": sim_dones,
-                    "sim_rewards": sim_rewards,
-                    "actual_reward": reward,
-                }
+                TrainData(
+                    state_tensor=state_tensor,
+                    action_tensor=action_tensor,
+                    next_states_tensor=next_states_tensor,
+                    sim_dones=sim_dones,
+                    sim_rewards=sim_rewards,
+                    actual_reward=reward,
+                )
+
             )
+
+            print(f"Saving preprocessed data to {preprocessed_file}...")
+            torch.save(data, preprocessed_file)
+            return data
+
+def train():
+    agent = AIAgent()
+    agent.load()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    agent.net.to(device)
+
+    preprocessed_file = "preprocessed_train_data.pt"
+    if os.path.exists(preprocessed_file):
+        print(f"Loading preprocessed data from {preprocessed_file}...")
+        data = torch.load(preprocessed_file, weights_only=False)
+    else:
+        data = preprocess(preprocessed_file)
 
     random.shuffle(data)
     split_idx = int(len(data) * 0.8)
     train_data = data[:split_idx]
     val_data = data[split_idx:]
 
-    batch_size = 32
+    batch_size = 128
+    EPOCHS = 20
 
-    VALUE_EPOCHS = 20
-    POLICY_EPOCHS = 20
-
-    # todo do value then policy each epoch. Save after each epoch
-    # todo use cuda
-    # todo avoid oom at policy optimizer step
-
-    print("Training Value Network...")
-    last_avg_loss = 999
-    for value_epoch in range(VALUE_EPOCHS):
-        print(f"val epoch {value_epoch}")
+    print("Training Network...")
+    for epoch in range(EPOCHS):
+        print(f"Epoch {epoch}")
+        
+        # Value
         losses = []
-        for i in tqdm(range(0, len(train_data), batch_size)):
+        for i in tqdm(range(0, len(train_data), batch_size), desc="Value"):
             batch = train_data[i : i + batch_size]
-            states = torch.cat([d["state_tensor"] for d in batch], dim=0)
+            states = torch.cat([d.state_tensor for d in batch], dim=0).to(device)
             rewards = torch.tensor(
-                [[d["actual_reward"]] for d in batch], dtype=torch.float32
-            )
+                [[d.actual_reward] for d in batch], dtype=torch.float32
+            ).to(device)
             v_loss = agent.train_value_step(states, rewards)
             losses.append(v_loss)
-        avg_loss = sum(losses) / len(losses)
-        print(f"value avg loss {avg_loss}")
-        if avg_loss + 0.001 > last_avg_loss:
-            break
-        last_avg_loss = avg_loss
+            
+        print(f"value avg loss {sum(losses) / len(losses)}")
 
-    print("Training Policy Network...")
-    last_avg_loss = 999
-    for policy_epoch in range(POLICY_EPOCHS):
-        print(f"policy epoch {policy_epoch}")
+        # Policy
         losses = []
-        for i in tqdm(range(0, len(train_data), batch_size)):
+        for i in tqdm(range(0, len(train_data), batch_size), desc="Policy"):
             batch = train_data[i : i + batch_size]
 
             for d in batch:
-                state_val = agent.get_value(d["state_tensor"]).item()
-                next_vals = agent.get_value(d["next_states_tensor"]).squeeze(1)
+                state_tensor = d.state_tensor.to(device)
+                next_states_tensor = d.next_states_tensor.to(device)
+                action_tensor = d.action_tensor.to(device)
+                
+                state_val = agent.get_value(state_tensor).item()
+                next_vals = agent.get_value(next_states_tensor).squeeze(1)
 
-                advantages = torch.zeros(len(d["sim_dones"]), dtype=torch.float32)
-                for j, done in enumerate(d["sim_dones"]):
+                advantages = torch.zeros(len(d.sim_dones), dtype=torch.float32).to(device)
+                for j, done in enumerate(d.sim_dones):
                     if done:
-                        advantages[j] = d["sim_rewards"][j] - state_val
+                        advantages[j] = d.sim_rewards[j] - state_val
                     else:
                         advantages[j] = next_vals[j].item() - state_val
 
-                # Lower temperature makes the network strongly prefer the best moves
-                temperature = 0.1  # todo what difference does this make in training?
+                temperature = 0.1
                 target_probs = F.softmax(advantages / temperature, dim=0)
 
                 p_loss = agent.train_policy_step(
-                    d["state_tensor"], d["action_tensor"], target_probs
+                    state_tensor, action_tensor, target_probs
                 )
                 losses.append(p_loss)
+                
+                del state_tensor, next_states_tensor, action_tensor, advantages, target_probs
+            
+            torch.cuda.empty_cache()
 
-        avg_loss = sum(losses) / len(losses)
-        print(f"avg policy loss {avg_loss}")
-        if avg_loss + 0.001 > last_avg_loss:
-            break
-        last_avg_loss = avg_loss
+        print(f"avg policy loss {sum(losses) / len(losses)}")
+        agent.save()
 
-    # Validation could be added here to compute loss on val_data
     print(f"Validation set size: {len(val_data)}")
-
-    agent.save()
     print("Training complete.")
 
 
