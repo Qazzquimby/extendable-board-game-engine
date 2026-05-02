@@ -34,13 +34,15 @@ class Grid:
         self,
         start: Point,
         max_range: int,
-        blocked_points: Optional[Set[Point]] = None,
+        blocking_los_points: Optional[Set[Point]] = None,
+        blocking_movement_points: Optional[Set[Point]] = None,
     ) -> Set[Point]:
         """Finds all points within max_range, respecting walls. First step can be diagonal. Must have line of sight."""
         if max_range < 0:
             return set()
 
-        blocked_points = blocked_points or set()
+        blocking_los_points = blocking_los_points or set()
+        blocking_movement_points = blocking_movement_points or set()
 
         # State: (point, cost, diagonal_used)
         # We use a dictionary to track the minimum cost to reach a point with/without using a diagonal
@@ -65,8 +67,7 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    # todo los blocking can be distinct at times eg smoke
-                    if not self.is_movement_blocked(curr, n, blocked_points):
+                    if not self.is_movement_blocked(curr, n, blocking_movement_points):
                         queue.append((n, cost + 1, diag_used))
 
             # Diagonal moves (only allowed if not used yet)
@@ -86,7 +87,7 @@ class Grid:
         valid_points = set()
         for point, _ in visited.keys():
             visible, _ = self.get_line_of_sight(
-                start, point, blocked_points=blocked_points
+                start, point, blocked_points=blocking_los_points
             )
             if visible:
                 valid_points.add(point)
