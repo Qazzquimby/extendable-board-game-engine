@@ -1,4 +1,5 @@
-from typing import Tuple, Set, List, Iterator, Callable, Optional
+from typing import Set, List, Iterator, Callable, Optional
+
 from grid import Grid
 from point import Point
 
@@ -45,7 +46,7 @@ class Square(Area):
         in_range: int = 0,
         condition: Optional[Callable[[Set[Point]], bool]] = None,
     ):
-        super().in_range(in_range=in_range)
+        super().__init__(in_range=in_range)
         self.side_length = side_length
         self.in_range = in_range
         self.condition = condition
@@ -107,15 +108,15 @@ def get_line(grid: Grid, start: Point, target: Point, length: int) -> List[Point
     for i in range(1, length + 1):
         nx = round(x0 + step_x * i)
         ny = round(y0 + step_y * i)
-        nxt = (nx, ny)
+        next_point = Point(nx, ny)
 
         if not (0 <= nx < grid.width and 0 <= ny < grid.height):
             break
 
-        if grid.is_movement_blocked(curr, nxt):
+        if grid.is_movement_blocked(curr, next_point):
             break
 
-        line.append(nxt)
-        curr = nxt
+        line.append(next_point)
+        curr = next_point
 
     return line

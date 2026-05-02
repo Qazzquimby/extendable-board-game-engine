@@ -30,10 +30,17 @@ class Grid:
             return dx + dy - 1
         return dx + dy
 
-    def get_points_in_range(self, start: Point, max_range: int) -> Set[Point]:
-        """Finds all points within max_range, respecting walls. First step can be diagonal."""
+    def get_points_in_range(
+        self,
+        start: Point,
+        max_range: int,
+        blocked_points: Optional[Set[Point]] = None,
+    ) -> Set[Point]:
+        """Finds all points within max_range, respecting walls. First step can be diagonal. Must have line of sight."""
         if max_range < 0:
             return set()
+
+        blocked_points = blocked_points or set()
 
         # State: (point, cost, diagonal_used)
         # We use a dictionary to track the minimum cost to reach a point with/without using a diagonal
@@ -58,7 +65,8 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if not self.is_movement_blocked(curr, n):
+                    # todo los blocking can be distinct at times eg smoke
+                    if not self.is_movement_blocked(curr, n, blocked_points):
                         queue.append((n, cost + 1, diag_used))
 
             # Diagonal moves (only allowed if not used yet)
@@ -75,12 +83,23 @@ class Grid:
                         if n not in self.walls:
                             queue.append((n, cost + 1, True))
 
-        return {point for point, _ in visited.keys()}
+        valid_points = set()
+        for point, _ in visited.keys():
+            visible, _ = self.get_line_of_sight(
+                start, point, blocked_points=blocked_points
+            )
+            if visible:
+                valid_points.add(point)
+        return valid_points
 
     def get_movable_spaces(
-        self, start: Point, max_movement: int, occupied_points: Set[Point]
+        self,
+        start: Point,
+        max_movement: int,
+        enemy_points: Set[Point],
+        ally_points: Set[Point],
     ) -> Set[Point]:
-        """Finds all points reachable within max_movement using orthogonal steps, respecting walls and occupied spaces."""
+        """Finds all points reachable within max_movement using orthogonal steps, respecting walls and enemy spaces. Cannot end on ally spaces."""
         if max_movement < 0:
             return set()
 
@@ -97,20 +116,27 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if n not in occupied_points and not self.is_movement_blocked(
-                        curr, n
-                    ):
+                    if not self.is_movement_blocked(curr, n, enemy_points):
                         if n not in visited or visited[n] > cost + 1:
                             visited[n] = cost + 1
                             queue.append((n, cost + 1))
 
-        reachable_points = set(visited.keys())
-        assert reachable_points  # should always at least include starting space
+        reachable_points = {
+            p for p in visited.keys() if p not in ally_points and p not in enemy_points
+        }
+        reachable_points.add(start)  # Can always stay where we are
         return reachable_points
 
-    def is_movement_blocked(self, current: Point, next_pos: Point) -> bool:
+    def is_movement_blocked(
+        self,
+        current: Point,
+        next_pos: Point,
+        blocked_points: Optional[Set[Point]] = None,
+    ) -> bool:
         """Checks if movement between two adjacent spaces is blocked."""
         if next_pos in self.walls:
+            return True
+        if blocked_points and next_pos in blocked_points:
             return True
         edge = tuple(sorted([current, next_pos]))
         if edge in self.edge_walls:
@@ -179,7 +205,11 @@ class Grid:
         return self.get_path(start, target, valid_step=is_toward)
 
     def get_line_of_sight(
-        self, start_pos: Point, target_pos: Point, visualize_file: Optional[str] = None
+        self,
+        start_pos: Point,
+        target_pos: Point,
+        visualize_file: Optional[str] = None,
+        blocked_points: Optional[Set[Point]] = None,
     ) -> Tuple[bool, bool]:
         """
         Calculates visibility based strictly on corner-to-corner math.
@@ -233,6 +263,10 @@ class Grid:
             if gap_w1 in self.walls and gap_w2 in self.walls:
                 visible = False
 
+        blocked = self.walls.copy()
+        if blocked_points:
+            blocked.update(blocked_points)
+
         # Perform ray tracing (DDA-style) if not already blocked
         if visible:
             distance = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
@@ -246,7 +280,7 @@ class Grid:
                     grid_x, grid_y = math.floor(curr_x), math.floor(curr_y)
                     local_x, local_y = curr_x % 1.0, curr_y % 1.0
 
-                    if (grid_x, grid_y) in self.walls:
+                    if (grid_x, grid_y) in blocked:
                         if (grid_x, grid_y) == (start_x, start_y) or (
                             grid_x,
                             grid_y,
