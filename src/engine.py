@@ -172,6 +172,7 @@ class Entity:
 
         self.modifiers: List["Modifier"] = []
         self.abilities: List["Ability"] = []
+        self.tokens: Dict[str, int] = {}
 
         self.move_actions: int = 0
         self.standard_actions: int = 0
@@ -227,6 +228,14 @@ class Entity:
         return q.result
 
     # --- Utility Helpers ---
+    def get_token(self, name: str) -> int:
+        return self.tokens.get(name, 0)
+        
+    def add_token(self, name: str, amount: int = 1) -> None:
+        self.tokens[name] = self.get_token(name) + amount
+        if self.tokens[name] <= 0:
+            del self.tokens[name]
+
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 

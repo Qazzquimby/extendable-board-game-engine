@@ -1,5 +1,6 @@
 from engine import Entity, Engine
-from abilities import Ability, DamageEffect, TargetUnit, TargetSelf
+from abilities import Ability, DamageEffect, TargetUnit, TargetSelf, TargetArea
+from targeting import Burst, Square
 from point import Point
 
 
@@ -38,4 +39,127 @@ class RangedHero(Entity):
         )
         self.abilities.append(
             Ability(name="Do Nothing", targeting=TargetSelf(), effects=[], owner=self)
+        )
+
+
+class Symmetra(Entity):
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(
+            engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
+        )
+        # ENGINE INSUFFICIENT:
+        # - Missing Undefendable / Defense stats
+        # - Missing End of Activation triggers
+        # - Missing Action Types (Free Action, Ultimate, Reaction)
+        # - Missing Object / Marker creation (Turrets, Teleporter, Barriers)
+        # - Missing "Unlimited" range targeting
+        # - Missing Delayed effects (e.g. At the beginning of your next activation)
+        # - Missing Facing and Edges for objects (Floating Barrier)
+        # - Missing Aura mechanics for maximum health buffs (Shield Generator)
+
+        # Approximated Default Ability
+        self.abilities.append(
+            Ability(
+                name="Photon Beam",
+                targeting=TargetUnit(in_range=2),
+                effects=[DamageEffect(amount=2)],  # Missing token scaling
+                is_default=True,
+                owner=self,
+            )
+        )
+
+
+class Reinhardt(Entity):
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(
+            engine=engine, name="Reinhardt", hp=12, speed=3, pos=pos, team=team
+        )
+        # ENGINE INSUFFICIENT:
+        # - Missing Forced Movement (Push/Pull) and immunity to it
+        # - Missing Line targeting
+        # - Missing Stances and Movement restrictions (Slow condition)
+        # - Missing Collision detection during movement (Charge)
+        # - Missing Tap/Exhaust resource mechanic (Fire Strike)
+        # - Missing Ultimate charge mechanics (Earthshatter)
+        # - Missing Status Conditions (Immobile, Stunned)
+
+        # todo, no, targeting is a path of '3 adjacent spaces within range 1'.
+        self.abilities.append(
+            Ability(
+                name="Rocket Hammer",
+                targeting=TargetArea(area=Burst(radius=2, in_range=1)),
+                effects=[DamageEffect(amount=2)],
+                is_default=True,
+                owner=self,
+            )
+        )
+
+
+class Viktoria(Entity):
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(
+            engine=engine, name="Viktoria", hp=6, speed=3, pos=pos, team=team
+        )
+        # ENGINE INSUFFICIENT:
+        # - Missing Summoning/Deploy mechanics without abilities
+        # - Missing Global team-wide triggers (All Viktorias heal 2)
+        # - Missing Death events / On-Kill events
+        # - Missing Critical Hit mechanics
+        # - Missing Teleport movement
+
+        self.abilities.append(
+            Ability(
+                name="Enchanted Katana",
+                targeting=TargetUnit(in_range=1),
+                effects=[DamageEffect(amount=2)],  # Missing Crit and Burst AoE
+                is_default=True,
+                owner=self,
+            )
+        )
+
+
+class Spy(Entity):
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(engine=engine, name="Spy", hp=6, speed=3, pos=pos, team=team)
+        # ENGINE INSUFFICIENT:
+        # - Missing Target spoofing (Treat as ally, redirect target)
+        # - Missing Reactions to enemy movement
+        # - Missing Irreducible damage
+        # - Missing Removal from board and hidden info (Face down markers)
+        # - Missing Damage over Time (DoT)
+        # - Missing Damage Resistance and conditional trigger prevention (Deadringer)
+
+        self.abilities.append(
+            Ability(
+                name="Revolver",
+                targeting=TargetUnit(in_range=99),  # Approximation of unlimited
+                effects=[
+                    DamageEffect(amount=2)
+                ],  # Missing kill counter scaling and irreducible
+                is_default=True,
+                owner=self,
+            )
+        )
+
+
+class Axe(Entity):
+    def __init__(self, engine: Engine, pos: Point, team: int):
+        super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
+        # ENGINE INSUFFICIENT:
+        # - Missing On-Damage received events (Counter Helix)
+        # - Missing tracking of Ability Types (Default vs non-Default in event context)
+        # - Missing Movement cost modifiers (Battle Hunger)
+        # - Missing Temporary Condition tracking (Berserker's Call duration)
+        # - Missing "Target must use X" forcing mechanics
+        # - Missing "Refresh ability" mechanic
+        # - Missing Hero/Summon unit typing
+
+        self.abilities.append(
+            Ability(
+                name="Axe",
+                targeting=TargetUnit(in_range=1),
+                effects=[DamageEffect(amount=2)],
+                is_default=True,
+                owner=self,
+            )
         )
