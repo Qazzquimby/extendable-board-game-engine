@@ -5,7 +5,7 @@ from ai_agent import (
     generate_plausible_actions,
     PlausibleAction,
 )
-from abilities import Ability, TargetUnit
+from abilities import Ability, TargetUnit, DamageEffect
 from engine import Engine, Entity
 from grid import Grid
 from point import Point
@@ -25,7 +25,13 @@ def test_generate_plausible_actions():
     engine = Engine(grid=Grid(100, 100))
 
     actor = Entity(engine, "Hero1", hp=10, speed=3, pos=Point(0, 0), team=1)
-    actor.abilities.append(Ability(name="Strike", targeting=TargetUnit(in_range=2)))
+    actor.abilities.append(
+        Ability(
+            name="Strike",
+            targeting=TargetUnit(in_range=2),
+            effects=[DamageEffect(amount=5)],
+        )
+    )
 
     enemy = Entity(engine, "Enemy1", hp=10, speed=3, pos=Point(5, 5), team=2)
     ally = Entity(engine, "Ally1", hp=10, speed=3, pos=Point(2, 2), team=1)

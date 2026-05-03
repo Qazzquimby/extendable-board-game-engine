@@ -42,19 +42,16 @@ class Grid:
 
         blocking_los_points = blocking_los_points or set()
 
-        # State: (point, cost, diagonal_used)
-        # We use a dictionary to track the minimum cost to reach a point with/without using a diagonal
-        visited = {}
+        visited: dict[Point, int] = {}  # point to cost
         queue = deque([(start, 0)])
 
         while queue:
             curr, cost = queue.popleft()
             curr: Point
-            state_key = curr
 
-            if state_key in visited and visited[state_key] <= cost:
+            if curr in visited and visited[curr] <= cost:
                 continue
-            visited[state_key] = cost
+            visited[curr] = cost
 
             if cost >= max_range:
                 continue
@@ -70,25 +67,25 @@ class Grid:
                     (x - 1, y + 1),
                     (x - 1, y - 1),
                 ]:
-                    n = Point(nx, ny)
+                    point = Point(nx, ny)
                     if 0 <= nx < self.width and 0 <= ny < self.height:
                         # Check if diagonal movement is blocked by walls (corner cutting)
-                        if n not in self.walls:
-                            queue.append((n, cost + 1))
+                        if point not in self.walls:
+                            queue.append((point, cost + 1))
             # Orthogonal moves
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
-                n = Point(nx, ny)
+                point = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    queue.append((n, cost + 1))
+                    queue.append((point, cost + 1))
 
-        valid_points = set()
-        for point, _ in visited.keys():
-            visible, _ = self.get_line_of_sight(
-                start, point, blocked_points=blocking_los_points
+        visible_points = set()
+        for point in visited.keys():
+            is_visible, _has_cover = self.get_line_of_sight(
+                start_pos=start, target_pos=point, blocked_points=blocking_los_points
             )
-            if visible:
-                valid_points.add(point)
-        return valid_points
+            if is_visible:
+                visible_points.add(point)
+        return visible_points
 
     def get_movable_spaces(
         self,
@@ -211,10 +208,13 @@ class Grid:
     ) -> Tuple[bool, bool]:
         """
         Calculates visibility based strictly on corner-to-corner math.
-        Returns (isVisible, isCovered).
+        Returns (isVisible, hasCover).
         """
-        start_x, start_y = start_pos
-        target_x, target_y = target_pos
+        if blocked_points:
+            blocked_points = blocked_points.copy()
+            blocked_points.update(self.walls)
+        else:
+            blocked_points = self.walls.copy()
 
         if start_pos == target_pos:
             if visualize_file:
@@ -224,46 +224,42 @@ class Grid:
                             start=start_pos,
                             target=target_pos,
                             visible=True,
-                            covered=False,
+                            has_cover=False,
                         )
                     )
             return True, False
 
         # 1. Corner Selection based on proximity
-        corner_x = 1.0 if target_x >= start_x else 0.0
-        corner_y = 1.0 if target_y >= start_y else 0.0
+        corner_x = 1.0 if target_pos.x >= start_pos.x else 0.0
+        corner_y = 1.0 if target_pos.y >= start_pos.y else 0.0
 
         # Mathematical float coordinates of the chosen corners
-        x0, y0 = float(start_x + corner_x), float(start_y + corner_y)
-        x1, y1 = float(target_x + corner_x), float(target_y + corner_y)
+        x0, y0 = float(start_pos.x + corner_x), float(start_pos.y + corner_y)
+        x1, y1 = float(target_pos.x + corner_x), float(target_pos.y + corner_y)
 
         # 2. Geometry Check: Does the segment intersect any wall interior?
         visible = True
 
         # Handle the simple diagonal cases first (common rule: squeezing points is blocked)
-        dx = target_x - start_x
-        dy = target_y - start_y
+        dx = target_pos.x - start_pos.x
+        dy = target_pos.y - start_pos.y
         if dx == 0:
             step = 1 if dy > 0 else -1
-            for y in range(start_y + step, target_y, step):
-                if (start_x, y) in self.walls:
+            for y in range(start_pos.y + step, target_pos.y, step):
+                if (start_pos.x, y) in blocked_points:
                     visible = False
                     break
         elif dy == 0:
             step = 1 if dx > 0 else -1
-            for x in range(start_x + step, target_x, step):
-                if (x, start_y) in self.walls:
+            for x in range(start_pos.x + step, target_pos.x, step):
+                if (x, start_pos.y) in blocked_points:
                     visible = False
                     break
         elif abs(dx) == abs(dy):
-            gap_w1 = (start_x + (1 if dx > 0 else -1), start_y)
-            gap_w2 = (start_x, start_y + (1 if dy > 0 else -1))
-            if gap_w1 in self.walls and gap_w2 in self.walls:
+            gap_w1 = (start_pos.x + (1 if dx > 0 else -1), start_pos.y)
+            gap_w2 = (start_pos.x, start_pos.y + (1 if dy > 0 else -1))
+            if gap_w1 in blocked_points and gap_w2 in blocked_points:
                 visible = False
-
-        blocked = self.walls.copy()
-        if blocked_points:
-            blocked.update(blocked_points)
 
         # Perform ray tracing (DDA-style) if not already blocked
         if visible:
@@ -278,11 +274,11 @@ class Grid:
                     grid_x, grid_y = math.floor(curr_x), math.floor(curr_y)
                     local_x, local_y = curr_x % 1.0, curr_y % 1.0
 
-                    if (grid_x, grid_y) in blocked:
-                        if (grid_x, grid_y) == (start_x, start_y) or (
+                    if Point(grid_x, grid_y) in blocked_points:
+                        if (grid_x, grid_y) == (start_pos.x, start_pos.y) or (
                             grid_x,
                             grid_y,
-                        ) == (target_x, target_y):
+                        ) == (target_pos.x, target_pos.y):
                             continue
 
                         EPSILON = 0.000001
@@ -293,20 +289,22 @@ class Grid:
                             break
 
         # 3. Covered Check (Must be visible)
-        covered = False
+        has_cover = False
         if visible:
             neighbors = [
-                (target_x - 1, target_y),
-                (target_x + 1, target_y),
-                (target_x, target_y - 1),
-                (target_x, target_y + 1),
+                (target_pos.x - 1, target_pos.y),
+                (target_pos.x + 1, target_pos.y),
+                (target_pos.x, target_pos.y - 1),
+                (target_pos.x, target_pos.y + 1),
             ]
-            target_dist = (target_x - start_x) ** 2 + (target_y - start_y) ** 2
+            target_dist = (target_pos.x - start_pos.x) ** 2 + (
+                target_pos.y - start_pos.y
+            ) ** 2
             for nx, ny in neighbors:
                 if (nx, ny) in self.walls:
-                    wall_dist = (nx - start_x) ** 2 + (ny - start_y) ** 2
+                    wall_dist = (nx - start_pos.x) ** 2 + (ny - start_pos.y) ** 2
                     if wall_dist < target_dist:
-                        covered = True
+                        has_cover = True
                         break
 
         if visualize_file:
@@ -316,18 +314,18 @@ class Grid:
                         start=start_pos,
                         target=target_pos,
                         visible=visible,
-                        covered=covered,
+                        has_cover=has_cover,
                     )
                 )
 
-        return visible, covered
+        return visible, has_cover
 
     def _render_html(self, color_func, legend_html: str) -> str:
         html = ['<table style="border-collapse: collapse;">']
         for y in range(self.height):
             html.append("  <tr>")
             for x in range(self.width):
-                color = color_func((x, y))
+                color = color_func(Point(x, y))
                 html.append(
                     f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>'
                 )
@@ -346,7 +344,7 @@ class Grid:
         target: Optional[Point] = None,
         path: Optional[List[Point]] = None,
         visible: Optional[bool] = None,
-        covered: Optional[bool] = None,
+        has_cover: Optional[bool] = None,
     ) -> str:
         path_set = set(path) if path else set()
 
@@ -372,7 +370,7 @@ class Grid:
             legend.append(
                 f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}'
             )
-            if covered:
+            if has_cover:
                 legend.append(" (Covered)")
 
         return self._render_html(get_color, "\n".join(legend))

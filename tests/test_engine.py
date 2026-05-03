@@ -212,7 +212,7 @@ def test_engine_serialization():
     state = engine.to_model()
     assert state.round_num == 1
     assert state.current_team == 1
-    assert state.active_entity == "Hero1"
+    assert state.active_entity == 1
     assert len(state.entities) == 1
 
     e1_state = state.entities[0]
