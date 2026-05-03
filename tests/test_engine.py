@@ -1,13 +1,17 @@
+from dataclasses import dataclass
+
 from engine import (
     Engine,
     Entity,
     DamageEvent,
     HealEvent,
     InnateArmor,
-    PaladinAura,
-    Marksmanship,
-    ShallowGrave,
-    Taunted,
+    Modifier,
+    query,
+    QueryHasArmor,
+    before,
+    QueryLegalActions,
+    QueryCanMove,
 )
 from mod_value import ModValue
 from point import Point
@@ -242,3 +246,58 @@ def test_engine_rng_seed():
 
     assert engine1.rng.random() == engine2.rng.random()
     assert engine1.rng.random() != engine3.rng.random()
+
+
+class PaladinAura(Modifier):
+    @query(QueryHasArmor, target_self=False)
+    def grant_armor_to_adjacent(self, q):
+        # Affects OTHERS: checks if the query target is near this aura's owner
+        if q.target != self.owner and q.target.distance_to(self.owner) <= 1:
+            q.result = True
+
+
+class Marksmanship(Modifier):
+    @before(DamageEvent, target_self=False)
+    def buff_long_range_attacks(self, e: DamageEvent) -> None:
+        # Buff applies if owner or ally attacks an enemy from range 3+
+        # and owner has no adjacent enemies.
+        if e.source and e.source.team == self.owner.team:
+            if (
+                not self.owner.has_adjacent_enemies()
+                and e.source.distance_to(e.target) >= 3
+            ):
+                e.amount.add(1)
+                e.amount.is_irreducible = True
+
+
+class ShallowGrave(Modifier):
+    @before(DamageEvent)
+    def prevent_death(self, e: DamageEvent) -> None:
+        e.amount.cap(lambda val: min(val, self.owner.hp - 1))
+
+    @before(HealEvent)
+    def boost_healing(self, e: HealEvent) -> None:
+        e.amount.mult(1.5)
+
+
+@dataclass
+class Taunted(Modifier):
+    taunter: Entity
+
+    @query(QueryLegalActions)
+    def force_attack(self, q: QueryLegalActions) -> None:
+        # Overrides the result to only allow default abilities targeting the taunter.
+        forced_actions = []
+        for ability in self.owner.abilities:
+            if ability.is_default:
+                # Create a copy to not modify the base ability
+                import copy
+
+                action = copy.deepcopy(ability)
+                action.target = self.taunter
+                forced_actions.append(action)
+        q.result = forced_actions
+
+    @query(QueryCanMove)
+    def prevent_move(self, q):
+        q.result = False

@@ -230,7 +230,7 @@ class Entity:
     # --- Utility Helpers ---
     def get_token(self, name: str) -> int:
         return self.tokens.get(name, 0)
-        
+
     def add_token(self, name: str, amount: int = 1) -> None:
         self.tokens[name] = self.get_token(name) + amount
         if self.tokens[name] <= 0:
@@ -315,7 +315,9 @@ class QueryCanMove:
 
 
 class QueryDefense:
-    def __init__(self, target: Entity, attack_source: Optional[Entity], result: int = 0):
+    def __init__(
+        self, target: Entity, attack_source: Optional[Entity], result: int = 0
+    ):
         self.target = target
         self.attack_source = attack_source
         self.result = result
@@ -332,28 +334,6 @@ class InnateArmor(Modifier):
         q.result = True
 
 
-class PaladinAura(Modifier):
-    @query(QueryHasArmor, target_self=False)
-    def grant_armor_to_adjacent(self, q):
-        # Affects OTHERS: checks if the query target is near this aura's owner
-        if q.target != self.owner and q.target.distance_to(self.owner) <= 1:
-            q.result = True
-
-
-class Marksmanship(Modifier):
-    @before(DamageEvent, target_self=False)
-    def buff_long_range_attacks(self, e: DamageEvent) -> None:
-        # Buff applies if owner or ally attacks an enemy from range 3+
-        # and owner has no adjacent enemies.
-        if e.source and e.source.team == self.owner.team:
-            if (
-                not self.owner.has_adjacent_enemies()
-                and e.source.distance_to(e.target) >= 3
-            ):
-                e.amount.add(1)
-                e.amount.is_irreducible = True
-
-
 class Immobile(Modifier):
     @query(QueryCanMove)
     def prevent_move(self, q: QueryCanMove) -> None:
@@ -368,36 +348,3 @@ class Stunned(Modifier):
     @query(QueryLegalActions)
     def prevent_actions(self, q: QueryLegalActions) -> None:
         q.result = []
-
-
-class ShallowGrave(Modifier):
-    @before(DamageEvent)
-    def prevent_death(self, e: DamageEvent) -> None:
-        e.amount.cap(lambda val: min(val, self.owner.hp - 1))
-
-    @before(HealEvent)
-    def boost_healing(self, e: HealEvent) -> None:
-        e.amount.mult(1.5)
-
-
-@dataclass
-class Taunted(Modifier):
-    taunter: Entity
-
-    @query(QueryLegalActions)
-    def force_attack(self, q: QueryLegalActions) -> None:
-        # Overrides the result to only allow default abilities targeting the taunter.
-        forced_actions = []
-        for ability in self.owner.abilities:
-            if ability.is_default:
-                # Create a copy to not modify the base ability
-                import copy
-
-                action = copy.deepcopy(ability)
-                action.target = self.taunter
-                forced_actions.append(action)
-        q.result = forced_actions
-
-    @query(QueryCanMove)
-    def prevent_move(self, q):
-        q.result = False
