@@ -39,6 +39,36 @@ class Burst(Area):
                 yield selection
 
 
+class Line(Area):
+    def __init__(
+        self,
+        length: int,
+        in_range: int = 0,
+        condition: Optional[Callable[[Set[Point]], bool]] = None,
+    ):
+        super().__init__(in_range=in_range)
+        self.length = length
+        self.condition = condition
+
+    def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
+        valid_starts = (
+            {start}
+            if self.in_range == 0
+            else grid.get_points_in_range(start, self.in_range)
+        )
+        seen_lines = set()
+        for s in valid_starts:
+            for aim in grid.get_points_in_range(s, self.length):
+                if aim == s:
+                    continue
+                line = tuple(get_line(grid, s, aim, self.length))
+                if line and line not in seen_lines:
+                    seen_lines.add(line)
+                    points = set(line)
+                    if self.condition is None or self.condition(points):
+                        yield points
+
+
 class Square(Area):
     def __init__(
         self,

@@ -314,6 +314,13 @@ class QueryCanMove:
         self.result: bool = True
 
 
+class QueryDefense:
+    def __init__(self, target: Entity, attack_source: Optional[Entity], result: int = 0):
+        self.target = target
+        self.attack_source = attack_source
+        self.result = result
+
+
 # ==========================================
 # ABILITIES (Developer Implementations)
 # ==========================================
@@ -345,6 +352,22 @@ class Marksmanship(Modifier):
             ):
                 e.amount.add(1)
                 e.amount.is_irreducible = True
+
+
+class Immobile(Modifier):
+    @query(QueryCanMove)
+    def prevent_move(self, q: QueryCanMove) -> None:
+        q.result = False
+
+
+class Stunned(Modifier):
+    @query(QueryCanMove)
+    def prevent_move(self, q: QueryCanMove) -> None:
+        q.result = False
+
+    @query(QueryLegalActions)
+    def prevent_actions(self, q: QueryLegalActions) -> None:
+        q.result = []
 
 
 class ShallowGrave(Modifier):

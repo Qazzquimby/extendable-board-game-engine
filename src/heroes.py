@@ -1,6 +1,6 @@
 from engine import Entity, Engine
 from abilities import Ability, DamageEffect, TargetUnit, TargetSelf, TargetArea
-from targeting import Burst, Square
+from targeting import Burst, Square, Line
 from point import Point
 
 
@@ -48,7 +48,6 @@ class Symmetra(Entity):
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
         # ENGINE INSUFFICIENT:
-        # - Missing Undefendable / Defense stats
         # - Missing End of Activation triggers
         # - Missing Action Types (Free Action, Ultimate, Reaction)
         # - Missing Object / Marker creation (Turrets, Teleporter, Barriers)
@@ -76,12 +75,10 @@ class Reinhardt(Entity):
         )
         # ENGINE INSUFFICIENT:
         # - Missing Forced Movement (Push/Pull) and immunity to it
-        # - Missing Line targeting
         # - Missing Stances and Movement restrictions (Slow condition)
         # - Missing Collision detection during movement (Charge)
         # - Missing Tap/Exhaust resource mechanic (Fire Strike)
         # - Missing Ultimate charge mechanics (Earthshatter)
-        # - Missing Status Conditions (Immobile, Stunned)
 
         # todo, no, targeting is a path of '3 adjacent spaces within range 1'.
         self.abilities.append(
@@ -124,7 +121,6 @@ class Spy(Entity):
         # ENGINE INSUFFICIENT:
         # - Missing Target spoofing (Treat as ally, redirect target)
         # - Missing Reactions to enemy movement
-        # - Missing Irreducible damage
         # - Missing Removal from board and hidden info (Face down markers)
         # - Missing Damage over Time (DoT)
         # - Missing Damage Resistance and conditional trigger prevention (Deadringer)
