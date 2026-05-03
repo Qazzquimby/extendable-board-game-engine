@@ -8,12 +8,12 @@ def test_target_area_instantiation():
     burst_area = Burst(radius=2)
     target_area_no_range = TargetArea(area=burst_area)
     assert target_area_no_range.area == burst_area
-    assert target_area_no_range.max_range == 0
+    assert target_area_no_range.area.in_range == 0
 
-    square_area = Square(side_length=3)
-    target_area_with_range = TargetArea(area=square_area, max_range=5)
+    square_area = Square(side_length=3, in_range=5)
+    target_area_with_range = TargetArea(area=square_area)
     assert target_area_with_range.area == square_area
-    assert target_area_with_range.max_range == 5
+    assert target_area_with_range.area.in_range == 5
 
 
 def test_ability_hashing():

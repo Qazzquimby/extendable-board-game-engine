@@ -203,12 +203,13 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     allies = [
         e for e in engine.entities if e.team == actor.team and e != actor and e.hp > 0
     ]
-
-    occupied_points = {
-        e.pos for e in engine.entities if e != actor and e.pos is not None
-    }
+    enemy_points = {e.pos for e in enemies if e.pos is not None}
+    ally_points = {e.pos for e in allies if e.pos is not None}
     reachable_points = engine.grid.get_movable_spaces(
-        actor.pos, actor.speed, occupied_points
+        start=actor.pos,
+        max_movement=actor.speed,
+        enemy_points=enemy_points,
+        ally_points=ally_points,
     )
     reachable_points.add(actor.pos)
 

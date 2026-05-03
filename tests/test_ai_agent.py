@@ -12,17 +12,13 @@ from point import Point
 
 
 def test_game_state_encoder_transformer():
-    encoder = GameStateEncoder(emb_size=32)
+    encoder = GameStateEncoder(entity_vocab_size=128, emb_size=32)
     # 10 entities * 5 features = 50
-    dummy_state = torch.rand(50)
-    output = encoder(dummy_state)
+    dummy_state = torch.rand((10, 20, 6))
+    pooled, transformed = encoder(dummy_state)
 
-    assert output.shape == (1, 32)
-
-    # Test batching
-    dummy_batch = torch.rand(5, 50)
-    output_batch = encoder(dummy_batch)
-    assert output_batch.shape == (5, 32)
+    assert pooled.shape == (10, 32)
+    assert transformed.shape == (10, 20, 32)
 
 
 def test_generate_plausible_actions():

@@ -61,8 +61,8 @@ def test_shallow_grave_multipliers_and_caps():
 
 def test_taunted_legal_actions_override():
     engine = Engine()
-    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 0), team=1)
-    enemy = MeleeHero(engine, "Enemy", hp=5, pos=Point(1, 0), team=2)
+    axe = Entity(engine=engine, name="Axe", hp=10, speed=3, pos=Point(0, 0), team=1)
+    enemy = MeleeHero(engine=engine, pos=Point(1, 0), team=2)
 
     # Before taunt: can move, has 2 abilities
     assert enemy.can_move() is True
