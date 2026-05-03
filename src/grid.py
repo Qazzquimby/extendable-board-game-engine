@@ -35,24 +35,22 @@ class Grid:
         start: Point,
         max_range: int,
         blocking_los_points: Optional[Set[Point]] = None,
-        blocking_movement_points: Optional[Set[Point]] = None,
     ) -> Set[Point]:
         """Finds all points within max_range, respecting walls. First step can be diagonal. Must have line of sight."""
         if max_range < 0:
             return set()
 
         blocking_los_points = blocking_los_points or set()
-        blocking_movement_points = blocking_movement_points or set()
 
         # State: (point, cost, diagonal_used)
         # We use a dictionary to track the minimum cost to reach a point with/without using a diagonal
         visited = {}
-        queue = deque([(start, 0, False)])
+        queue = deque([(start, 0)])
 
         while queue:
-            curr, cost, diag_used = queue.popleft()
+            curr, cost = queue.popleft()
             curr: Point
-            state_key = (curr, diag_used)
+            state_key = curr
 
             if state_key in visited and visited[state_key] <= cost:
                 continue
@@ -63,15 +61,9 @@ class Grid:
 
             x = curr.x
             y = curr.y
-            # Orthogonal moves
-            for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
-                n = Point(nx, ny)
-                if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if not self.is_movement_blocked(curr, n, blocking_movement_points):
-                        queue.append((n, cost + 1, diag_used))
 
-            # Diagonal moves (only allowed if not used yet)
-            if not diag_used:
+            # Diagonal moves possible as first step
+            if cost == 0:
                 for nx, ny in [
                     (x + 1, y + 1),
                     (x + 1, y - 1),
@@ -82,7 +74,12 @@ class Grid:
                     if 0 <= nx < self.width and 0 <= ny < self.height:
                         # Check if diagonal movement is blocked by walls (corner cutting)
                         if n not in self.walls:
-                            queue.append((n, cost + 1, True))
+                            queue.append((n, cost + 1))
+            # Orthogonal moves
+            for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
+                n = Point(nx, ny)
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    queue.append((n, cost + 1))
 
         valid_points = set()
         for point, _ in visited.keys():

@@ -199,6 +199,30 @@ def get_plausible_action_features(
 
 
 def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleAction]:
+    proposed_moves = get_plausible_movements(
+        actor=actor,
+        engine=engine,
+    )
+    # 2. For each move position, find all possible actions
+    actions_map = {}  # Use dict to store unique actions
+    for move_pos, movement_name in proposed_moves.items():
+        plausible_actions_after_movement = get_plausible_actions_after_movement(
+            actor=actor,
+            engine=engine,
+            move_pos=move_pos,
+            movement_name=movement_name,
+        )
+        actions_map.update(plausible_actions_after_movement)
+
+    actions = list(actions_map.values())
+    assert actions
+    return actions
+
+
+def get_plausible_movements(
+    actor: Entity,
+    engine: Engine,
+):
     enemies = [e for e in engine.entities if e.team != actor.team and e.hp > 0]
     allies = [
         e for e in engine.entities if e.team == actor.team and e != actor and e.hp > 0
@@ -213,7 +237,6 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
     )
     reachable_points.add(actor.pos)
 
-    # 1. Generate a set of interesting move positions.
     proposed_moves = {actor.pos: "Stay"}
     if reachable_points:
         # For each enemy, find a good position to approach
@@ -265,85 +288,102 @@ def generate_plausible_actions(actor: Entity, engine: Engine) -> List[PlausibleA
                 proposed_moves[best_guard_ally] = (
                     f"Guard {ally.name} {ally.id} from {nearest_enemy_to_ally.name} {nearest_enemy_to_ally.id}"
                 )
+    return proposed_moves
 
-    # 2. For each move position, find all possible actions
-    actions_map = {}  # Use dict to store unique actions
-    for move_pos, movement_name in proposed_moves.items():
-        for ability in actor.abilities:
-            is_positive = any(isinstance(e, HealEffect) for e in ability.effects)
-            is_negative = any(isinstance(e, DamageEffect) for e in ability.effects)
 
-            if isinstance(ability.targeting, TargetUnit):
-                attack_range = ability.targeting.in_range
-                # Target anyone in range. Could be friend or foe.
-                for target in engine.entities:
-                    if not target.pos:
-                        continue
-                    if target == actor:
-                        continue
-                    if not is_positive and target.team == actor.team:
-                        continue
-                    if not is_negative and target.team != actor.team:
-                        continue
-                    if move_pos.get_distance(target.pos) <= attack_range:
-                        key = (move_pos, target.pos, ability.get_hash())
-                        if key not in actions_map:
-                            actions_map[key] = PlausibleAction(
-                                move_pos=move_pos,
-                                target=target,
-                                ability=ability,
-                                movement_name=movement_name,
-                            )
-            elif isinstance(ability.targeting, TargetArea):
-                area = ability.targeting.area
-                for area_points in area.get_selections(engine.grid, move_pos):
-                    affected_entities = {
-                        e for e in engine.entities if e.pos in area_points
-                    }
-                    if not affected_entities:
-                        continue
+def get_plausible_actions_after_movement(
+    actor: Entity, engine: Engine, move_pos: Point, movement_name: str
+) -> dict[tuple, PlausibleAction]:
+    plausible_actions_after_movement = {}
+    for ability in actor.abilities:
+        plausible_uses_of_ability_after_movement = (
+            get_plausible_uses_of_ability_after_movement(
+                actor=actor,
+                engine=engine,
+                move_pos=move_pos,
+                movement_name=movement_name,
+                ability=ability,
+            )
+        )
+        plausible_actions_after_movement.update(
+            plausible_uses_of_ability_after_movement
+        )
+    return plausible_actions_after_movement
 
-                    # One action per unique set of affected entities
-                    key = (
-                        move_pos,
-                        frozenset(e.pos for e in affected_entities),
-                        ability.get_hash(),
-                    )
-                    if key not in actions_map:
-                        if is_positive:
-                            valid_targets = [
-                                e for e in affected_entities if e.team == actor.team
-                            ]
-                        elif is_negative:
-                            valid_targets = [
-                                e for e in affected_entities if e.team != actor.team
-                            ]
-                        else:
-                            valid_targets = list(affected_entities)
 
-                        if not valid_targets:
-                            continue
+def get_plausible_uses_of_ability_after_movement(
+    actor: Entity, engine: Engine, move_pos: Point, movement_name: str, ability: Ability
+) -> dict[tuple, PlausibleAction]:
+    plausible_uses_of_ability_after_movement = {}
+    is_positive = any(isinstance(e, HealEffect) for e in ability.effects)
+    is_negative = any(isinstance(e, DamageEffect) for e in ability.effects)
 
-                        actions_map[key] = PlausibleAction(
-                            move_pos=move_pos,
-                            target=None,
-                            ability=ability,
-                            movement_name=movement_name,
-                        )
-            elif isinstance(ability.targeting, TargetSelf):
-                target = actor
-                key = (move_pos, target.pos, ability.get_hash())
-                if key not in actions_map:
-                    actions_map[key] = PlausibleAction(
-                        move_pos=move_pos,
-                        target=target,
-                        ability=ability,
-                        movement_name=movement_name,
-                    )
+    if isinstance(ability.targeting, TargetUnit):
+        attack_range = ability.targeting.in_range
+        # Target anyone in range. Could be friend or foe.
+        for target in engine.entities:
+            if not target.pos or target == actor:
+                continue
+            if not is_positive and target.team == actor.team:
+                continue
+            if not is_negative and target.team != actor.team:
+                continue
+            # todo, no, check if it's in range. grid reachable points
+            if engine.grid.get_points_in_range(start=move_pos, max_range=attack_range):
+                plausible_uses_of_ability_after_movement[
+                    (move_pos, target.pos, ability.get_hash())
+                ] = PlausibleAction(
+                    move_pos=move_pos,
+                    target=target,
+                    ability=ability,
+                    movement_name=movement_name,
+                )
+    elif isinstance(ability.targeting, TargetArea):
+        area = ability.targeting.area
+        for area_points in area.get_selections(engine.grid, move_pos):
+            affected_entities = {e for e in engine.entities if e.pos in area_points}
+            if not affected_entities:
+                continue
 
-    actions = list(actions_map.values())
-    assert actions
-    return actions
+            # One action per unique set of affected entities
+            key = (
+                move_pos,
+                frozenset(e.pos for e in affected_entities),
+                ability.get_hash(),
+            )
+            if key not in plausible_uses_of_ability_after_movement:
+                if is_positive:
+                    valid_targets = [
+                        e for e in affected_entities if e.team == actor.team
+                    ]
+                elif is_negative:
+                    valid_targets = [
+                        e for e in affected_entities if e.team != actor.team
+                    ]
+                else:
+                    valid_targets = list(affected_entities)
+
+                if not valid_targets:
+                    continue
+
+                plausible_uses_of_ability_after_movement[key] = PlausibleAction(
+                    move_pos=move_pos,
+                    target=None,
+                    ability=ability,
+                    movement_name=movement_name,
+                )
+    elif isinstance(ability.targeting, TargetSelf):
+        target = actor
+        key = (move_pos, target.pos, ability.get_hash())
+        if key not in plausible_uses_of_ability_after_movement:
+            plausible_uses_of_ability_after_movement[key] = PlausibleAction(
+                move_pos=move_pos,
+                target=target,
+                ability=ability,
+                movement_name=movement_name,
+            )
+
+    return plausible_uses_of_ability_after_movement
 
 
 class AIAgent:
