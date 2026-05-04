@@ -70,8 +70,26 @@ class MoveEffect(Effect):
 
 
 @dataclass
+class PushEffect(Effect):
+    distance: int
+
+
+@dataclass
+class PullEffect(Effect):
+    distance: int
+
+
+@dataclass
 class ApplyModifierEffect(Effect):
     modifier_class: type
+
+
+@dataclass
+class GiveTokenEffect(Effect):
+    token_name: (
+        str  # todo tokens can have attached passive abilities. They're not just a name.
+    )
+    amount: int = 1
 
 
 # ==========================================

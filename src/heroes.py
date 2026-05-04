@@ -1,7 +1,16 @@
 from engine import Entity, Engine
-from abilities import Ability, DamageEffect, TargetUnit, TargetSelf, TargetArea
+from abilities import (
+    Ability,
+    DamageEffect,
+    GiveTokenEffect,
+    ApplyModifierEffect,
+    TargetUnit,
+    TargetSelf,
+    TargetArea,
+)
 from targeting import Burst, Square, Line
 from point import Point
+from engine import Immobile, InnateArmor
 
 
 class MeleeHero(Entity):
@@ -61,7 +70,10 @@ class Symmetra(Entity):
             Ability(
                 name="Photon Beam",
                 targeting=TargetUnit(in_range=2),
-                effects=[DamageEffect(amount=2)],  # Missing token scaling
+                effects=[
+                    DamageEffect(amount=2, undefendable=True),
+                    GiveTokenEffect(token_name="Photon Beam", amount=1),
+                ],  # Missing token scaling
                 is_default=True,
                 owner=self,
             )
@@ -87,6 +99,23 @@ class Reinhardt(Entity):
                 targeting=TargetArea(area=Burst(radius=2, in_range=1)),
                 effects=[DamageEffect(amount=2)],
                 is_default=True,
+                owner=self,
+            )
+        )
+        self.abilities.append(
+            Ability(
+                name="Fire Strike",
+                targeting=TargetArea(area=Line(length=99)),
+                effects=[DamageEffect(amount=3)],
+                owner=self,
+            )
+        )
+        self.abilities.append(
+            Ability(
+                name="Earthshatter",
+                targeting=TargetArea(area=Square(side_length=3, in_range=2)),
+                effects=[ApplyModifierEffect(modifier_class=Immobile)],
+                # todo immobile until end of their next turn.
                 owner=self,
             )
         )
@@ -128,10 +157,12 @@ class Spy(Entity):
         self.abilities.append(
             Ability(
                 name="Revolver",
-                targeting=TargetUnit(in_range=99),  # Approximation of unlimited
+                targeting=TargetUnit(
+                    in_range=99
+                ),  # todo use in_range None instead. Default to None.
                 effects=[
-                    DamageEffect(amount=2)
-                ],  # Missing kill counter scaling and irreducible
+                    DamageEffect(amount=2, irreducible=True)
+                ],  # Missing kill counter scaling
                 is_default=True,
                 owner=self,
             )
@@ -156,6 +187,34 @@ class Axe(Entity):
                 targeting=TargetUnit(in_range=1),
                 effects=[DamageEffect(amount=2)],
                 is_default=True,
+                owner=self,
+            )
+        )
+        self.abilities.append(
+            Ability(
+                name="Berserker's Call",
+                targeting=TargetSelf(),
+                effects=[ApplyModifierEffect(modifier_class=InnateArmor)],
+                cost_standard_action=False,
+                owner=self,
+            )
+        )
+        self.abilities.append(
+            Ability(
+                name="Battle Hunger",
+                targeting=TargetUnit(in_range=3),
+                effects=[
+                    GiveTokenEffect(token_name="Damage over Time", amount=2),
+                    GiveTokenEffect(token_name="Battle Hunger", amount=1),
+                ],
+                owner=self,
+            )
+        )
+        self.abilities.append(
+            Ability(
+                name="Culling Blade",
+                targeting=TargetUnit(in_range=1),
+                effects=[DamageEffect(amount=3, irreducible=True)],
                 owner=self,
             )
         )
