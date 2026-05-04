@@ -28,9 +28,9 @@ class TargetSelf(Targeting):
 
 @dataclass
 class TargetUnit(Targeting):
-    """Targets a single unit within a given range."""
+    """Targets a single unit within a given range. None means unlimited."""
 
-    in_range: int
+    in_range: Optional[int] = None
 
 
 @dataclass

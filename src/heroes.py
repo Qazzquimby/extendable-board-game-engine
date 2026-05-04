@@ -92,11 +92,11 @@ class Reinhardt(Entity):
         # - Missing Tap/Exhaust resource mechanic (Fire Strike)
         # - Missing Ultimate charge mechanics (Earthshatter)
 
-        # todo, no, targeting is a path of '3 adjacent spaces within range 1'.
         self.abilities.append(
             Ability(
                 name="Rocket Hammer",
                 targeting=TargetArea(area=Burst(radius=2, in_range=1)),
+                # todo, no, targeting is a path of '3 adjacent spaces within range 1'.
                 effects=[DamageEffect(amount=2)],
                 is_default=True,
                 owner=self,
@@ -157,9 +157,7 @@ class Spy(Entity):
         self.abilities.append(
             Ability(
                 name="Revolver",
-                targeting=TargetUnit(
-                    in_range=99
-                ),  # todo use in_range None instead. Default to None.
+                targeting=TargetUnit(),
                 effects=[
                     DamageEffect(amount=2, irreducible=True)
                 ],  # Missing kill counter scaling
