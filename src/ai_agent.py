@@ -14,8 +14,8 @@ from abilities import (
     TargetArea,
     TargetSelf,
     TargetUnit,
-    DamageEffect,
-    HealEffect,
+    DamageInstruction,
+    HealInstruction,
 )
 from point import Point
 
@@ -315,8 +315,8 @@ def get_plausible_uses_of_ability_after_movement(
     actor: Entity, engine: Engine, move_pos: Point, movement_name: str, ability: Ability
 ) -> dict[tuple, PlausibleAction]:
     plausible_uses_of_ability_after_movement = {}
-    is_positive = any(isinstance(e, HealEffect) for e in ability.effects)
-    is_negative = any(isinstance(e, DamageEffect) for e in ability.effects)
+    is_positive = any(isinstance(e, HealInstruction) for e in ability.instructions)
+    is_negative = any(isinstance(e, DamageInstruction) for e in ability.instructions)
 
     if isinstance(ability.targeting, TargetUnit):
         attack_range = ability.targeting.in_range

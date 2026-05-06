@@ -1,3 +1,13 @@
+
+Action: A player's decision to do something. Consumes action points. (e.g., "Player uses Venom Strike on Goblin").
+Ability: The static rules text. Contains targeting rules, costs, and Instructions.
+Instruction: The blueprint of what the ability tries to do. (e.g., DealDamageInstruction). Instructions generate Events.
+Event: The dynamic, modifiable occurrence in time. (e.g., DamageEvent). This goes to the Router, where modifiers intercept it.
+
+If we ever need networking or an undoable game log, introduce Effect: The actual change to the game state. This happens at the very end of an Event. It cannot be modified or canceled. This is what you push to the Game Log for replays or Undo functionality.
+
+---
+
 # Gameplay Overview
 
 - 2 Players

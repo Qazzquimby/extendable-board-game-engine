@@ -61,7 +61,7 @@ class TargetArea(Targeting):
 
 
 @dataclass
-class Effect:
+class Instruction:
     """Base class for all ability effects."""
 
     def execute(self, ctx: ActionContext) -> None:
@@ -69,7 +69,7 @@ class Effect:
 
 
 @dataclass
-class DamageEffect(Effect):
+class DamageInstruction(Instruction):
     amount: DynamicInt
     undefendable: bool = False
     irreducible: bool = False
@@ -87,7 +87,7 @@ class DamageEffect(Effect):
 
 
 @dataclass
-class HealEffect(Effect):
+class HealInstruction(Instruction):
     amount: DynamicInt
 
     def execute(self, ctx: ActionContext) -> None:
@@ -99,7 +99,7 @@ class HealEffect(Effect):
 
 
 @dataclass
-class GiveTokenEffect(Effect):
+class GiveTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
 
@@ -110,7 +110,7 @@ class GiveTokenEffect(Effect):
 
 
 @dataclass
-class RemoveTokenEffect(Effect):
+class RemoveTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
 
@@ -121,7 +121,7 @@ class RemoveTokenEffect(Effect):
 
 
 @dataclass
-class CustomEffect(Effect):
+class CustomInstruction(Instruction):
     """Fallback for totally bespoke, one-off logic."""
 
     func: Callable[[ActionContext], None]
@@ -131,30 +131,30 @@ class CustomEffect(Effect):
 
 
 @dataclass
-class MoveEffect(Effect):
+class MoveInstruction(Instruction):
     distance: DynamicInt
     # todo execution
 
 
 @dataclass
-class PushEffect(Effect):
+class PushInstruction(Instruction):
     distance: DynamicInt
     # todo execution
 
 
 @dataclass
-class PullEffect(Effect):
+class PullInstruction(Instruction):
     distance: DynamicInt
     # todo execution
 
 
 @dataclass
-class ApplyModifierEffect(Effect):
+class ApplyModifierInstruction(Instruction):
     modifier_class: type
 
 
 @dataclass
-class GiveTokenEffect(Effect):
+class GiveTokenInstruction(Instruction):
     token_name: (
         str  # todo tokens can have attached passive abilities. They're not just a name.
     )
@@ -170,7 +170,7 @@ class GiveTokenEffect(Effect):
 class Ability:
     name: str
     targeting: Targeting
-    effects: List[Effect] = field(default_factory=list)
+    instructions: List[Instruction] = field(default_factory=list)
     owner: Optional["Entity"] = None
     is_default: bool = False
     cost_standard_action: bool = True
@@ -188,8 +188,8 @@ class Ability:
         # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
         for target in targets:
             ctx = ActionContext(engine=engine, source=source, target=target)
-            for effect in self.effects:
-                effect.execute(ctx)
+            for instruction in self.instructions:
+                instruction.execute(ctx)
 
     def get_hash(self) -> float:
         import hashlib

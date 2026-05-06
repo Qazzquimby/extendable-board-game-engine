@@ -328,6 +328,7 @@ class DamageEvent:
         self.target.hp -= final_damage
 
         if self.target.hp <= 0:
+            # todo trigger death event
             self.target.pos = None
 
         self.engine.router.publish(self, EventPhase.AFTER)

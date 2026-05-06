@@ -5,7 +5,7 @@ from ai_agent import (
     generate_plausible_actions,
     PlausibleAction,
 )
-from abilities import Ability, TargetUnit, DamageEffect
+from abilities import Ability, TargetUnit, DamageInstruction
 from engine import Engine, Entity
 from grid import Grid
 from point import Point
@@ -29,7 +29,7 @@ def test_generate_plausible_actions():
         Ability(
             name="Strike",
             targeting=TargetUnit(in_range=2),
-            effects=[DamageEffect(amount=5)],
+            instructions=[DamageInstruction(amount=5)],
         )
     )
 

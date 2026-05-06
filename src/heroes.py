@@ -1,9 +1,9 @@
 from engine import Entity, Engine
 from abilities import (
     Ability,
-    DamageEffect,
-    GiveTokenEffect,
-    ApplyModifierEffect,
+    DamageInstruction,
+    GiveTokenInstruction,
+    ApplyModifierInstruction,
     TargetUnit,
     TargetSelf,
     TargetArea,
@@ -22,13 +22,15 @@ class MeleeHero(Entity):
             Ability(
                 name="Melee Attack",
                 targeting=TargetUnit(in_range=1),
-                effects=[DamageEffect(amount=2)],
+                instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
             )
         )
         self.abilities.append(
-            Ability(name="Do Nothing", targeting=TargetSelf(), effects=[], owner=self)
+            Ability(
+                name="Do Nothing", targeting=TargetSelf(), instructions=[], owner=self
+            )
         )
 
 
@@ -41,13 +43,15 @@ class RangedHero(Entity):
             Ability(
                 name="Ranged Attack",
                 targeting=TargetUnit(in_range=3),
-                effects=[DamageEffect(amount=2)],
+                instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
             )
         )
         self.abilities.append(
-            Ability(name="Do Nothing", targeting=TargetSelf(), effects=[], owner=self)
+            Ability(
+                name="Do Nothing", targeting=TargetSelf(), instructions=[], owner=self
+            )
         )
 
 
@@ -70,9 +74,9 @@ class Symmetra(Entity):
             Ability(
                 name="Photon Beam",
                 targeting=TargetUnit(in_range=2),
-                effects=[
-                    DamageEffect(amount=2, undefendable=True),
-                    GiveTokenEffect(token_name="Photon Beam", amount=1),
+                instructions=[
+                    DamageInstruction(amount=2, undefendable=True),
+                    GiveTokenInstruction(token_name="Photon Beam", amount=1),
                 ],  # Missing token scaling
                 is_default=True,
                 owner=self,
@@ -97,7 +101,7 @@ class Reinhardt(Entity):
                 name="Rocket Hammer",
                 targeting=TargetArea(area=Burst(radius=2, in_range=1)),
                 # todo, no, targeting is a path of '3 adjacent spaces within range 1'.
-                effects=[DamageEffect(amount=2)],
+                instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
             )
@@ -106,7 +110,7 @@ class Reinhardt(Entity):
             Ability(
                 name="Fire Strike",
                 targeting=TargetArea(area=Line(length=99)),
-                effects=[DamageEffect(amount=3)],
+                instructions=[DamageInstruction(amount=3)],
                 owner=self,
             )
         )
@@ -114,7 +118,7 @@ class Reinhardt(Entity):
             Ability(
                 name="Earthshatter",
                 targeting=TargetArea(area=Square(side_length=3, in_range=2)),
-                effects=[ApplyModifierEffect(modifier_class=Immobile)],
+                instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
                 # todo immobile until end of their next turn.
                 owner=self,
             )
@@ -137,7 +141,9 @@ class Viktoria(Entity):
             Ability(
                 name="Enchanted Katana",
                 targeting=TargetUnit(in_range=1),
-                effects=[DamageEffect(amount=2)],  # Missing Crit and Burst AoE
+                instructions=[
+                    DamageInstruction(amount=2)
+                ],  # Missing Crit and Burst AoE
                 is_default=True,
                 owner=self,
             )
@@ -158,8 +164,8 @@ class Spy(Entity):
             Ability(
                 name="Revolver",
                 targeting=TargetUnit(),
-                effects=[
-                    DamageEffect(amount=2, irreducible=True)
+                instructions=[
+                    DamageInstruction(amount=2, irreducible=True)
                 ],  # Missing kill counter scaling
                 is_default=True,
                 owner=self,
@@ -183,7 +189,7 @@ class Axe(Entity):
             Ability(
                 name="Axe",
                 targeting=TargetUnit(in_range=1),
-                effects=[DamageEffect(amount=2)],
+                instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
             )
@@ -192,7 +198,7 @@ class Axe(Entity):
             Ability(
                 name="Berserker's Call",
                 targeting=TargetSelf(),
-                effects=[ApplyModifierEffect(modifier_class=InnateArmor)],
+                instructions=[ApplyModifierInstruction(modifier_class=InnateArmor)],
                 cost_standard_action=False,
                 owner=self,
             )
@@ -201,9 +207,9 @@ class Axe(Entity):
             Ability(
                 name="Battle Hunger",
                 targeting=TargetUnit(in_range=3),
-                effects=[
-                    GiveTokenEffect(token_name="Damage over Time", amount=2),
-                    GiveTokenEffect(token_name="Battle Hunger", amount=1),
+                instructions=[
+                    GiveTokenInstruction(token_name="Damage over Time", amount=2),
+                    GiveTokenInstruction(token_name="Battle Hunger", amount=1),
                 ],
                 owner=self,
             )
@@ -212,7 +218,7 @@ class Axe(Entity):
             Ability(
                 name="Culling Blade",
                 targeting=TargetUnit(in_range=1),
-                effects=[DamageEffect(amount=3, irreducible=True)],
+                instructions=[DamageInstruction(amount=3, irreducible=True)],
                 owner=self,
             )
         )

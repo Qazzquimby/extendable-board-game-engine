@@ -13,7 +13,7 @@ from ai_agent import (
     generate_plausible_actions,
 )
 from point import Point
-from abilities import DamageEffect, HealEffect
+from abilities import DamageInstruction, HealInstruction
 from schemas import ActionState, LogEntry, GameLog, ActionSim
 
 
@@ -62,17 +62,17 @@ def run_game(agent: AIAgent) -> GameLog:
             )
 
             sim_actor.pos = p_action.move_pos
-            for effect in p_action.ability.effects:
-                if isinstance(effect, DamageEffect):
+            for instruction in p_action.ability.instructions:
+                if isinstance(instruction, DamageInstruction):
                     DamageEvent(
                         engine=sim_engine,
                         source=sim_actor,
                         target=sim_target,
-                        amount=effect.amount,
+                        amount=instruction.amount,
                     ).resolve()
-                elif isinstance(effect, HealEffect):
+                elif isinstance(instruction, HealInstruction):
                     HealEvent(
-                        engine=sim_engine, target=sim_target, amount=effect.amount
+                        engine=sim_engine, target=sim_target, amount=instruction.amount
                     ).resolve()
 
             sim_time_up = sim_engine.round_num >= 6
@@ -117,13 +117,18 @@ def run_game(agent: AIAgent) -> GameLog:
         actor.pos = chosen_action.move_pos
         ability = chosen_action.ability
         target = chosen_action.target
-        for effect in ability.effects:
-            if isinstance(effect, DamageEffect):
+        for instruction in ability.instructions:
+            if isinstance(instruction, DamageInstruction):
                 DamageEvent(
-                    engine=engine, source=actor, target=target, amount=effect.amount
+                    engine=engine,
+                    source=actor,
+                    target=target,
+                    amount=instruction.amount,
                 ).resolve()
-            elif isinstance(effect, HealEffect):
-                HealEvent(engine=engine, target=target, amount=effect.amount).resolve()
+            elif isinstance(instruction, HealInstruction):
+                HealEvent(
+                    engine=engine, target=target, amount=instruction.amount
+                ).resolve()
 
         # Check win condition
         time_up = engine.round_num >= 6
