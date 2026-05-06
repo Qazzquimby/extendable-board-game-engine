@@ -1,10 +1,25 @@
 from dataclasses import dataclass, field
-from typing import List, Optional, TYPE_CHECKING, Union
+from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type
 
 if TYPE_CHECKING:
-    from engine import Entity
+    from engine import Entity, Token
     from point import Point
     from targeting import Area
+
+
+@dataclass
+class ActionContext:
+    engine: "Engine"
+    source: "Entity"
+    target: Union["Entity", "Point"]
+    # todo some abilities will surely need more than a single target. Aoe. Move all tokens from one entity to another.
+
+
+DynamicInt = Union[int, Callable[[ActionContext], int]]
+
+
+def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
+    return val(ctx) if callable(val) else val
 
 
 # ==========================================
@@ -49,34 +64,88 @@ class TargetArea(Targeting):
 class Effect:
     """Base class for all ability effects."""
 
-    pass
+    def execute(self, ctx: ActionContext) -> None:
+        pass
 
 
 @dataclass
 class DamageEffect(Effect):
-    amount: int
+    amount: DynamicInt
     undefendable: bool = False
     irreducible: bool = False
+
+    def execute(self, ctx: ActionContext) -> None:
+        from engine import (
+            DamageEvent,
+        )  # todo feels like events and effects should be kept together.
+
+        amount = resolve_int(self.amount, ctx)
+        if hasattr(ctx.target, "hp"):
+            DamageEvent(
+                engine=ctx.engine, source=ctx.source, target=ctx.target, amount=amount
+            ).resolve()
 
 
 @dataclass
 class HealEffect(Effect):
-    amount: int
+    amount: DynamicInt
+
+    def execute(self, ctx: ActionContext) -> None:
+        from engine import HealEvent
+
+        amount = resolve_int(self.amount, ctx)
+        if hasattr(ctx.target, "hp"):
+            HealEvent(engine=ctx.engine, target=ctx.target, amount=amount).resolve()
+
+
+@dataclass
+class GiveTokenEffect(Effect):
+    token_class: Type["Token"]
+    amount: DynamicInt = 1
+
+    def execute(self, ctx: ActionContext) -> None:
+        amt = resolve_int(self.amount, ctx)
+        if hasattr(ctx.target, "add_token"):
+            ctx.target.add_token(self.token_class, amt)
+
+
+@dataclass
+class RemoveTokenEffect(Effect):
+    token_class: Type["Token"]
+    amount: DynamicInt = 1
+
+    def execute(self, ctx: ActionContext) -> None:
+        amt = resolve_int(self.amount, ctx)
+        if hasattr(ctx.target, "remove_token"):
+            ctx.target.remove_token(self.token_class, amt)
+
+
+@dataclass
+class CustomEffect(Effect):
+    """Fallback for totally bespoke, one-off logic."""
+
+    func: Callable[[ActionContext], None]
+
+    def execute(self, ctx: ActionContext) -> None:
+        self.func(ctx)
 
 
 @dataclass
 class MoveEffect(Effect):
-    distance: int
+    distance: DynamicInt
+    # todo execution
 
 
 @dataclass
 class PushEffect(Effect):
-    distance: int
+    distance: DynamicInt
+    # todo execution
 
 
 @dataclass
 class PullEffect(Effect):
-    distance: int
+    distance: DynamicInt
+    # todo execution
 
 
 @dataclass
@@ -109,6 +178,18 @@ class Ability:
     target: Optional[Union["Entity", "Point"]] = (
         None  # For pre-determined targets like with Taunt
     )
+
+    def execute(
+        self,
+        engine: "Engine",
+        source: "Entity",
+        targets: List[Union["Entity", "Point"]],
+    ) -> None:
+        # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
+        for target in targets:
+            ctx = ActionContext(engine=engine, source=source, target=target)
+            for effect in self.effects:
+                effect.execute(ctx)
 
     def get_hash(self) -> float:
         import hashlib

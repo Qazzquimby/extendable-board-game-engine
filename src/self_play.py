@@ -49,6 +49,7 @@ def run_game(agent: AIAgent) -> GameLog:
 
         simulations = []
         for p_action in plausible_actions:
+            # todo use ability.execute()
             sim_engine = engine.clone()
             sim_actor = next(e for e in sim_engine.entities if e.id == actor.id)
             sim_target = next(

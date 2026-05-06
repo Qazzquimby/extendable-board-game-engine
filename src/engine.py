@@ -53,6 +53,9 @@ class Router:
                     )
                 )
 
+    def unsubscribe(self, modifier: "Modifier") -> None:
+        self.subscribers = [sub for sub in self.subscribers if sub.modifier != modifier]
+
     def publish(self, event: Any, phase: EventPhase) -> None:
         for sub in list(self.subscribers):  # iterate copy
             if sub.event_type == type(event) and sub.phase == phase:
@@ -131,6 +134,9 @@ class Engine:
     def next_turn(self) -> None:
         if not self.entities:
             return
+
+        if self.active_entity is not None:
+            TurnEndEvent(self, self.active_entity).resolve()
         if self.active_entity is None:
             self.active_entity = self.entities[0]
         else:
@@ -140,8 +146,10 @@ class Engine:
             else:
                 self.active_entity = self.entities[0]
                 self.round_num += 1
+
         self.current_team = self.active_entity.team
-        self.active_entity.start_turn()
+
+        TurnStartEvent(self, self.active_entity).resolve()
 
     def to_model(self) -> EngineState:
         return EngineState(
@@ -172,7 +180,6 @@ class Entity:
 
         self.modifiers: List["Modifier"] = []
         self.abilities: List["Ability"] = []
-        self.tokens: Dict[str, int] = {}
 
         self.move_actions: int = 0
         self.standard_actions: int = 0
@@ -227,15 +234,6 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
-    # --- Utility Helpers ---
-    def get_token(self, name: str) -> int:
-        return self.tokens.get(name, 0)
-
-    def add_token(self, name: str, amount: int = 1) -> None:
-        self.tokens[name] = self.get_token(name) + amount
-        if self.tokens[name] <= 0:
-            del self.tokens[name]
-
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 
@@ -244,14 +242,71 @@ class Entity:
         self.modifiers.append(modifier)
         self.engine.router.subscribe(modifier)
 
+    def remove_modifier(self, modifier: "Modifier") -> None:
+        if modifier in self.modifiers:
+            self.modifiers.remove(modifier)
+            self.engine.router.unsubscribe(modifier)
+
+    def add_token(self, token_class: Type["Token"], amount: int = 1) -> None:
+        for mod in self.modifiers:
+            if isinstance(mod, token_class):
+                mod.add(amount)
+                return
+        new_token = token_class(amount)
+        self.add_modifier(new_token)
+
+    def remove_token(self, token_class: Type["Token"], amount: int = 1) -> None:
+        for mod in self.modifiers:
+            if isinstance(mod, token_class):
+                mod.remove(amount)
+                return
+
+    def get_token_count(self, token_class: Type["Token"]) -> int:
+        for mod in self.modifiers:
+            if isinstance(mod, token_class):
+                return mod.amount
+        return 0
+
 
 class Modifier:
     owner: Entity = field(init=False)
 
 
+class Token(Modifier):
+    def __init__(self, amount: int = 1):
+        self.amount = amount
+
+    def add(self, amount: int) -> None:
+        self.amount += amount
+
+    def remove(self, amount: int) -> None:
+        self.amount -= amount
+        if self.amount <= 0:
+            self.owner.remove_modifier(self)
+
+
 # ==========================================
 # EVENTS
 # ==========================================
+class TurnStartEvent:
+    def __init__(self, engine: "Engine", target: "Entity"):
+        self.engine = engine
+        self.target = target
+
+    def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
+        self.engine.active_entity.start_turn()
+        self.engine.router.publish(self, EventPhase.AFTER)
+
+
+class TurnEndEvent:
+    def __init__(self, engine: "Engine", target: "Entity"):
+        self.engine = engine
+        self.target = target
+
+    def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
+        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class DamageEvent:
