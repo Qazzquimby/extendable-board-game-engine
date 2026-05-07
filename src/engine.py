@@ -119,7 +119,7 @@ class Engine:
 
     @property
     def living_entities(self) -> List["Entity"]:
-        # todo should use is_alive query
+        # todo should use is_alive engine query
         return [entity for entity in self.entities if entity.pos and entity.hp > 0]
 
     def generate_id(self) -> int:
@@ -229,7 +229,21 @@ class Entity:
     def get_legal_actions(self) -> List[Ability]:
         # Returns all abilities the entity has. Modifiers can alter this list.
         # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.
-        q = QueryLegalActions(self, result=list(self.abilities))
+        legal = []
+        for ability in self.abilities:
+            if ability.is_tapped:
+                continue
+            if ability.charges is not None and ability.charges <= 0:
+                continue
+            if (
+                ability.is_ultimate
+                and ability.ultimate_turn is not None
+                and self.engine.round_num < ability.ultimate_turn
+            ):
+                continue
+            legal.append(ability)
+
+        q = QueryLegalActions(self, result=legal)
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
@@ -310,6 +324,13 @@ class TurnEndEvent:
 
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
+
+        for ability in self.target.abilities:
+            if ability.taps:
+                if not ability.tapped_this_turn:
+                    ability.is_tapped = False
+                ability.tapped_this_turn = False
+
         self.engine.router.publish(self, EventPhase.AFTER)
 
 
@@ -480,6 +501,10 @@ class Summon(Entity):
         )
         self.summoner = summoner
         SummonEvent(self.engine, summoner=self.summoner, summon=self).resolve()
+
+
+class Object(Summon):
+    pass
 
 
 @dataclass

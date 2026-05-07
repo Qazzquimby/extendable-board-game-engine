@@ -125,7 +125,6 @@ class Reinhardt(Hero):
         # - Missing Forced Movement (Push/Pull) and immunity to it
         # - Missing Stances and Movement restrictions (Slow condition)
         # - Missing Collision detection during movement (Charge)
-        # - Missing Tap/Exhaust resource mechanic (Fire Strike)
         # - Missing Ultimate charge mechanics (Earthshatter)
 
         self.abilities.append(
@@ -143,6 +142,7 @@ class Reinhardt(Hero):
                 name="Fire Strike",
                 targeting=TargetArea(area=Line(length=99)),
                 instructions=[DamageInstruction(amount=3)],
+                taps=True,
                 owner=self,
             )
         )
@@ -151,7 +151,10 @@ class Reinhardt(Hero):
                 name="Earthshatter",
                 targeting=TargetArea(area=Square(side_length=3, in_range=2)),
                 instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
-                # todo immobile until end of their next turn.
+                # todo immobile is until end of their next turn.
+                is_ultimate=True,
+                ultimate_turn=4,
+                charges=1,
                 owner=self,
             )
         )
@@ -276,8 +279,11 @@ class CullingBladeInstruction(Instruction):
         )
         event.amount.is_irreducible = True
         event.resolve()
-        if ctx.target.hp <= 0 and isinstance(ctx.target, Hero):
-            ctx.source.add_modifier(InnateArmor())
+        if ctx.target.hp <= 0:
+            if ctx.ability and ctx.ability.charges is not None:
+                ctx.ability.charges += 1
+            if isinstance(ctx.target, Hero):
+                ctx.source.add_modifier(InnateArmor())
 
 
 class AxeCleaveOnTakeDamage(Modifier):
@@ -338,6 +344,7 @@ class Axe(Hero):
                 targeting=TargetSelf(),
                 instructions=[ApplyModifierInstruction(modifier_class=InnateArmor)],
                 cost_standard_action=False,
+                charges=1,
                 owner=self,
             )
         )
@@ -349,6 +356,7 @@ class Axe(Hero):
                     GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
                     GiveTokenInstruction(token_class=BattleHungerToken, amount=1),
                 ],
+                charges=1,
                 owner=self,
             )
         )
@@ -357,6 +365,7 @@ class Axe(Hero):
                 name="Culling Blade",
                 targeting=TargetUnit(in_range=1),
                 instructions=[CullingBladeInstruction()],
+                charges=1,
                 owner=self,
             )
         )

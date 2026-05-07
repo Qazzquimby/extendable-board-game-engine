@@ -176,6 +176,12 @@ class Ability:
     target: Optional[Union["Entity", "Point"]] = (
         None  # For pre-determined targets like with Taunt
     )
+    taps: bool = False
+    is_tapped: bool = False
+    tapped_this_turn: bool = False
+    charges: Optional[int] = None
+    is_ultimate: bool = False
+    ultimate_turn: Optional[int] = None
 
     def execute(
         self,
@@ -183,6 +189,11 @@ class Ability:
         source: "Entity",
         targets: List[Union["Entity", "Point"]],
     ) -> None:
+        if self.charges is not None:
+            self.charges -= 1
+        if self.taps:
+            self.is_tapped = True
+            self.tapped_this_turn = True
         # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
         for target in targets:
             ctx = ActionContext(
