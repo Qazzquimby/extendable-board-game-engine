@@ -328,9 +328,20 @@ class DamageEvent:
         self.target.hp -= final_damage
 
         if self.target.hp <= 0:
-            # todo trigger death event
-            self.target.pos = None
+            DeathEvent(self.engine, target=self.target, killer=self.source).resolve()
 
+        self.engine.router.publish(self, EventPhase.AFTER)
+
+
+class DeathEvent:
+    def __init__(self, engine: Engine, target: Entity, killer: Optional[Entity] = None):
+        self.engine = engine
+        self.target = target
+        self.killer = killer
+
+    def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
+        self.target.pos = None
         self.engine.router.publish(self, EventPhase.AFTER)
 
 
