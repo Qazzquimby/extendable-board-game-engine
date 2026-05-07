@@ -13,6 +13,8 @@ from engine import (
     DeathEvent,
     HealEvent,
     DamageEvent,
+    query,
+    QueryDefense,
 )
 from abilities import (
     Ability,
@@ -163,13 +165,23 @@ class AllViktoriasHealWhenAnyViktoriaKills(Modifier):
                     HealEvent(self.owner.engine, target=entity, amount=2).resolve()
 
 
+class DefenseModifier(Modifier):
+    def __init__(self, owner, amount):
+        super().__init__(owner)
+        self.amount = amount
+
+    @query(QueryDefense)
+    def modify_defense(self, q: QueryDefense):
+        q.result += self.amount
+
+
 class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
     @after(DeathEvent)
     def on_death(self):
         for entity in self.owner.engine.living_entities:
             if entity.name == "Viktoria" and entity != self.owner:
                 HealEvent(self.owner.engine, target=entity, amount=2).resolve()
-                # todo add def
+                self.owner.add_modifier(DefenseModifier(owner=entity, amount=2))
 
 
 class Viktoria(Hero):

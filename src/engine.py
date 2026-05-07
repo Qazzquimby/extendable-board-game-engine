@@ -233,6 +233,11 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
+    def get_defense(self):
+        q = QueryDefense(self, attack_source=None)
+        self.engine.router.publish(q, EventPhase.QUERY)
+        return q.result
+
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 
