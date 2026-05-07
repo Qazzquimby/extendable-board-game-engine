@@ -26,6 +26,7 @@ from abilities import (
     TargetArea,
     Instruction,
     ActionContext,
+    RemoveTokenInstruction,
 )
 from mod_value import div
 from targeting import Burst, Square, Line
@@ -235,9 +236,8 @@ class Spy(Hero):
         # - Missing Damage over Time (DoT)
         # - Missing Damage Resistance and conditional trigger prevention (Deadringer)
 
-        def revolver_damage(ctx) -> int:
-            if getattr(ctx.source, "get_token_count", lambda t: 0)(KillCounter) > 0:
-                ctx.source.remove_token(KillCounter, 1)
+        def revolver_damage(ctx: ActionContext) -> int:
+            if ctx.target.get_token_count(KillCounter) > 0:
                 return 4
             return 2
 
@@ -246,7 +246,8 @@ class Spy(Hero):
                 name="Revolver",
                 targeting=TargetUnit(),
                 instructions=[
-                    DamageInstruction(amount=revolver_damage, irreducible=True)
+                    DamageInstruction(amount=revolver_damage, irreducible=True),
+                    RemoveTokenInstruction(token_class=KillCounter, amount=1),
                 ],
                 is_default=True,
                 owner=self,
