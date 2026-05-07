@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from engine import Entity, Engine
+from engine import Engine, Hero, TurnEndEvent, before, Immobile, InnateArmor, Token
 from abilities import (
     Ability,
     DamageInstruction,
@@ -14,10 +14,9 @@ from abilities import (
 )
 from targeting import Burst, Square, Line
 from point import Point
-from engine import Immobile, InnateArmor, Token
 
 
-class MeleeHero(Entity):
+class MeleeHero(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Melee Hero", hp=10, speed=3, pos=pos, team=team
@@ -38,7 +37,7 @@ class MeleeHero(Entity):
         )
 
 
-class RangedHero(Entity):
+class RangedHero(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Ranged Hero", hp=6, speed=3, pos=pos, team=team
@@ -63,12 +62,12 @@ class PhotonBeamToken(Token):
     pass
 
 
-class Symmetra(Entity):
+class Symmetra(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
-        # ENGINE INSUFFICIENT:
+        # STUBBED:
         # - Missing End of Activation triggers
         # - Missing Action Types (Free Action, Ultimate, Reaction)
         # - Missing Object / Marker creation (Turrets, Teleporter, Barriers)
@@ -100,12 +99,12 @@ class Symmetra(Entity):
         )
 
 
-class Reinhardt(Entity):
+class Reinhardt(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Reinhardt", hp=12, speed=3, pos=pos, team=team
         )
-        # ENGINE INSUFFICIENT:
+        # STUBBED:
         # - Missing Forced Movement (Push/Pull) and immunity to it
         # - Missing Stances and Movement restrictions (Slow condition)
         # - Missing Collision detection during movement (Charge)
@@ -141,12 +140,12 @@ class Reinhardt(Entity):
         )
 
 
-class Viktoria(Entity):
+class Viktoria(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Viktoria", hp=6, speed=3, pos=pos, team=team
         )
-        # ENGINE INSUFFICIENT:
+        # STUBBED:
         # - Missing Summoning/Deploy mechanics without abilities
         # - Missing Global team-wide triggers (All Viktorias heal 2)
         # - Missing Death events / On-Kill events
@@ -170,10 +169,10 @@ class KillCounter(Token):
     pass
 
 
-class Spy(Entity):
+class Spy(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Spy", hp=6, speed=3, pos=pos, team=team)
-        # ENGINE INSUFFICIENT:
+        # STUBBED:
         # - Missing Target spoofing (Treat as ally, redirect target)
         # - Missing Reactions to enemy movement
         # - Missing Removal from board and hidden info (Face down markers)
@@ -200,7 +199,13 @@ class Spy(Entity):
 
 
 class DamageOverTimeToken(Token):
-    pass
+    @before(TurnEndEvent)
+    def take_damage(self, event: TurnEndEvent) -> None:
+        from engine import DamageEvent
+
+        DamageEvent(
+            engine=event.engine, source=None, target=self.owner, amount=self.amount
+        ).resolve()
 
 
 class BattleHungerToken(Token):
@@ -224,10 +229,10 @@ class CullingBladeInstruction(Instruction):
             ctx.source.add_modifier(InnateArmor())
 
 
-class Axe(Entity):
+class Axe(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
-        # ENGINE INSUFFICIENT:
+        # STUBBED:
         # - Missing On-Damage received events (Counter Helix)
         # - Missing tracking of Ability Types (Default vs non-Default in event context)
         # - Missing Movement cost modifiers (Battle Hunger)

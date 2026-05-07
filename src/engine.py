@@ -73,11 +73,9 @@ class Router:
 
 def before(event_type: Type, target_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
-        func._listen_event, func._listen_phase, func._listen_target_self = (
-            event_type,
-            EventPhase.BEFORE,
-            target_self,
-        )
+        func._listen_event = event_type
+        func._listen_phase = EventPhase.BEFORE
+        func._listen_target_self = target_self
         return func
 
     return decorator
@@ -85,11 +83,9 @@ def before(event_type: Type, target_self: bool = True) -> Callable:
 
 def after(event_type: Type, target_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
-        func._listen_event, func._listen_phase, func._listen_target_self = (
-            event_type,
-            EventPhase.AFTER,
-            target_self,
-        )
+        func._listen_event = event_type
+        func._listen_phase = EventPhase.AFTER
+        func._listen_target_self = target_self
         return func
 
     return decorator
@@ -97,11 +93,9 @@ def after(event_type: Type, target_self: bool = True) -> Callable:
 
 def query(event_type: Type, target_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
-        func._listen_event, func._listen_phase, func._listen_target_self = (
-            event_type,
-            EventPhase.QUERY,
-            target_self,
-        )
+        func._listen_event = event_type
+        func._listen_phase = EventPhase.QUERY
+        func._listen_target_self = target_self
         return func
 
     return decorator
@@ -381,6 +375,12 @@ class QueryCanMove:
         self.result: bool = True
 
 
+class QuerySpeed:
+    def __init__(self, target: Entity, result: int):
+        self.target = target
+        self.result = result
+
+
 class QueryDefense:
     def __init__(
         self, target: Entity, attack_source: Optional[Entity], result: int = 0
@@ -415,3 +415,21 @@ class Stunned(Modifier):
     @query(QueryLegalActions)
     def prevent_actions(self, q: QueryLegalActions) -> None:
         q.result = []
+
+
+class Slow(Modifier):
+    def __init__(self, amount: int):
+        self.amount = amount
+
+    @query(QuerySpeed)
+    def reduce_speed(self, q: QuerySpeed) -> None:
+        q.result = max(0, q.result - self.amount)
+
+
+class Hero(Entity):
+    def __init__(
+        self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
+    ):
+        super().__init__(
+            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
+        )
