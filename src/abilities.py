@@ -84,7 +84,11 @@ class DamageInstruction(Instruction):
         amount = resolve_int(self.amount, ctx)
         if hasattr(ctx.target, "hp"):
             DamageEvent(
-                engine=ctx.engine, source=ctx.source, target=ctx.target, amount=amount
+                engine=ctx.engine,
+                source=ctx.source,
+                target=ctx.target,
+                amount=amount,
+                ability=ctx.ability,
             ).resolve()
 
 
@@ -181,7 +185,9 @@ class Ability:
     ) -> None:
         # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
         for target in targets:
-            ctx = ActionContext(engine=engine, source=source, target=target, ability=self)
+            ctx = ActionContext(
+                engine=engine, source=source, target=target, ability=self
+            )
             for instruction in self.instructions:
                 instruction.execute(ctx)
 

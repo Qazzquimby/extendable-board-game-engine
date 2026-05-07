@@ -2,6 +2,11 @@ import math
 from typing import Callable, List, Union
 
 
+def div(numerator: int, denominator: int) -> int:
+    # Always rounds up
+    return math.ceil(numerator / denominator)
+
+
 class ModValue:
     def __init__(self, base: int):
         self.base: int = base

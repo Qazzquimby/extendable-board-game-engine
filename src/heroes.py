@@ -1,6 +1,19 @@
 from dataclasses import dataclass
 
-from engine import Engine, Hero, TurnEndEvent, before, Immobile, InnateArmor, Token
+from engine import (
+    Engine,
+    Hero,
+    TurnEndEvent,
+    before,
+    Immobile,
+    InnateArmor,
+    Token,
+    Modifier,
+    after,
+    DeathEvent,
+    HealEvent,
+    DamageEvent,
+)
 from abilities import (
     Ability,
     DamageInstruction,
@@ -12,6 +25,7 @@ from abilities import (
     Instruction,
     ActionContext,
 )
+from mod_value import div
 from targeting import Burst, Square, Line
 from point import Point
 
@@ -140,6 +154,24 @@ class Reinhardt(Hero):
         )
 
 
+class AllViktoriasHealWhenAnyViktoriaKills(Modifier):
+    @after(DeathEvent, target_self=False)
+    def on_kill(self, event: DeathEvent):
+        if event.killer == self.owner:
+            for entity in self.owner.engine.living_entities:
+                if entity.name == "Viktoria":
+                    HealEvent(self.owner.engine, target=entity, amount=2).resolve()
+
+
+class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
+    @after(DeathEvent)
+    def on_death(self):
+        for entity in self.owner.engine.living_entities:
+            if entity.name == "Viktoria" and entity != self.owner:
+                HealEvent(self.owner.engine, target=entity, amount=2).resolve()
+                # todo add def
+
+
 class Viktoria(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -147,10 +179,11 @@ class Viktoria(Hero):
         )
         # STUBBED:
         # - Missing Summoning/Deploy mechanics without abilities
-        # - Missing Global team-wide triggers (All Viktorias heal 2)
-        # - Missing Death events / On-Kill events
         # - Missing Critical Hit mechanics
         # - Missing Teleport movement
+
+        self.add_modifier(AllViktoriasHealWhenAnyViktoriaKills())
+        self.add_modifier(OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies())
 
         self.abilities.append(
             Ability(
@@ -169,11 +202,22 @@ class KillCounter(Token):
     pass
 
 
+class DamageOverTimeToken(Token):
+    @before(TurnEndEvent)
+    def take_damage(self, event: TurnEndEvent) -> None:
+        from engine import DamageEvent
+
+        DamageEvent(
+            engine=event.engine, source=None, target=self.owner, amount=self.amount
+        ).resolve()
+
+
 class Spy(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Spy", hp=6, speed=3, pos=pos, team=team)
         # STUBBED:
-        # - Missing Target spoofing (Treat as ally, redirect target)
+        # - Missing query_is_ally
+        # - Missing Redirect ability target
         # - Missing Reactions to enemy movement
         # - Missing Removal from board and hidden info (Face down markers)
         # - Missing Damage over Time (DoT)
@@ -198,16 +242,6 @@ class Spy(Hero):
         )
 
 
-class DamageOverTimeToken(Token):
-    @before(TurnEndEvent)
-    def take_damage(self, event: TurnEndEvent) -> None:
-        from engine import DamageEvent
-
-        DamageEvent(
-            engine=event.engine, source=None, target=self.owner, amount=self.amount
-        ).resolve()
-
-
 class BattleHungerToken(Token):
     pass
 
@@ -216,30 +250,65 @@ class BattleHungerToken(Token):
 class CullingBladeInstruction(Instruction):
 
     def execute(self, ctx: ActionContext) -> None:
-        from engine import DamageEvent
+        from engine import DamageEvent, Hero
 
         if not hasattr(ctx.target, "hp"):
             return
         event = DamageEvent(
-            engine=ctx.engine, source=ctx.source, target=ctx.target, amount=3
+            engine=ctx.engine,
+            source=ctx.source,
+            target=ctx.target,
+            amount=3,
+            ability=ctx.ability,
         )
         event.amount.is_irreducible = True
         event.resolve()
-        if ctx.target.hp <= 0:
+        if ctx.target.hp <= 0 and isinstance(ctx.target, Hero):
             ctx.source.add_modifier(InnateArmor())
+
+
+class AxeCleaveOnTakeDamage(Modifier):
+    # - name: Receive damage
+    #   text: |-
+    #     Enemies in burst 1, 1dmg
+    @after(DamageEvent)
+    def burst_damage(self, event: "DamageEvent") -> None:
+        points_in_range = self.owner.engine.grid.get_points_in_range(
+            start=self.owner.pos, max_range=1
+        )
+        for entity in self.owner.engine.living_entities:
+            if entity.team != self.owner.team and entity.pos in points_in_range:
+                DamageEvent(
+                    self.owner.engine, source=self.owner, target=entity, amount=1
+                ).resolve()
+
+
+class AxeReflectHalfOfDamageFromDefaults(Modifier):
+    #       name: Receive damage from a Default Ability
+    #       text: The attacker takes 1/2 the damage received, before Armor.
+    @before(DamageEvent)
+    def reflect_default_damage(self, event: "DamageEvent") -> None:
+        if event.ability and event.ability.is_default and event.source:
+            reflect_amt = div(event.amount.value, 2)
+            if reflect_amt > 0:
+                DamageEvent(
+                    self.owner.engine,
+                    source=self.owner,
+                    target=event.source,
+                    amount=reflect_amt,
+                ).resolve()
 
 
 class Axe(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
         # STUBBED:
-        # - Missing On-Damage received events (Counter Helix)
-        # - Missing tracking of Ability Types (Default vs non-Default in event context)
         # - Missing Movement cost modifiers (Battle Hunger)
         # - Missing Temporary Condition tracking (Berserker's Call duration)
-        # - Missing "Target must use X" forcing mechanics
         # - Missing "Refresh ability" mechanic
-        # - Missing Hero/Summon unit typing
+
+        self.add_modifier(AxeCleaveOnTakeDamage())
+        self.add_modifier(AxeReflectHalfOfDamageFromDefaults())
 
         self.abilities.append(
             Ability(

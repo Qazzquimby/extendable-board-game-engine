@@ -117,6 +117,11 @@ class Engine:
         self.active_entity: Optional["Entity"] = None
         self._next_id: int = 1
 
+    @property
+    def living_entities(self) -> List["Entity"]:
+        # todo should use is_alive query
+        return [entity for entity in self.entities if entity.pos and entity.hp > 0]
+
     def generate_id(self) -> int:
         res = self._next_id
         self._next_id += 1
@@ -305,12 +310,18 @@ class TurnEndEvent:
 
 class DamageEvent:
     def __init__(
-        self, engine: Engine, source: Optional[Entity], target: Entity, amount: int
+        self,
+        engine: Engine,
+        source: Optional[Entity],
+        target: Entity,
+        amount: int,
+        ability: Optional["Ability"] = None,
     ):
         self.engine = engine
         self.source = source
         self.target = target
         self.amount = ModValue(amount)
+        self.ability = ability
 
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
@@ -464,3 +475,30 @@ class Summon(Entity):
         )
         self.summoner = summoner
         SummonEvent(self.engine, summoner=self.summoner, summon=self).resolve()
+
+
+@dataclass
+class Taunted(Modifier):
+    taunter: Entity
+
+    @query(QueryLegalActions)
+    def force_attack(self, q: QueryLegalActions) -> None:
+        forced_actions = []
+        # for ability in self.owner.abilities:
+        for (
+            ability
+        ) in (
+            q.result
+        ):  # It should start initialized to all legal actions including move.
+            if ability.is_default:
+                import copy
+
+                action = copy.deepcopy(ability)
+                action.target = self.taunter
+                forced_actions.append(action)
+        q.result = forced_actions
+        # todo this should be cleared immediately after
+
+    @query(QueryCanMove)
+    def prevent_move(self, q: QueryCanMove) -> None:
+        q.result = False

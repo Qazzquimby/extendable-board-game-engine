@@ -12,6 +12,7 @@ from engine import (
     before,
     QueryLegalActions,
     QueryCanMove,
+    Taunted,
 )
 from mod_value import ModValue
 from point import Point
@@ -280,24 +281,3 @@ class ShallowGrave(Modifier):
         e.amount.mult(1.5)
 
 
-@dataclass
-class Taunted(Modifier):
-    taunter: Entity
-
-    @query(QueryLegalActions)
-    def force_attack(self, q: QueryLegalActions) -> None:
-        # Overrides the result to only allow default abilities targeting the taunter.
-        forced_actions = []
-        for ability in self.owner.abilities:
-            if ability.is_default:
-                # Create a copy to not modify the base ability
-                import copy
-
-                action = copy.deepcopy(ability)
-                action.target = self.taunter
-                forced_actions.append(action)
-        q.result = forced_actions
-
-    @query(QueryCanMove)
-    def prevent_move(self, q):
-        q.result = False
