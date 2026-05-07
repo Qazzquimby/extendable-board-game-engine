@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from engine import Entity, Engine
 from abilities import (
     Ability,
@@ -7,10 +9,12 @@ from abilities import (
     TargetUnit,
     TargetSelf,
     TargetArea,
+    Instruction,
+    ActionContext,
 )
 from targeting import Burst, Square, Line
 from point import Point
-from engine import Immobile, InnateArmor
+from engine import Immobile, InnateArmor, Token
 
 
 class MeleeHero(Entity):
@@ -55,6 +59,10 @@ class RangedHero(Entity):
         )
 
 
+class PhotonBeamToken(Token):
+    pass
+
+
 class Symmetra(Entity):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -69,15 +77,23 @@ class Symmetra(Entity):
         # - Missing Facing and Edges for objects (Floating Barrier)
         # - Missing Aura mechanics for maximum health buffs (Shield Generator)
 
-        # Approximated Default Ability
         self.abilities.append(
             Ability(
                 name="Photon Beam",
                 targeting=TargetUnit(in_range=2),
                 instructions=[
-                    DamageInstruction(amount=2, undefendable=True),
-                    GiveTokenInstruction(token_name="Photon Beam", amount=1),
-                ],  # Missing token scaling
+                    DamageInstruction(
+                        amount=lambda ctx: 2
+                        + (
+                            2
+                            * getattr(ctx.target, "get_token_count", lambda t: 0)(
+                                PhotonBeamToken
+                            )
+                        ),
+                        undefendable=True,
+                    ),
+                    GiveTokenInstruction(token_class=PhotonBeamToken, amount=1),
+                ],
                 is_default=True,
                 owner=self,
             )
@@ -150,6 +166,10 @@ class Viktoria(Entity):
         )
 
 
+class KillCounter(Token):
+    pass
+
+
 class Spy(Entity):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Spy", hp=6, speed=3, pos=pos, team=team)
@@ -160,17 +180,48 @@ class Spy(Entity):
         # - Missing Damage over Time (DoT)
         # - Missing Damage Resistance and conditional trigger prevention (Deadringer)
 
+        def revolver_damage(ctx) -> int:
+            if getattr(ctx.source, "get_token_count", lambda t: 0)(KillCounter) > 0:
+                ctx.source.remove_token(KillCounter, 1)
+                return 4
+            return 2
+
         self.abilities.append(
             Ability(
                 name="Revolver",
                 targeting=TargetUnit(),
                 instructions=[
-                    DamageInstruction(amount=2, irreducible=True)
-                ],  # Missing kill counter scaling
+                    DamageInstruction(amount=revolver_damage, irreducible=True)
+                ],
                 is_default=True,
                 owner=self,
             )
         )
+
+
+class DamageOverTimeToken(Token):
+    pass
+
+
+class BattleHungerToken(Token):
+    pass
+
+
+@dataclass
+class CullingBladeInstruction(Instruction):
+
+    def execute(self, ctx: ActionContext) -> None:
+        from engine import DamageEvent
+
+        if not hasattr(ctx.target, "hp"):
+            return
+        event = DamageEvent(
+            engine=ctx.engine, source=ctx.source, target=ctx.target, amount=3
+        )
+        event.amount.is_irreducible = True
+        event.resolve()
+        if ctx.target.hp <= 0:
+            ctx.source.add_modifier(InnateArmor())
 
 
 class Axe(Entity):
@@ -208,8 +259,8 @@ class Axe(Entity):
                 name="Battle Hunger",
                 targeting=TargetUnit(in_range=3),
                 instructions=[
-                    GiveTokenInstruction(token_name="Damage over Time", amount=2),
-                    GiveTokenInstruction(token_name="Battle Hunger", amount=1),
+                    GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
+                    GiveTokenInstruction(token_class=BattleHungerToken, amount=1),
                 ],
                 owner=self,
             )
@@ -218,7 +269,7 @@ class Axe(Entity):
             Ability(
                 name="Culling Blade",
                 targeting=TargetUnit(in_range=1),
-                instructions=[DamageInstruction(amount=3, irreducible=True)],
+                instructions=[CullingBladeInstruction()],
                 owner=self,
             )
         )

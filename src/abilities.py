@@ -121,16 +121,6 @@ class RemoveTokenInstruction(Instruction):
 
 
 @dataclass
-class CustomInstruction(Instruction):
-    """Fallback for totally bespoke, one-off logic."""
-
-    func: Callable[[ActionContext], None]
-
-    def execute(self, ctx: ActionContext) -> None:
-        self.func(ctx)
-
-
-@dataclass
 class MoveInstruction(Instruction):
     distance: DynamicInt
     # todo execution
@@ -151,14 +141,6 @@ class PullInstruction(Instruction):
 @dataclass
 class ApplyModifierInstruction(Instruction):
     modifier_class: type
-
-
-@dataclass
-class GiveTokenInstruction(Instruction):
-    token_name: (
-        str  # todo tokens can have attached passive abilities. They're not just a name.
-    )
-    amount: int = 1
 
 
 # ==========================================
