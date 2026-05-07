@@ -336,6 +336,19 @@ class DeathEvent:
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
         self.target.pos = None
+
+
+# For on-kill use on-death and filter by killer
+
+
+class SummonEvent:
+    def __init__(self, engine: Engine, summoner: Entity, summon: "Summon"):
+        self.engine = engine
+        self.summoner = summoner
+        self.summon = summon
+
+    def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
         self.engine.router.publish(self, EventPhase.AFTER)
 
 
@@ -433,3 +446,21 @@ class Hero(Entity):
         super().__init__(
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
         )
+
+
+class Summon(Entity):
+    def __init__(
+        self,
+        engine: "Engine",
+        name: str,
+        hp: int,
+        speed: int,
+        pos: Point,
+        team: int,
+        summoner: Entity,
+    ):
+        super().__init__(
+            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
+        )
+        self.summoner = summoner
+        SummonEvent(self.engine, summoner=self.summoner, summon=self).resolve()

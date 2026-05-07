@@ -12,10 +12,12 @@ class ActionContext:
     engine: "Engine"
     source: "Entity"
     target: Union["Entity", "Point"]
+    ability: Optional["Ability"] = None
     # todo some abilities will surely need more than a single target. Aoe. Move all tokens from one entity to another.
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]
+DynamicPoint = Union["Point", Callable[[ActionContext], "Point"]]
 
 
 def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
@@ -139,6 +141,16 @@ class PullInstruction(Instruction):
 
 
 @dataclass
+class TeleportInstruction(Instruction):
+    destination: DynamicPoint
+
+    def execute(self, ctx: ActionContext) -> None:
+        dest = self.destination(ctx) if callable(self.destination) else self.destination
+        if hasattr(ctx.target, "pos"):
+            ctx.target.pos = dest
+
+
+@dataclass
 class ApplyModifierInstruction(Instruction):
     modifier_class: type
 
@@ -169,7 +181,7 @@ class Ability:
     ) -> None:
         # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
         for target in targets:
-            ctx = ActionContext(engine=engine, source=source, target=target)
+            ctx = ActionContext(engine=engine, source=source, target=target, ability=self)
             for instruction in self.instructions:
                 instruction.execute(ctx)
 
