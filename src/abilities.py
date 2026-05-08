@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type
 
 if TYPE_CHECKING:
-    from engine import Entity, Token
+    from engine import Engine, Entity, Token
     from point import Point
     from targeting import Area
 
@@ -127,21 +127,42 @@ class RemoveTokenInstruction(Instruction):
 
 
 @dataclass
-class MoveInstruction(Instruction):
-    distance: DynamicInt
-    # todo execution
-
-
-@dataclass
 class PushInstruction(Instruction):
     distance: DynamicInt
-    # todo execution
+
+    # todo probably want direction param and update resolution
+    def execute(self, ctx: ActionContext) -> None:
+        from engine import PushEvent
+
+        dist = resolve_int(self.distance, ctx)
+        if hasattr(ctx.target, "pos"):
+            PushEvent(
+                engine=ctx.engine, target=ctx.target, distance=dist, source=ctx.source
+            ).resolve()
 
 
 @dataclass
 class PullInstruction(Instruction):
     distance: DynamicInt
-    # todo execution
+
+    # todo probably want direction param and update resolution
+    def execute(self, ctx: ActionContext) -> None:
+        from engine import PullEvent
+
+        dist = resolve_int(self.distance, ctx)
+        if hasattr(ctx.target, "pos"):
+            PullEvent(
+                engine=ctx.engine, target=ctx.target, distance=dist, source=ctx.source
+            ).resolve()
+
+
+@dataclass
+class RefreshAbilityInstruction(Instruction):
+    def execute(self, ctx: ActionContext) -> None:
+        if ctx.ability:
+            ctx.ability.is_tapped = False
+            ctx.ability.tapped_this_turn = False
+            ctx.ability.charges = ctx.ability.max_charges
 
 
 @dataclass
@@ -173,15 +194,17 @@ class Ability:
     is_default: bool = False
     cost_standard_action: bool = True
     cost_move_action: bool = False
-    target: Optional[Union["Entity", "Point"]] = (
-        None  # For pre-determined targets like with Taunt
-    )
+    cost_free_action: bool = False
+    target: Optional[Union["Entity", "Point"]] = None
     taps: bool = False
     is_tapped: bool = False
     tapped_this_turn: bool = False
-    charges: Optional[int] = None
+    max_charges: Optional[int] = None
     is_ultimate: bool = False
     ultimate_turn: Optional[int] = None
+
+    def __post_init__(self):
+        self.charges = self.max_charges
 
     def execute(
         self,

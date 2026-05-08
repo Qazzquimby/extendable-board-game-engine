@@ -311,6 +311,73 @@ class Token(Modifier):
 # ==========================================
 # EVENTS
 # ==========================================
+class PushEvent:
+    def __init__(
+        self,
+        engine: "Engine",
+        target: "Entity",
+        distance: int,
+        source: Optional["Entity"] = None,
+    ):
+        self.engine = engine
+        self.target = target
+        self.distance = ModValue(distance)
+        self.source = source
+        self.canceled = False
+
+    def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
+        if self.canceled:
+            return
+        # Pushing is calculated based on pathing away from the source
+        if (
+            getattr(self.target, "pos", None) is not None
+            and self.source
+            and getattr(self.source, "pos", None) is not None
+        ):
+            dist = max(0, self.distance.value)
+            if dist > 0:
+                path = self.engine.grid.get_push_path(
+                    self.target.pos, None, self.source.pos
+                )
+                if path and len(path) >= dist:
+                    self.target.pos = path[dist - 1]
+        self.engine.router.publish(self, EventPhase.AFTER)
+
+
+class PullEvent:
+    def __init__(
+        self,
+        engine: "Engine",
+        target: "Entity",
+        distance: int,
+        source: Optional["Entity"] = None,
+    ):
+        self.engine = engine
+        self.target = target
+        self.distance = ModValue(distance)
+        self.source = source
+        self.canceled = False
+
+    def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
+        if self.canceled:
+            return
+        if (
+            getattr(self.target, "pos", None) is not None
+            and self.source
+            and getattr(self.source, "pos", None) is not None
+        ):
+            dist = max(0, self.distance.value)
+            if dist > 0:
+                path = self.engine.grid.get_pull_path(
+                    self.target.pos, self.source.pos, self.source.pos
+                )
+                if path and len(path) >= dist:
+                    self.target.pos = path[dist - 1]
+        self.engine.router.publish(self, EventPhase.AFTER)
+
+
 class TurnStartEvent:
     def __init__(self, engine: "Engine", target: "Entity"):
         self.engine = engine
@@ -370,6 +437,7 @@ class DamageEvent:
 
 
 class DeathEvent:
+    # For on-kill use on-death and filter by killer
     def __init__(self, engine: Engine, target: Entity, killer: Optional[Entity] = None):
         self.engine = engine
         self.target = target
@@ -378,9 +446,6 @@ class DeathEvent:
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
         self.target.pos = None
-
-
-# For on-kill use on-death and filter by killer
 
 
 class SummonEvent:

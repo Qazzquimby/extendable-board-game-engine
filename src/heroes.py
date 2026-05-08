@@ -13,6 +13,8 @@ from engine import (
     DeathEvent,
     HealEvent,
     DamageEvent,
+    PushEvent,
+    PullEvent,
     query,
     QueryDefense,
 )
@@ -27,6 +29,8 @@ from abilities import (
     Instruction,
     ActionContext,
     RemoveTokenInstruction,
+    RefreshAbilityInstruction,
+    PushInstruction,
 )
 from mod_value import div
 from targeting import Burst, Square, Line
@@ -121,19 +125,41 @@ class Reinhardt(Hero):
         super().__init__(
             engine=engine, name="Reinhardt", hp=12, speed=3, pos=pos, team=team
         )
-        # STUBBED:
-        # - Missing Forced Movement (Push/Pull) and immunity to it
-        # - Missing Stances and Movement restrictions (Slow condition)
-        # - Missing Collision detection during movement (Charge)
-        # - Missing Ultimate charge mechanics (Earthshatter)
+
+        class CannotBePushedOrPulled(Modifier):
+            @before(PushEvent)
+            def prevent_movement(self, event):
+                event.canceled = True
+
+            @before(PullEvent)
+            def prevent_movement(self, event):
+                event.canceled = True
+
+        self.add_modifier(CannotBePushedOrPulled())
 
         self.abilities.append(
             Ability(
                 name="Rocket Hammer",
                 targeting=TargetArea(area=Burst(radius=2, in_range=1)),
-                # todo, no, targeting is a path of '3 adjacent spaces within range 1'.
+                # todo, no, targeting should be a path of '3 adjacent spaces within range 1'.
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
+                owner=self,
+            )
+        )
+        self.abilities.append(
+            Ability(
+                # todo, implement collide and drag
+                name="Charge",
+                targeting=TargetArea(area=Line(length=99, in_range=0)),
+                instructions=[
+                    DamageInstruction(amount=6),
+                    PushInstruction(distance=99),
+                    ApplyModifierInstruction(modifier_class=Immobile),
+                ],
+                cost_move_action=True,
+                cost_standard_action=True,
+                charges=1,
                 owner=self,
             )
         )
@@ -151,7 +177,6 @@ class Reinhardt(Hero):
                 name="Earthshatter",
                 targeting=TargetArea(area=Square(side_length=3, in_range=2)),
                 instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
-                # todo immobile is until end of their next turn.
                 is_ultimate=True,
                 ultimate_turn=4,
                 charges=1,
@@ -266,8 +291,6 @@ class BattleHungerToken(Token):
 class CullingBladeInstruction(Instruction):
 
     def execute(self, ctx: ActionContext) -> None:
-        from engine import DamageEvent, Hero
-
         if not hasattr(ctx.target, "hp"):
             return
         event = DamageEvent(
@@ -280,6 +303,7 @@ class CullingBladeInstruction(Instruction):
         event.amount.is_irreducible = True
         event.resolve()
         if ctx.target.hp <= 0:
+            RefreshAbilityInstruction().execute(ctx)
             if ctx.ability and ctx.ability.charges is not None:
                 ctx.ability.charges += 1
             if isinstance(ctx.target, Hero):
@@ -344,6 +368,7 @@ class Axe(Hero):
                 targeting=TargetSelf(),
                 instructions=[ApplyModifierInstruction(modifier_class=InnateArmor)],
                 cost_standard_action=False,
+                cost_free_action=True,
                 charges=1,
                 owner=self,
             )
