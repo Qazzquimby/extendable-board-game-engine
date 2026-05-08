@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Set
+from typing import Set, Iterator
 
 from engine import (
     Engine,
@@ -35,6 +35,7 @@ from abilities import (
     PushInstruction,
     ActionCost,
 )
+from grid import Grid
 from mod_value import div
 from targeting import Square, Line, PathArea
 from point import Point
@@ -123,11 +124,23 @@ class Symmetra(Hero):
         )
 
 
-def _reinhardt_all_path_spaces_are_in_range_1(source: Entity, points: Set[Point]):
-    points_in_range_1 = source.engine.grid.get_points_in_range(
-        start=source.pos, max_range=1
-    )
-    return all([point in points_in_range_1 for point in points])
+class PathAllInRangeArea(PathArea):
+    def __init__(
+        self,
+        length: int,
+        in_range: int = 0,
+    ):
+        super().__init__(length=length, in_range=in_range)
+
+    def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
+        unlimited_selections = super().get_selections(grid=grid, start=start)
+
+        points_in_range_1 = grid.get_points_in_range(
+            start=start, max_range=self.in_range
+        )
+        for selection in unlimited_selections:
+            if all([point in points_in_range_1 for point in selection]):
+                yield selection
 
 
 @dataclass
@@ -136,9 +149,10 @@ class ChargeInstruction(Instruction):
         first_enemy = None
         last_point = ctx.source.pos
 
-        # todo not knowing if each item is a point or entity is bad
-        #  Everything technically targets a point. Make all targets points.
-        #  need to be able to efficiently get content of point
+        # todo
+        #  Everything technically targets a point.
+        #  need to be able to efficiently get content of point.
+        #  Need easy guard against two entities being in same point (markers are not limited that way).
         #  It's usually more convenient to treat targets as entities since its usually immediately resolved.
         #  Don't want to need an expensive lookup many times during event handling.
 
@@ -153,7 +167,7 @@ class ChargeInstruction(Instruction):
         second_last_point = path[-2]
 
         for point in ctx.included:
-            entity = ctx.engine.entity_at(point)
+            entity = ctx.engine.entity_at(point)  # todo implement
             if not entity:
                 continue
             if not first_enemy:
@@ -203,10 +217,9 @@ class Reinhardt(Hero):
             Ability(
                 name="Rocket Hammer",
                 targeting=TargetArea(
-                    area=PathArea(
+                    area=PathAllInRangeArea(
                         length=3,
                         in_range=1,
-                        condition=_reinhardt_all_path_spaces_are_in_range_1,
                     )
                 ),
                 instructions=[DamageInstruction(amount=2)],

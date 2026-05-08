@@ -21,12 +21,10 @@ class Burst(Area):
         self,
         radius: int,
         in_range: int = 0,
-        condition: Optional[Callable[[Set[Point]], bool]] = None,
     ):
         super().__init__(in_range=in_range)
         self.radius = radius
         self.range_limit = in_range
-        self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         # If range_limit is 0, it's centered on the start point
@@ -38,8 +36,7 @@ class Burst(Area):
 
         for center in centers:
             selection = grid.get_points_in_range(center, self.radius)
-            if self.condition is None or self.condition(selection):
-                yield selection
+            yield selection
 
 
 class Line(Area):
@@ -47,11 +44,9 @@ class Line(Area):
         self,
         length: int,
         in_range: int = 0,
-        condition: Optional[Callable[[Set[Point]], bool]] = None,
     ):
         super().__init__(in_range=in_range)
         self.length = length
-        self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
@@ -68,8 +63,7 @@ class Line(Area):
                 if line and line not in seen_lines:
                     seen_lines.add(line)
                     points = set(line)
-                    if self.condition is None or self.condition(points):
-                        yield points
+                    yield points
 
 
 class PathArea(Area):
@@ -77,11 +71,9 @@ class PathArea(Area):
         self,
         length: int,
         in_range: int = 0,
-        condition: Optional[Callable[["Entity", Set[Point]], bool]] = None,
     ):
         super().__init__(in_range=in_range)
         self.length = length
-        self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
@@ -96,8 +88,7 @@ class PathArea(Area):
                 frozen = frozenset(current_path)
                 if frozen not in seen_paths:
                     seen_paths.add(frozen)
-                    if self.condition is None or self.condition(current_path):
-                        yield set(current_path)
+                    yield set(current_path)
                 return
 
             for adj in grid.get_points_in_range(current, 1):
@@ -113,12 +104,10 @@ class Square(Area):
         self,
         side_length: int,
         in_range: int = 0,
-        condition: Optional[Callable[[Set[Point]], bool]] = None,
     ):
         super().__init__(in_range=in_range)
         self.side_length = side_length
         self.in_range = in_range
-        self.condition = condition
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
@@ -147,8 +136,7 @@ class Square(Area):
                         frozen_points = frozenset(points)
                         if frozen_points not in seen_squares:
                             seen_squares.add(frozen_points)
-                            if self.condition is None or self.condition(points):
-                                yield points
+                            yield points
 
 
 def get_line(grid: Grid, start: Point, target: Point, length: int) -> List[Point]:
