@@ -117,6 +117,14 @@ class Engine:
         self.grid: Grid = grid
         self.active_entity: Optional["Entity"] = None
         self._next_id: int = 1
+        self.entity_by_pos: Dict[Point, "Entity"] = {}
+        self.markers_by_pos: Dict[Point, List["Marker"]] = {}
+
+    def entity_at(self, pos: Point) -> Optional["Entity"]:
+        return self.entity_by_pos.get(pos)
+
+    def markers_at(self, pos: Point) -> List["Marker"]:
+        return self.markers_by_pos.get(pos, [])
 
     @property
     def living_entities(self) -> List["Entity"]:
@@ -180,7 +188,7 @@ class Entity:
         self.hp = hp
         self.speed = speed
 
-        self.pos: Point = pos
+        self._pos: Optional[Point] = None
         self.team = team
 
         self.modifiers: List["Modifier"] = []
@@ -190,6 +198,20 @@ class Entity:
         self.standard_actions: int = 0
         self.free_actions: int = 0
         self.engine.add_entity(self)
+        self.pos = pos
+
+    @property
+    def pos(self) -> Optional[Point]:
+        return self._pos
+
+    @pos.setter
+    def pos(self, value: Optional[Point]) -> None:
+        if self._pos is not None:
+            if self.engine.entity_at(self._pos) == self:
+                del self.engine.entity_by_pos[self._pos]
+        self._pos = value
+        if value is not None:
+            self.engine.entity_by_pos[value] = self
 
     def start_turn(self) -> None:
         self.move_actions = 1
@@ -650,10 +672,26 @@ class Marker:
         self.engine = engine
         self.id = self.engine.generate_id()
         self.name = name
-        self.pos = pos
+        self._pos: Optional[Point] = None
         self.team = team
         self.modifiers: List["Modifier"] = []
         self.engine.markers.append(self)
+        self.pos = pos
+
+    @property
+    def pos(self) -> Optional[Point]:
+        return self._pos
+
+    @pos.setter
+    def pos(self, value: Optional[Point]) -> None:
+        if self._pos is not None:
+            if self in self.engine.markers_by_pos.get(self._pos, []):
+                self.engine.markers_by_pos[self._pos].remove(self)
+                if not self.engine.markers_by_pos[self._pos]:
+                    del self.engine.markers_by_pos[self._pos]
+        self._pos = value
+        if value is not None:
+            self.engine.markers_by_pos.setdefault(value, []).append(self)
 
 
 @dataclass

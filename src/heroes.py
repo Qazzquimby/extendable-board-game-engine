@@ -96,7 +96,6 @@ class Symmetra(Hero):
         #  Missing End of Activation triggers
         #  Missing Action Types (Free Action, Ultimate, Reaction)
         #  Missing Object / Marker creation (Turrets, Teleporter, Barriers)
-        #  Missing "Unlimited" range targeting
         #  Missing Delayed effects (e.g. At the beginning of your next activation)
         #  Missing Facing and Edges for objects (Floating Barrier)
         #  Missing Aura mechanics for maximum health buffs (Shield Generator)
@@ -167,7 +166,7 @@ class ChargeInstruction(Instruction):
         second_last_point = path[-2]
 
         for point in ctx.included:
-            entity = ctx.engine.entity_at(point)  # todo implement
+            entity = ctx.engine.entity_at(point)
             if not entity:
                 continue
             if not first_enemy:
