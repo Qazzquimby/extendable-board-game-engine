@@ -28,10 +28,7 @@ from abilities import (
     DamageInstruction,
     GiveTokenInstruction,
     ApplyModifierInstruction,
-    TargetUnit,
-    TargetSelf,
     IncludeArea,
-    TargetPoint,
     MultipleAiming,
     Instruction,
     ActionContext,
@@ -41,7 +38,7 @@ from abilities import (
 )
 from grid import Grid
 from mod_value import div
-from targeting import Square, Line, PathArea
+from targeting import Square, Line, PathArea, TargetSelf, TargetUnit, TargetPoint
 from point import Point
 
 

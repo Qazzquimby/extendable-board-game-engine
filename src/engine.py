@@ -550,7 +550,9 @@ class DamageEvent:
             self.target.hp -= final_damage
 
             if self.target.hp <= 0:
-                DeathEvent(self.engine, target=self.target, killer=self.source).resolve()
+                DeathEvent(
+                    self.engine, target=self.target, killer=self.source
+                ).resolve()
 
         self.engine.router.publish(self, EventPhase.AFTER)
 

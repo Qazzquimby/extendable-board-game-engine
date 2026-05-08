@@ -5,7 +5,7 @@ from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type, Dict
 if TYPE_CHECKING:
     from engine import Engine, Entity, Token, DamageEvent
     from point import Point
-    from targeting import Area
+    from targeting import Area, Aiming
 
 
 @dataclass
@@ -32,64 +32,6 @@ DynamicPoint = Union["Point", Callable[[ActionContext], "Point"]]
 
 def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
-
-
-# ==========================================
-# AIMING
-# ==========================================
-# Recipient: Anything being affected
-# Target Point: A point that has been individually chosen
-# Target: The entity or marker at the target point, if any.
-# Included Point: A point that is in a chosen area. Not a target.
-# Included Entity: An entity in an included point, if any.
-
-# todo migrate actual target selection here from ai_agent.py
-#  In ai_agent.py it's implemented to only yield 'plausible' targets,
-#  while in a human game you'd want a different implementation.
-
-@dataclass
-class Aiming:
-    """Base class for how an ability finds its recipients."""
-
-    pass
-
-
-@dataclass
-class TargetSelf(Aiming):
-    """Targets the owner's point."""
-
-    pass
-
-
-@dataclass
-class TargetUnit(Aiming):
-    """Targets a point containing a unit within a given range. None means unlimited."""
-
-    in_range: Optional[int] = None
-
-
-@dataclass
-class TargetPoint(Aiming):
-    """Targets a point on the grid. Optionally must be empty."""
-
-    in_range: Optional[int] = None
-    empty: bool = False
-
-
-@dataclass
-class IncludeArea(Aiming):
-    """Targets an area on the grid."""
-
-    area: "Area"
-
-
-class MultipleAiming(Aiming):
-    """Requires multiple aimings. The dict keys are just identifiers for the aimings, and can be used in instructions to refer to specific targets."""
-
-    def __init__(self, aimings: Union[List[Aiming], Dict[str, Aiming]]):
-        if isinstance(aimings, list):
-            aimings = {f"{i}": t for i, t in enumerate(aimings)}
-        self.aimings = aimings
 
 
 # ==========================================

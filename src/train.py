@@ -20,7 +20,8 @@ import os
 from pydantic import BaseModel, ConfigDict
 
 from engine import Engine, Entity
-from abilities import Ability, Aiming
+from abilities import Ability
+from targeting import Aiming
 from schemas import GameLog, EngineState, LogEntry
 
 # First train value prediction

@@ -5,7 +5,8 @@ from ai_agent import (
     generate_plausible_actions,
     PlausibleAction,
 )
-from abilities import Ability, TargetUnit, DamageInstruction
+from abilities import Ability, DamageInstruction
+from targeting import TargetUnit
 from engine import Engine, Entity
 from grid import Grid
 from point import Point

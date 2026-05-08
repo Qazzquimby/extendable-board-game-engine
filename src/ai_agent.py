@@ -12,11 +12,10 @@ from engine import Engine, Entity
 from abilities import (
     Ability,
     IncludeArea,
-    TargetSelf,
-    TargetUnit,
     DamageInstruction,
     HealInstruction,
 )
+from targeting import TargetSelf, TargetUnit
 from point import Point
 
 import torch.nn.functional as F

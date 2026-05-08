@@ -1,10 +1,10 @@
-from typing import Set, List, Iterator, Callable, Optional, TYPE_CHECKING
+from typing import Set, List, Iterator, TYPE_CHECKING
 
 from grid import Grid
 from point import Point
 
 if TYPE_CHECKING:
-    from engine import Entity
+    pass
 
 
 class Area:

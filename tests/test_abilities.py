@@ -1,7 +1,7 @@
-from abilities import Ability, IncludeArea, TargetSelf
+from abilities import Ability, IncludeArea
 from engine import Engine, Entity
 from point import Point
-from targeting import Burst, Square
+from targeting import Burst, Square, TargetSelf
 
 
 def test_target_area_instantiation():

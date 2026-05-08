@@ -3,10 +3,9 @@ from engine import before, query
 from abilities import (
     Ability,
     DamageInstruction,
-    TargetUnit,
     RemoveTokenInstruction,
-    TargetSelf,
 )
+from targeting import TargetSelf, TargetUnit
 
 
 class PoisonToken(Token):
