@@ -13,7 +13,12 @@ class ActionContext:
     source: "Entity"
     target: Union["Entity", "Point"]
     ability: Optional["Ability"] = None
-    # todo some abilities will surely need more than a single target. Aoe. Move all tokens from one entity to another.
+    is_hit: bool = True
+    is_crit: bool = False
+    # todo 'target' is insufficient.
+    #   Some abilities include many things in an area (none of them technically targets.)
+    #   some abilities will surely need more than a single target.
+    #   Targets are not always treated the same. Move all tokens from one target1 to target2.
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]
@@ -82,6 +87,10 @@ class DamageInstruction(Instruction):
         )  # todo feels like events and effects should be kept together.
 
         amount = resolve_int(self.amount, ctx)
+        if ctx.is_crit:
+            amount *= 2  # Critical hit grants +1x damage multiplier
+        # todo will likely need more extensible later
+
         if hasattr(ctx.target, "hp"):
             DamageEvent(
                 engine=ctx.engine,
@@ -202,6 +211,7 @@ class Ability:
     max_charges: Optional[int] = None
     is_ultimate: bool = False
     ultimate_turn: Optional[int] = None
+    crit_chance: int = 0
 
     def __post_init__(self):
         self.charges = self.max_charges
@@ -217,13 +227,40 @@ class Ability:
         if self.taps:
             self.is_tapped = True
             self.tapped_this_turn = True
+
+        roll = engine.rng.randint(1, 6)  # todo rolling should be an event
+
         # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
-        for target in targets:
-            ctx = ActionContext(
-                engine=engine, source=source, target=target, ability=self
-            )
-            for instruction in self.instructions:
-                instruction.execute(ctx)
+
+        # Attack rolls apply to entity or point targets, not areas
+        if not isinstance(self.targeting, TargetArea):
+            for target in targets:
+                defense = min(
+                    4, get_defense(source=source, target=target, ability=self)
+                )  # todo probably clearer to make it a function rather than method.
+                is_hit = roll > defense
+
+                crit_chance = get_crit(
+                    source=source, target=target, ability=self
+                )  # todo use query
+                is_crit = roll >= 7 - crit_chance
+
+                # Evaluate Crit
+                if self.crit_chance > 0 and roll >= (7 - self.crit_chance):
+                    is_crit = True
+
+                ctx = ActionContext(
+                    engine=engine,
+                    source=source,
+                    target=target,
+                    ability=self,
+                    is_hit=is_hit,
+                    is_crit=is_crit,
+                )
+
+                if is_hit:
+                    for instruction in self.instructions:
+                        instruction.execute(ctx)
 
     def get_hash(self) -> float:
         import hashlib

@@ -110,6 +110,7 @@ class Engine:
     def __init__(self, seed: int = 42, grid: Grid = None) -> None:
         self.router = Router()
         self.entities: List["Entity"] = []
+        self.markers: List["Marker"] = []
         self.rng = random.Random(seed)
         self.round_num: int = 1
         self.current_team: int = 1
@@ -253,7 +254,7 @@ class Entity:
         return q.result
 
     def get_defense(self):
-        q = QueryDefense(self, attack_source=None)
+        q = QueryDefense(self, attack_source=None)  # Need to know attacker and ability
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
@@ -589,7 +590,35 @@ class Summon(Entity):
 
 
 class Object(Summon):
-    pass
+    def __init__(
+        self,
+        engine: "Engine",
+        name: str,
+        hp: int,
+        pos: Point,
+        team: int,
+        summoner: Entity,
+    ):
+        super().__init__(
+            engine=engine,
+            name=name,
+            hp=hp,
+            speed=0,
+            pos=pos,
+            team=team,
+            summoner=summoner,
+        )
+
+
+class Marker:
+    def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
+        self.engine = engine
+        self.id = self.engine.generate_id()
+        self.name = name
+        self.pos = pos
+        self.team = team
+        self.modifiers: List["Modifier"] = []
+        self.engine.markers.append(self)
 
 
 @dataclass
