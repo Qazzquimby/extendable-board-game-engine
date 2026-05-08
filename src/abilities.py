@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type
 
 if TYPE_CHECKING:
@@ -11,8 +12,9 @@ if TYPE_CHECKING:
 class ActionContext:
     engine: "Engine"
     source: "Entity"
-    target: Union["Entity", "Point"]
-    targets: List[Union["Entity", "Point"]] = field(default_factory=list)
+    receiver: "Entity"
+    target: Optional[Union["Entity", "Point"]] = None
+    included: List[Union["Entity", "Point"]] = field(default_factory=list)
     ability: Optional["Ability"] = None
     is_hit: bool = True
     is_crit: bool = False
@@ -191,6 +193,14 @@ class ApplyModifierInstruction(Instruction):
 # ==========================================
 
 
+class ActionCost(Enum):
+    FREE = "free"
+    STANDARD = "standard"
+    MOVE = "move"
+    MOVE_AND_STANDARD = "move_and_standard"
+    MOVE_OR_STANDARD = "move_or_standard"
+
+
 @dataclass
 class Ability:
     name: str
@@ -198,10 +208,7 @@ class Ability:
     instructions: List[Instruction] = field(default_factory=list)
     owner: Optional["Entity"] = None
     is_default: bool = False
-    cost_standard_action: bool = True
-    cost_move_action: bool = False
-    cost_free_action: bool = False
-    target: Optional[Union["Entity", "Point"]] = None
+    action_cost: ActionCost = ActionCost.STANDARD
     taps: bool = False
     is_tapped: bool = False
     tapped_this_turn: bool = False
@@ -217,7 +224,8 @@ class Ability:
         self,
         engine: "Engine",
         source: "Entity",
-        targets: List[Union["Entity", "Point"]],
+        target: Optional[Union["Entity", "Point"]],
+        included: List[Union["Entity", "Point"]],
     ) -> None:
         if self.charges is not None:
             self.charges -= 1
@@ -225,31 +233,43 @@ class Ability:
             self.is_tapped = True
             self.tapped_this_turn = True
 
-        roll = engine.rng.randint(1, 6)  # todo rolling should be an event
+        if target:
+            roll = engine.rng.randint(1, 6)  # todo rolling should be an event
+            defense = target.get_defense(attack_source=source, ability=self)
+            defense = min(4, defense)
+            is_hit = roll > defense
 
-        # Attack rolls apply to entity or point targets, not areas
-        if not isinstance(self.targeting, TargetArea):
-            for target in targets:
-                defense = target.get_defense(attack_source=source, ability=self)
-                defense = min(4, defense)
-                is_hit = roll > defense
+            crit_chance = source.get_crit(receiver=target, ability=self)
+            is_crit = roll >= 7 - crit_chance
 
-                crit_chance = source.get_crit(target=target, ability=self)
-                is_crit = roll >= 7 - crit_chance
+            ctx = ActionContext(
+                engine=engine,
+                source=source,
+                receiver=target,
+                target=target,
+                included=included,
+                ability=self,
+                is_hit=is_hit,
+                is_crit=is_crit,
+            )
 
+            if is_hit:
+                for instruction in self.instructions:
+                    instruction.execute(ctx)
+
+        if included:
+            # No roll
+            for included_entity in included:
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
+                    receiver=included_entity,
                     target=target,
-                    targets=targets,
+                    included=included,
                     ability=self,
-                    is_hit=is_hit,
-                    is_crit=is_crit,
                 )
-
-                if is_hit:
-                    for instruction in self.instructions:
-                        instruction.execute(ctx)
+                for instruction in self.instructions:
+                    instruction.execute(ctx)
 
     def get_hash(self) -> float:
         import hashlib

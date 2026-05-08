@@ -259,14 +259,14 @@ class Entity:
         ability: Optional["Ability"] = None,
     ) -> int:
         q = QueryDefense(
-            target=self, attack_source=attack_source, ability=ability, result=0
+            receiver=self, attack_source=attack_source, ability=ability, result=0
         )
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
-    def get_crit(self, target: "Entity", ability: Optional["Ability"] = None) -> int:
+    def get_crit(self, receiver: "Entity", ability: Optional["Ability"] = None) -> int:
         q = QueryCrit(
-            target=target,
+            target=receiver,
             attack_source=self,
             ability=ability,
             result=ability.crit_chance,
@@ -527,12 +527,12 @@ class QuerySpeed:
 class QueryDefense:
     def __init__(
         self,
-        target: Entity,
+        receiver: Entity,
         attack_source: Optional[Entity] = None,
         ability: Optional["Ability"] = None,
         result: int = 0,
     ):
-        self.target = target
+        self.target = receiver
         self.attack_source = attack_source
         self.ability = ability
         self.result = result

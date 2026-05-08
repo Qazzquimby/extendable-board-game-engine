@@ -33,6 +33,7 @@ from abilities import (
     RemoveTokenInstruction,
     RefreshAbilityInstruction,
     PushInstruction,
+    ActionCost,
 )
 from mod_value import div
 from targeting import Square, Line, PathArea
@@ -171,8 +172,7 @@ class Reinhardt(Hero):
                     PushInstruction(distance=99),
                     ApplyModifierInstruction(modifier_class=Immobile),
                 ],
-                cost_move_action=True,
-                cost_standard_action=True,
+                action_cost=ActionCost.MOVE_AND_STANDARD,
                 max_charges=1,
                 owner=self,
             )
@@ -330,14 +330,15 @@ class AxeCleaveOnTakeDamage(Modifier):
     #     Enemies in burst 1, 1dmg
     @after(DamageEvent)
     def burst_damage(self, event: "DamageEvent") -> None:
-        points_in_range = self.owner.engine.grid.get_points_in_range(
-            start=self.owner.pos, max_range=1
-        )
-        for entity in self.owner.engine.living_entities:
-            if entity.team != self.owner.team and entity.pos in points_in_range:
-                DamageEvent(
-                    self.owner.engine, source=self.owner, target=entity, amount=1
-                ).resolve()
+        if event.amount > 0:
+            points_in_range = self.owner.engine.grid.get_points_in_range(
+                start=self.owner.pos, max_range=1
+            )
+            for entity in self.owner.engine.living_entities:
+                if entity.team != self.owner.team and entity.pos in points_in_range:
+                    DamageEvent(
+                        self.owner.engine, source=self.owner, target=entity, amount=1
+                    ).resolve()
 
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
@@ -381,8 +382,7 @@ class Axe(Hero):
                 name="Berserker's Call",
                 targeting=TargetSelf(),
                 instructions=[ApplyModifierInstruction(modifier_class=InnateArmor)],
-                cost_standard_action=False,
-                cost_free_action=True,
+                action_cost=ActionCost.FREE,
                 max_charges=1,
                 owner=self,
             )
