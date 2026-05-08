@@ -119,8 +119,13 @@ class Engine:
 
     @property
     def living_entities(self) -> List["Entity"]:
-        # todo should use is_alive engine query
-        return [entity for entity in self.entities if entity.pos and entity.hp > 0]
+        alive = []
+        for entity in self.entities:
+            q = QueryIsAlive(entity)
+            self.router.publish(q, EventPhase.QUERY)
+            if q.result:
+                alive.append(entity)
+        return alive
 
     def generate_id(self) -> int:
         res = self._next_id
@@ -407,6 +412,12 @@ class HealEvent:
 # ==========================================
 
 
+class QueryIsAlive:
+    def __init__(self, target: Entity):
+        self.target = target
+        self.result: bool = target.pos is not None and target.hp > 0
+
+
 class QueryHasArmor:
     def __init__(self, target: Entity):
         self.target = target
@@ -455,6 +466,15 @@ class Immobile(Modifier):
     @query(QueryCanMove)
     def prevent_move(self, q: QueryCanMove) -> None:
         q.result = False
+
+    @before(TurnEndEvent)
+    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
+        # todo, we'd rather modify the modifier somehow
+        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
+        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
+        #  eg Nearby enemies are immobile
+        if self in self.owner.modifiers:
+            self.owner.remove_modifier(self)
 
 
 class Stunned(Modifier):
@@ -527,7 +547,7 @@ class Taunted(Modifier):
                 action.target = self.taunter
                 forced_actions.append(action)
         q.result = forced_actions
-        # todo this should be cleared immediately after
+        self.owner.remove_modifier(self)
 
     @query(QueryCanMove)
     def prevent_move(self, q: QueryCanMove) -> None:
