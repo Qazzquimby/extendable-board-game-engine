@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Set
 
 from engine import (
     Engine,
@@ -17,6 +18,7 @@ from engine import (
     PullEvent,
     query,
     QueryDefense,
+    Entity,
 )
 from abilities import (
     Ability,
@@ -33,7 +35,7 @@ from abilities import (
     PushInstruction,
 )
 from mod_value import div
-from targeting import Burst, Square, Line
+from targeting import Square, Line, PathArea
 from point import Point
 
 
@@ -120,6 +122,13 @@ class Symmetra(Hero):
         )
 
 
+def _reinhardt_all_path_spaces_are_in_range_1(source: Entity, points: Set[Point]):
+    points_in_range_1 = source.engine.grid.get_points_in_range(
+        start=source.pos, max_range=1
+    )
+    return all([point in points_in_range_1 for point in points])
+
+
 class Reinhardt(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -140,8 +149,13 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Rocket Hammer",
-                targeting=TargetArea(area=Burst(radius=2, in_range=1)),
-                # todo, no, targeting should be a path of '3 adjacent spaces within range 1'.
+                targeting=TargetArea(
+                    area=PathArea(
+                        length=3,
+                        in_range=1,
+                        condition=_reinhardt_all_path_spaces_are_in_range_1,
+                    )
+                ),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -159,7 +173,7 @@ class Reinhardt(Hero):
                 ],
                 cost_move_action=True,
                 cost_standard_action=True,
-                charges=1,
+                max_charges=1,
                 owner=self,
             )
         )
@@ -179,7 +193,7 @@ class Reinhardt(Hero):
                 instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
                 is_ultimate=True,
                 ultimate_turn=4,
-                charges=1,
+                max_charges=1,
                 owner=self,
             )
         )
@@ -369,7 +383,7 @@ class Axe(Hero):
                 instructions=[ApplyModifierInstruction(modifier_class=InnateArmor)],
                 cost_standard_action=False,
                 cost_free_action=True,
-                charges=1,
+                max_charges=1,
                 owner=self,
             )
         )
@@ -381,7 +395,7 @@ class Axe(Hero):
                     GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
                     GiveTokenInstruction(token_class=BattleHungerToken, amount=1),
                 ],
-                charges=1,
+                max_charges=1,
                 owner=self,
             )
         )
@@ -390,7 +404,7 @@ class Axe(Hero):
                 name="Culling Blade",
                 targeting=TargetUnit(in_range=1),
                 instructions=[CullingBladeInstruction()],
-                charges=1,
+                max_charges=1,
                 owner=self,
             )
         )

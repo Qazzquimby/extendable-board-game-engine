@@ -12,13 +12,10 @@ class ActionContext:
     engine: "Engine"
     source: "Entity"
     target: Union["Entity", "Point"]
+    targets: List[Union["Entity", "Point"]] = field(default_factory=list)
     ability: Optional["Ability"] = None
     is_hit: bool = True
     is_crit: bool = False
-    # todo 'target' is insufficient.
-    #   Some abilities include many things in an area (none of them technically targets.)
-    #   some abilities will surely need more than a single target.
-    #   Targets are not always treated the same. Move all tokens from one target1 to target2.
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]
@@ -230,29 +227,21 @@ class Ability:
 
         roll = engine.rng.randint(1, 6)  # todo rolling should be an event
 
-        # todo not all targets may be the same, eg 'move all tokens on one entity to another'. May need a targeting object for some abilities
-
         # Attack rolls apply to entity or point targets, not areas
         if not isinstance(self.targeting, TargetArea):
             for target in targets:
-                defense = min(
-                    4, get_defense(source=source, target=target, ability=self)
-                )  # todo probably clearer to make it a function rather than method.
+                defense = target.get_defense(attack_source=source, ability=self)
+                defense = min(4, defense)
                 is_hit = roll > defense
 
-                crit_chance = get_crit(
-                    source=source, target=target, ability=self
-                )  # todo use query
+                crit_chance = source.get_crit(target=target, ability=self)
                 is_crit = roll >= 7 - crit_chance
-
-                # Evaluate Crit
-                if self.crit_chance > 0 and roll >= (7 - self.crit_chance):
-                    is_crit = True
 
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
                     target=target,
+                    targets=targets,
                     ability=self,
                     is_hit=is_hit,
                     is_crit=is_crit,

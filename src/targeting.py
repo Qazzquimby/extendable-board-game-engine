@@ -1,7 +1,10 @@
-from typing import Set, List, Iterator, Callable, Optional
+from typing import Set, List, Iterator, Callable, Optional, TYPE_CHECKING
 
 from grid import Grid
 from point import Point
+
+if TYPE_CHECKING:
+    from engine import Entity
 
 
 class Area:
@@ -67,6 +70,42 @@ class Line(Area):
                     points = set(line)
                     if self.condition is None or self.condition(points):
                         yield points
+
+
+class PathArea(Area):
+    def __init__(
+        self,
+        length: int,
+        in_range: int = 0,
+        condition: Optional[Callable[["Entity", Set[Point]], bool]] = None,
+    ):
+        super().__init__(in_range=in_range)
+        self.length = length
+        self.condition = condition
+
+    def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
+        valid_starts = (
+            {start}
+            if self.in_range == 0
+            else grid.get_points_in_range(start, self.in_range)
+        )
+        seen_paths = set()
+
+        def dfs(current: Point, current_path: Set[Point]) -> Iterator[Set[Point]]:
+            if len(current_path) == self.length:
+                frozen = frozenset(current_path)
+                if frozen not in seen_paths:
+                    seen_paths.add(frozen)
+                    if self.condition is None or self.condition(current_path):
+                        yield set(current_path)
+                return
+
+            for adj in grid.get_points_in_range(current, 1):
+                if adj != current and adj not in current_path:
+                    yield from dfs(adj, current_path | {adj})
+
+        for s in valid_starts:
+            yield from dfs(s, {s})
 
 
 class Square(Area):

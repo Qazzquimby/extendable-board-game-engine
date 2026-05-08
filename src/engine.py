@@ -253,8 +253,24 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
-    def get_defense(self):
-        q = QueryDefense(self, attack_source=None)  # Need to know attacker and ability
+    def get_defense(
+        self,
+        attack_source: Optional["Entity"] = None,
+        ability: Optional["Ability"] = None,
+    ) -> int:
+        q = QueryDefense(
+            target=self, attack_source=attack_source, ability=ability, result=0
+        )
+        self.engine.router.publish(q, EventPhase.QUERY)
+        return q.result
+
+    def get_crit(self, target: "Entity", ability: Optional["Ability"] = None) -> int:
+        q = QueryCrit(
+            target=target,
+            attack_source=self,
+            ability=ability,
+            result=ability.crit_chance,
+        )
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
@@ -510,10 +526,29 @@ class QuerySpeed:
 
 class QueryDefense:
     def __init__(
-        self, target: Entity, attack_source: Optional[Entity], result: int = 0
+        self,
+        target: Entity,
+        attack_source: Optional[Entity] = None,
+        ability: Optional["Ability"] = None,
+        result: int = 0,
     ):
         self.target = target
         self.attack_source = attack_source
+        self.ability = ability
+        self.result = result
+
+
+class QueryCrit:
+    def __init__(
+        self,
+        target: Entity,
+        attack_source: Optional[Entity] = None,
+        ability: Optional["Ability"] = None,
+        result: int = 0,
+    ):
+        self.target = target
+        self.attack_source = attack_source
+        self.ability = ability
         self.result = result
 
 
