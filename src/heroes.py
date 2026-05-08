@@ -31,6 +31,8 @@ from abilities import (
     TargetUnit,
     TargetSelf,
     TargetArea,
+    TargetPoint,
+    TargetMultiple,
     Instruction,
     ActionContext,
     RemoveTokenInstruction,
@@ -138,8 +140,9 @@ class Teleporter(Object):
 @dataclass
 class CreateSentryTurretInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        # todo, targeting should allow 3 empty spaces in unlimited range
-        for point in ctx.included:
+        # ctx.targets should contain the 3 empty spaces
+        points = ctx.targets if ctx.targets else [ctx.receiver] + ctx.included
+        for point in points:
             if not ctx.engine.entity_at(point):
                 SentryTurret(
                     engine=ctx.engine,
@@ -152,12 +155,13 @@ class CreateSentryTurretInstruction(Instruction):
 @dataclass
 class CreateTeleporterInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        # todo, targeting should allow 1 empty space in range 1 and 1 in unlimited range
-        for point in ctx.included:
+        # ctx.targets should contain the 2 teleporter points
+        points = ctx.targets if ctx.targets else [ctx.receiver] + ctx.included
+        for point in points:
             if not ctx.engine.entity_at(point):
                 Teleporter(
                     engine=ctx.engine,
-                    pos=ctx.receiver,
+                    pos=point,
                     team=ctx.source.team,
                     summoner=ctx.source,
                 )
@@ -211,7 +215,7 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Create Sentry Turret",
-                targeting=TargetArea(area=Square(side_length=1, in_range=99)), # todo space, not square
+                targeting=TargetMultiple([TargetPoint(in_range=None, empty=True)] * 3),
                 instructions=[CreateSentryTurretInstruction()],
                 max_charges=1,
                 owner=self,
@@ -221,7 +225,10 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Create Teleporter",
-                targeting=TargetArea(area=Square(side_length=1, in_range=99)), # todo space, not square
+                targeting=TargetMultiple([
+                    TargetPoint(in_range=1, empty=True),
+                    TargetPoint(in_range=None, empty=True)
+                ]),
                 instructions=[CreateTeleporterInstruction()],
                 max_charges=1,
                 owner=self,
