@@ -23,9 +23,9 @@ def test_ability_hashing():
     )
     mage = Entity(engine=engine, name="Mage", hp=10, speed=3, pos=Point(1, 1), team=1)
 
-    ability1 = Ability(name="Slash", targeting=TargetSelf(), owner=warrior)
-    ability2 = Ability(name="Shoot", targeting=TargetSelf(), owner=warrior)
-    ability3 = Ability(name="Slash", targeting=TargetSelf(), owner=mage)
+    ability1 = Ability(name="Slash", aiming=TargetSelf(), owner=warrior)
+    ability2 = Ability(name="Shoot", aiming=TargetSelf(), owner=warrior)
+    ability3 = Ability(name="Slash", aiming=TargetSelf(), owner=mage)
 
     hash1 = ability1.get_hash()
     hash2 = ability2.get_hash()

@@ -1,5 +1,5 @@
 from point import Point
-from targeting import Burst, Square, get_line
+from areas import Burst, Square, get_line
 from grid import Grid
 
 

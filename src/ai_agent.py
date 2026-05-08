@@ -251,10 +251,10 @@ def get_plausible_movements(
             # For each ability that can target units/areas, find a spot at optimal range
             for ability in actor.abilities:
                 attack_range = 0
-                if isinstance(ability.targeting, TargetUnit):
-                    attack_range = ability.targeting.in_range
-                elif isinstance(ability.targeting, IncludeArea):
-                    attack_range = ability.targeting.area.in_range
+                if isinstance(ability.aiming, TargetUnit):
+                    attack_range = ability.aiming.in_range
+                elif isinstance(ability.aiming, IncludeArea):
+                    attack_range = ability.aiming.area.in_range
 
                 if attack_range > 0:
                     best_at_range = min(
@@ -317,8 +317,8 @@ def get_plausible_uses_of_ability_after_movement(
     is_positive = any(isinstance(e, HealInstruction) for e in ability.instructions)
     is_negative = any(isinstance(e, DamageInstruction) for e in ability.instructions)
 
-    if isinstance(ability.targeting, TargetUnit):
-        attack_range = ability.targeting.in_range
+    if isinstance(ability.aiming, TargetUnit):
+        attack_range = ability.aiming.in_range
         # Target anyone in range. Could be friend or foe.
         for target in engine.entities:
             if not target.pos or target == actor:
@@ -337,8 +337,8 @@ def get_plausible_uses_of_ability_after_movement(
                     ability=ability,
                     movement_name=movement_name,
                 )
-    elif isinstance(ability.targeting, IncludeArea):
-        area = ability.targeting.area
+    elif isinstance(ability.aiming, IncludeArea):
+        area = ability.aiming.area
         for area_points in area.get_selections(engine.grid, move_pos):
             affected_entities = {e for e in engine.entities if e.pos in area_points}
             if not affected_entities:
@@ -371,7 +371,7 @@ def get_plausible_uses_of_ability_after_movement(
                     ability=ability,
                     movement_name=movement_name,
                 )
-    elif isinstance(ability.targeting, TargetSelf):
+    elif isinstance(ability.aiming, TargetSelf):
         target = actor
         key = (move_pos, target.pos, ability.get_hash())
         if key not in plausible_uses_of_ability_after_movement:

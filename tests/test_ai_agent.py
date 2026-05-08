@@ -29,7 +29,7 @@ def test_generate_plausible_actions():
     actor.abilities.append(
         Ability(
             name="Strike",
-            targeting=TargetUnit(in_range=2),
+            aiming=TargetUnit(in_range=2),
             instructions=[DamageInstruction(amount=5)],
         )
     )

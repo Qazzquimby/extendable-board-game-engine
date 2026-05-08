@@ -19,7 +19,7 @@ class PoisonToken(Token):
 
 venom_strike = Ability(
     name="Venom Strike",
-    targeting=TargetUnit(in_range=1),
+    aiming=TargetUnit(in_range=1),
     instructions=[
         # Dynamic Callable damage formula evaluated exactly at Execution Time
         DamageInstruction(
@@ -34,7 +34,7 @@ class RootToken(Token):
     def grant_rip_roots(self, q: QueryLegalActions):
         ability = Ability(
             name="Rip Free",
-            targeting=TargetSelf(),
+            aiming=TargetSelf(),
             instructions=[RemoveTokenInstruction(token_class=RootToken, amount=1)],
             cost_standard_action=True,
             owner=self.owner,

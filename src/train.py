@@ -107,7 +107,7 @@ def preprocess_log(game: GameLog, log: LogEntry) -> Optional[TrainData]:
                     target_ent = e
                     break
 
-        ability = Ability(name=sim.action.ability, targeting=Aiming())
+        ability = Ability(name=sim.action.ability, aiming=Aiming())
         ability.owner = actor
 
         sim_action = PlausibleAction(

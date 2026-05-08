@@ -50,16 +50,14 @@ class MeleeHero(Hero):
         self.abilities.append(
             Ability(
                 name="Melee Attack",
-                targeting=TargetUnit(in_range=1),
+                aiming=TargetUnit(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
             )
         )
         self.abilities.append(
-            Ability(
-                name="Do Nothing", targeting=TargetSelf(), instructions=[], owner=self
-            )
+            Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
         )
 
 
@@ -71,16 +69,14 @@ class RangedHero(Hero):
         self.abilities.append(
             Ability(
                 name="Ranged Attack",
-                targeting=TargetUnit(in_range=3),
+                aiming=TargetUnit(in_range=3),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
             )
         )
         self.abilities.append(
-            Ability(
-                name="Do Nothing", targeting=TargetSelf(), instructions=[], owner=self
-            )
+            Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
         )
 
 
@@ -137,7 +133,7 @@ class Teleporter(Object):
 @dataclass
 class CreateSentryTurretInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        for point in ctx.targets:
+        for point in ctx.target_points:
             if not ctx.engine.entity_at(point):
                 SentryTurret(
                     engine=ctx.engine,
@@ -150,7 +146,7 @@ class CreateSentryTurretInstruction(Instruction):
 @dataclass
 class CreateTeleporterInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        for point in ctx.targets:
+        for point in ctx.target_points:
             if not ctx.engine.entity_at(point):
                 Teleporter(
                     engine=ctx.engine,
@@ -176,7 +172,7 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Photon Beam",
-                targeting=TargetUnit(in_range=2),
+                aiming=TargetUnit(in_range=2),
                 instructions=[
                     DamageInstruction(
                         amount=lambda ctx: 2
@@ -193,7 +189,7 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Photon Orb",
-                targeting=TargetUnit(in_range=4),
+                aiming=TargetUnit(in_range=4),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -203,7 +199,7 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Create Sentry Turret",
-                targeting=MultipleAiming(
+                aiming=MultipleAiming(
                     [TargetPoint(in_range=None, empty=True) for _i in range(3)]
                 ),
                 instructions=[CreateSentryTurretInstruction()],
@@ -215,7 +211,7 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Create Teleporter",
-                targeting=MultipleAiming(
+                aiming=MultipleAiming(
                     [
                         TargetPoint(in_range=1, empty=True),
                         TargetPoint(in_range=None, empty=True),
@@ -266,11 +262,11 @@ class ChargeInstruction(Instruction):
         #  If any space cannot be emptied, stop.
         #  The below is teleporting to the end of the range and does nothing to prevent ending on top of another entity.
 
-        path = [ctx.source.pos] + ctx.included
+        path = [ctx.source.pos] + ctx.included_points
         last_point = path[-1]
         second_last_point = path[-2]
 
-        for point in ctx.included:
+        for point in ctx.included_points:
             entity = ctx.engine.entity_at(point)
             if not entity:
                 continue
@@ -320,7 +316,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Rocket Hammer",
-                targeting=IncludeArea(
+                aiming=IncludeArea(
                     area=PathAllInRangeArea(
                         length=3,
                         in_range=1,
@@ -334,7 +330,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Charge",
-                targeting=IncludeArea(area=Line(length=99, in_range=0)),
+                aiming=IncludeArea(area=Line(length=99, in_range=0)),
                 instructions=[ChargeInstruction()],
                 action_cost=ActionCost.MOVE_AND_STANDARD,
                 max_charges=1,
@@ -344,7 +340,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Fire Strike",
-                targeting=IncludeArea(area=Line(length=99)),
+                aiming=IncludeArea(area=Line(length=99)),
                 instructions=[DamageInstruction(amount=3)],
                 taps=True,
                 owner=self,
@@ -353,7 +349,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Earthshatter",
-                targeting=IncludeArea(area=Square(side_length=3, in_range=2)),
+                aiming=IncludeArea(area=Square(side_length=3, in_range=2)),
                 instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
                 is_ultimate=True,
                 ultimate_turn=4,
@@ -423,7 +419,7 @@ class Viktoria(Hero):
         self.abilities.append(
             Ability(
                 name="Enchanted Katana",
-                targeting=TargetUnit(in_range=1),
+                aiming=TargetUnit(in_range=1),
                 instructions=[DamageInstruction(amount=2), KatanaBurstInstruction()],
                 crit_chance=2,
                 is_default=True,
@@ -465,7 +461,7 @@ class Spy(Hero):
         self.abilities.append(
             Ability(
                 name="Revolver",
-                targeting=TargetUnit(),
+                aiming=TargetUnit(),
                 instructions=[
                     DamageInstruction(amount=revolver_damage, irreducible=True),
                     RemoveTokenInstruction(token_class=KillCounter, amount=1),
@@ -550,7 +546,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Axe",
-                targeting=TargetUnit(in_range=1),
+                aiming=TargetUnit(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -559,7 +555,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Berserker's Call",
-                targeting=TargetSelf(),
+                aiming=TargetSelf(),
                 instructions=[ApplyModifierInstruction(modifier_class=InnateArmor)],
                 action_cost=ActionCost.FREE,
                 max_charges=1,
@@ -569,7 +565,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Battle Hunger",
-                targeting=TargetUnit(in_range=3),
+                aiming=TargetUnit(in_range=3),
                 instructions=[
                     GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
                     GiveTokenInstruction(token_class=BattleHungerToken, amount=1),
@@ -581,7 +577,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Culling Blade",
-                targeting=TargetUnit(in_range=1),
+                aiming=TargetUnit(in_range=1),
                 instructions=[CullingBladeInstruction()],
                 max_charges=1,
                 owner=self,

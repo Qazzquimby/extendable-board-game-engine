@@ -1,29 +1,34 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type, Dict
+from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type
+
+from aimings import Aiming
 
 if TYPE_CHECKING:
     from engine import Engine, Entity, Token, DamageEvent
     from point import Point
-    from targeting import Area, Aiming
 
 
 @dataclass
 class ActionContext:
     engine: "Engine"
     source: "Entity"
-    receiver: "Point"
-    targets: List["Point"] = field(default_factory=list)
-    included: List["Point"] = field(default_factory=list)
+    receiver_point: "Point"  # The point currently being affected
+
+    # all points with targets
+    target_points: List["Point"] = field(default_factory=list)
+
+    # all points included in areas
+    included_points: List["Point"] = field(default_factory=list)
     ability: Optional["Ability"] = None
     is_hit: bool = True
     is_crit: bool = False
 
-    @property
-    def target(self):
-        if len(self.targets) != 1:
-            raise ValueError("Cannot use `.target` when there are multiple targets.")
-        return self.targets[0]
+    # @property
+    # def target(self):
+    #     if len(self.target_points) != 1:
+    #         raise ValueError("Cannot use `.target` when there are multiple targets.")
+    #     return self.target_points[0]
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]
@@ -32,11 +37,6 @@ DynamicPoint = Union["Point", Callable[[ActionContext], "Point"]]
 
 def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
-
-
-# ==========================================
-# EFFECTS
-# ==========================================
 
 
 @dataclass
@@ -57,16 +57,15 @@ class DamageInstruction(Instruction):
         amount = resolve_int(self.amount, ctx)
         if ctx.is_crit:
             amount *= 2  # Critical hit grants +1x damage multiplier
-        # todo will likely need more extensible later
+        # todo crit handling will likely need to be more extensible later
 
-        if hasattr(ctx.target, "hp"):
-            DamageEvent(
-                engine=ctx.engine,
-                source=ctx.source,
-                target=ctx.target,
-                amount=amount,
-                ability=ctx.ability,
-            ).resolve()
+        DamageEvent(
+            engine=ctx.engine,
+            source=ctx.source,
+            target=ctx.target,
+            amount=amount,
+            ability=ctx.ability,
+        ).resolve()
 
 
 @dataclass
@@ -77,8 +76,7 @@ class HealInstruction(Instruction):
         from engine import HealEvent
 
         amount = resolve_int(self.amount, ctx)
-        if hasattr(ctx.target, "hp"):
-            HealEvent(engine=ctx.engine, target=ctx.target, amount=amount).resolve()
+        HealEvent(engine=ctx.engine, target=ctx.target, amount=amount).resolve()
 
 
 @dataclass
@@ -173,17 +171,21 @@ class ActionCost(Enum):
 @dataclass
 class Ability:
     name: str
-    targeting: Aiming
+    aiming: Aiming
     instructions: List[Instruction] = field(default_factory=list)
     owner: Optional["Entity"] = None
     is_default: bool = False
     action_cost: ActionCost = ActionCost.STANDARD
+
     taps: bool = False
     is_tapped: bool = False
     tapped_this_turn: bool = False
     max_charges: Optional[int] = None
     is_ultimate: bool = False
     ultimate_turn: Optional[int] = None
+
+    is_undefendable: bool = False
+    defense: int = 0
     crit_chance: int = 0
 
     def __post_init__(self):
@@ -193,9 +195,9 @@ class Ability:
         self,
         engine: "Engine",
         source: "Entity",
-        target: Optional[Union["Entity", "Point"]],
-        included: List[Union["Entity", "Point"]],
-    ) -> None:
+        targets: Optional[List["Point"]],
+        included: Optional[List["Point"]],
+    ) -> None:  # todo not used yet
         if self.charges is not None:
             self.charges -= 1
         if self.taps:
@@ -214,9 +216,9 @@ class Ability:
             ctx = ActionContext(
                 engine=engine,
                 source=source,
-                receiver=target,
+                receiver_point=target,
                 target=target,
-                included=included,
+                included_points=included,
                 ability=self,
                 is_hit=is_hit,
                 is_crit=is_crit,
@@ -232,9 +234,9 @@ class Ability:
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
-                    receiver=included_entity,
+                    receiver_point=included_entity,
                     target=target,
-                    included=included,
+                    included_points=included,
                     ability=self,
                 )
                 for instruction in self.instructions:
