@@ -20,7 +20,7 @@ import os
 from pydantic import BaseModel, ConfigDict
 
 from engine import Engine, Entity
-from abilities import Ability, Targeting
+from abilities import Ability, Aiming
 from schemas import GameLog, EngineState, LogEntry
 
 # First train value prediction
@@ -106,7 +106,7 @@ def preprocess_log(game: GameLog, log: LogEntry) -> Optional[TrainData]:
                     target_ent = e
                     break
 
-        ability = Ability(name=sim.action.ability, targeting=Targeting())
+        ability = Ability(name=sim.action.ability, targeting=Aiming())
         ability.owner = actor
 
         sim_action = PlausibleAction(

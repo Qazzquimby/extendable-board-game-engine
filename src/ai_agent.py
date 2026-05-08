@@ -11,7 +11,7 @@ from torch import Tensor
 from engine import Engine, Entity
 from abilities import (
     Ability,
-    TargetArea,
+    IncludeArea,
     TargetSelf,
     TargetUnit,
     DamageInstruction,
@@ -254,7 +254,7 @@ def get_plausible_movements(
                 attack_range = 0
                 if isinstance(ability.targeting, TargetUnit):
                     attack_range = ability.targeting.in_range
-                elif isinstance(ability.targeting, TargetArea):
+                elif isinstance(ability.targeting, IncludeArea):
                     attack_range = ability.targeting.area.in_range
 
                 if attack_range > 0:
@@ -338,7 +338,7 @@ def get_plausible_uses_of_ability_after_movement(
                     ability=ability,
                     movement_name=movement_name,
                 )
-    elif isinstance(ability.targeting, TargetArea):
+    elif isinstance(ability.targeting, IncludeArea):
         area = ability.targeting.area
         for area_points in area.get_selections(engine.grid, move_pos):
             affected_entities = {e for e in engine.entities if e.pos in area_points}

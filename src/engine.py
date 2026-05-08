@@ -117,14 +117,14 @@ class Engine:
         self.grid: Grid = grid
         self.active_entity: Optional["Entity"] = None
         self._next_id: int = 1
-        self.entity_by_pos: Dict[Point, "Entity"] = {}
-        self.markers_by_pos: Dict[Point, List["Marker"]] = {}
+        self._entity_by_pos: Dict[Point, "Entity"] = {}
+        self._markers_by_pos: Dict[Point, List["Marker"]] = {}
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
-        return self.entity_by_pos.get(pos)
+        return self._entity_by_pos.get(pos)
 
     def markers_at(self, pos: Point) -> List["Marker"]:
-        return self.markers_by_pos.get(pos, [])
+        return self._markers_by_pos.get(pos, [])
 
     @property
     def living_entities(self) -> List["Entity"]:
@@ -208,10 +208,10 @@ class Entity:
     def pos(self, value: Optional[Point]) -> None:
         if self._pos is not None:
             if self.engine.entity_at(self._pos) == self:
-                del self.engine.entity_by_pos[self._pos]
+                del self.engine._entity_by_pos[self._pos]
         self._pos = value
         if value is not None:
-            self.engine.entity_by_pos[value] = self
+            self.engine._entity_by_pos[value] = self
 
     def start_turn(self) -> None:
         self.move_actions = 1
@@ -396,13 +396,13 @@ class Marker:
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
         if self._pos is not None:
-            if self in self.engine.markers_by_pos.get(self._pos, []):
-                self.engine.markers_by_pos[self._pos].remove(self)
-                if not self.engine.markers_by_pos[self._pos]:
-                    del self.engine.markers_by_pos[self._pos]
+            if self in self.engine._markers_by_pos.get(self._pos, []):
+                self.engine._markers_by_pos[self._pos].remove(self)
+                if not self.engine._markers_by_pos[self._pos]:
+                    del self.engine._markers_by_pos[self._pos]
         self._pos = value
         if value is not None:
-            self.engine.markers_by_pos.setdefault(value, []).append(self)
+            self.engine._markers_by_pos.setdefault(value, []).append(self)
 
 
 class Modifier:
@@ -529,7 +529,7 @@ class DamageEvent:
         self,
         engine: Engine,
         source: Optional[Entity],
-        target: Entity,
+        target: Point,
         amount: int,
         ability: Optional["Ability"] = None,
     ):
@@ -541,15 +541,16 @@ class DamageEvent:
 
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
+        entity = self.engine.entity_at(self.target)
+        if entity:
+            if self.target.has_armor():
+                self.amount.add(-1)
 
-        if self.target.has_armor():
-            self.amount.add(-1)
+            final_damage = max(0, self.amount.value)
+            self.target.hp -= final_damage
 
-        final_damage = max(0, self.amount.value)
-        self.target.hp -= final_damage
-
-        if self.target.hp <= 0:
-            DeathEvent(self.engine, target=self.target, killer=self.source).resolve()
+            if self.target.hp <= 0:
+                DeathEvent(self.engine, target=self.target, killer=self.source).resolve()
 
         self.engine.router.publish(self, EventPhase.AFTER)
 

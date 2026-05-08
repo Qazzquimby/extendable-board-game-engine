@@ -1,9 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type
+from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type, Dict
 
 if TYPE_CHECKING:
-    from engine import Engine, Entity, Token
+    from engine import Engine, Entity, Token, DamageEvent
     from point import Point
     from targeting import Area
 
@@ -13,11 +13,17 @@ class ActionContext:
     engine: "Engine"
     source: "Entity"
     receiver: "Point"
-    target: Optional["Point"] = None
+    targets: List["Point"] = field(default_factory=list)
     included: List["Point"] = field(default_factory=list)
     ability: Optional["Ability"] = None
     is_hit: bool = True
     is_crit: bool = False
+
+    @property
+    def target(self):
+        if len(self.targets) != 1:
+            raise ValueError("Cannot use `.target` when there are multiple targets.")
+        return self.targets[0]
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]
@@ -29,36 +35,61 @@ def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
 
 
 # ==========================================
-# TARGETING
+# AIMING
 # ==========================================
+# Recipient: Anything being affected
+# Target Point: A point that has been individually chosen
+# Target: The entity or marker at the target point, if any.
+# Included Point: A point that is in a chosen area. Not a target.
+# Included Entity: An entity in an included point, if any.
 
+# todo migrate actual target selection here from ai_agent.py
+#  In ai_agent.py it's implemented to only yield 'plausible' targets,
+#  while in a human game you'd want a different implementation.
 
 @dataclass
-class Targeting:
-    """Base class for how an ability finds its targets."""
+class Aiming:
+    """Base class for how an ability finds its recipients."""
 
     pass
 
 
 @dataclass
-class TargetSelf(Targeting):
-    """Targets the ability's owner."""
+class TargetSelf(Aiming):
+    """Targets the owner's point."""
 
     pass
 
 
 @dataclass
-class TargetUnit(Targeting):
-    """Targets a single unit within a given range. None means unlimited."""
+class TargetUnit(Aiming):
+    """Targets a point containing a unit within a given range. None means unlimited."""
 
     in_range: Optional[int] = None
 
 
 @dataclass
-class TargetArea(Targeting):
+class TargetPoint(Aiming):
+    """Targets a point on the grid. Optionally must be empty."""
+
+    in_range: Optional[int] = None
+    empty: bool = False
+
+
+@dataclass
+class IncludeArea(Aiming):
     """Targets an area on the grid."""
 
     area: "Area"
+
+
+class MultipleAiming(Aiming):
+    """Requires multiple aimings. The dict keys are just identifiers for the aimings, and can be used in instructions to refer to specific targets."""
+
+    def __init__(self, aimings: Union[List[Aiming], Dict[str, Aiming]]):
+        if isinstance(aimings, list):
+            aimings = {f"{i}": t for i, t in enumerate(aimings)}
+        self.aimings = aimings
 
 
 # ==========================================
@@ -81,10 +112,6 @@ class DamageInstruction(Instruction):
     irreducible: bool = False
 
     def execute(self, ctx: ActionContext) -> None:
-        from engine import (
-            DamageEvent,
-        )  # todo feels like events and effects should be kept together.
-
         amount = resolve_int(self.amount, ctx)
         if ctx.is_crit:
             amount *= 2  # Critical hit grants +1x damage multiplier
@@ -204,7 +231,7 @@ class ActionCost(Enum):
 @dataclass
 class Ability:
     name: str
-    targeting: Targeting
+    targeting: Aiming
     instructions: List[Instruction] = field(default_factory=list)
     owner: Optional["Entity"] = None
     is_default: bool = False

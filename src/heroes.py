@@ -30,9 +30,9 @@ from abilities import (
     ApplyModifierInstruction,
     TargetUnit,
     TargetSelf,
-    TargetArea,
+    IncludeArea,
     TargetPoint,
-    TargetMultiple,
+    MultipleAiming,
     Instruction,
     ActionContext,
     RemoveTokenInstruction,
@@ -140,9 +140,7 @@ class Teleporter(Object):
 @dataclass
 class CreateSentryTurretInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        # ctx.targets should contain the 3 empty spaces
-        points = ctx.targets if ctx.targets else [ctx.receiver] + ctx.included
-        for point in points:
+        for point in ctx.targets:
             if not ctx.engine.entity_at(point):
                 SentryTurret(
                     engine=ctx.engine,
@@ -155,9 +153,7 @@ class CreateSentryTurretInstruction(Instruction):
 @dataclass
 class CreateTeleporterInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        # ctx.targets should contain the 2 teleporter points
-        points = ctx.targets if ctx.targets else [ctx.receiver] + ctx.included
-        for point in points:
+        for point in ctx.targets:
             if not ctx.engine.entity_at(point):
                 Teleporter(
                     engine=ctx.engine,
@@ -187,12 +183,7 @@ class Symmetra(Hero):
                 instructions=[
                     DamageInstruction(
                         amount=lambda ctx: 2
-                        + (
-                            2
-                            * getattr(ctx.target, "get_token_count", lambda t: 0)(
-                                PhotonBeamToken
-                            )
-                        ),
+                        + (2 * ctx.target.get_token_count(PhotonBeamToken)),
                         undefendable=True,
                     ),
                     GiveTokenInstruction(token_class=PhotonBeamToken, amount=1),
@@ -215,7 +206,9 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Create Sentry Turret",
-                targeting=TargetMultiple([TargetPoint(in_range=None, empty=True)] * 3),
+                targeting=MultipleAiming(
+                    [TargetPoint(in_range=None, empty=True) for _i in range(3)]
+                ),
                 instructions=[CreateSentryTurretInstruction()],
                 max_charges=1,
                 owner=self,
@@ -225,10 +218,12 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Create Teleporter",
-                targeting=TargetMultiple([
-                    TargetPoint(in_range=1, empty=True),
-                    TargetPoint(in_range=None, empty=True)
-                ]),
+                targeting=MultipleAiming(
+                    [
+                        TargetPoint(in_range=1, empty=True),
+                        TargetPoint(in_range=None, empty=True),
+                    ]
+                ),
                 instructions=[CreateTeleporterInstruction()],
                 max_charges=1,
                 owner=self,
@@ -328,7 +323,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Rocket Hammer",
-                targeting=TargetArea(
+                targeting=IncludeArea(
                     area=PathAllInRangeArea(
                         length=3,
                         in_range=1,
@@ -342,7 +337,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Charge",
-                targeting=TargetArea(area=Line(length=99, in_range=0)),
+                targeting=IncludeArea(area=Line(length=99, in_range=0)),
                 instructions=[ChargeInstruction()],
                 action_cost=ActionCost.MOVE_AND_STANDARD,
                 max_charges=1,
@@ -352,7 +347,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Fire Strike",
-                targeting=TargetArea(area=Line(length=99)),
+                targeting=IncludeArea(area=Line(length=99)),
                 instructions=[DamageInstruction(amount=3)],
                 taps=True,
                 owner=self,
@@ -361,7 +356,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Earthshatter",
-                targeting=TargetArea(area=Square(side_length=3, in_range=2)),
+                targeting=IncludeArea(area=Square(side_length=3, in_range=2)),
                 instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
                 is_ultimate=True,
                 ultimate_turn=4,
