@@ -330,8 +330,87 @@ class Entity:
         return 0
 
 
+class Hero(Entity):
+    def __init__(
+        self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
+    ):
+        super().__init__(
+            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
+        )
+
+
+class Summon(Entity):
+    def __init__(
+        self,
+        engine: "Engine",
+        name: str,
+        hp: int,
+        speed: int,
+        pos: Point,
+        team: int,
+        summoner: Entity,
+    ):
+        super().__init__(
+            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
+        )
+        self.summoner = summoner
+        SummonEvent(self.engine, summoner=self.summoner, summon=self).resolve()
+
+
+class Object(Summon):
+    def __init__(
+        self,
+        engine: "Engine",
+        name: str,
+        hp: int,
+        pos: Point,
+        team: int,
+        summoner: Entity,
+    ):
+        super().__init__(
+            engine=engine,
+            name=name,
+            hp=hp,
+            speed=0,
+            pos=pos,
+            team=team,
+            summoner=summoner,
+        )
+
+
+class Marker:
+    def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
+        self.engine = engine
+        self.id = self.engine.generate_id()
+        self.name = name
+        self._pos: Optional[Point] = None
+        self.team = team
+        self.modifiers: List["Modifier"] = []
+        self.engine.markers.append(self)
+        self.pos = pos
+
+    @property
+    def pos(self) -> Optional[Point]:
+        return self._pos
+
+    @pos.setter
+    def pos(self, value: Optional[Point]) -> None:
+        if self._pos is not None:
+            if self in self.engine.markers_by_pos.get(self._pos, []):
+                self.engine.markers_by_pos[self._pos].remove(self)
+                if not self.engine.markers_by_pos[self._pos]:
+                    del self.engine.markers_by_pos[self._pos]
+        self._pos = value
+        if value is not None:
+            self.engine.markers_by_pos.setdefault(value, []).append(self)
+
+
 class Modifier:
     owner: Entity = field(init=False)
+
+
+class SummonModifier(Modifier):
+    owner: Summon = field(init=False)
 
 
 class Token(Modifier):
@@ -617,81 +696,6 @@ class Slow(Modifier):
     @query(QuerySpeed)
     def reduce_speed(self, q: QuerySpeed) -> None:
         q.result = max(0, q.result - self.amount)
-
-
-class Hero(Entity):
-    def __init__(
-        self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
-    ):
-        super().__init__(
-            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
-        )
-
-
-class Summon(Entity):
-    def __init__(
-        self,
-        engine: "Engine",
-        name: str,
-        hp: int,
-        speed: int,
-        pos: Point,
-        team: int,
-        summoner: Entity,
-    ):
-        super().__init__(
-            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
-        )
-        self.summoner = summoner
-        SummonEvent(self.engine, summoner=self.summoner, summon=self).resolve()
-
-
-class Object(Summon):
-    def __init__(
-        self,
-        engine: "Engine",
-        name: str,
-        hp: int,
-        pos: Point,
-        team: int,
-        summoner: Entity,
-    ):
-        super().__init__(
-            engine=engine,
-            name=name,
-            hp=hp,
-            speed=0,
-            pos=pos,
-            team=team,
-            summoner=summoner,
-        )
-
-
-class Marker:
-    def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
-        self.engine = engine
-        self.id = self.engine.generate_id()
-        self.name = name
-        self._pos: Optional[Point] = None
-        self.team = team
-        self.modifiers: List["Modifier"] = []
-        self.engine.markers.append(self)
-        self.pos = pos
-
-    @property
-    def pos(self) -> Optional[Point]:
-        return self._pos
-
-    @pos.setter
-    def pos(self, value: Optional[Point]) -> None:
-        if self._pos is not None:
-            if self in self.engine.markers_by_pos.get(self._pos, []):
-                self.engine.markers_by_pos[self._pos].remove(self)
-                if not self.engine.markers_by_pos[self._pos]:
-                    del self.engine.markers_by_pos[self._pos]
-        self._pos = value
-        if value is not None:
-            self.engine.markers_by_pos.setdefault(value, []).append(self)
 
 
 @dataclass

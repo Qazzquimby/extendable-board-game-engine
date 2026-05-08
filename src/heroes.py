@@ -19,6 +19,9 @@ from engine import (
     query,
     QueryDefense,
     Entity,
+    Object,
+    TurnStartEvent,
+    SummonModifier,
 )
 from abilities import (
     Ability,
@@ -32,7 +35,6 @@ from abilities import (
     ActionContext,
     RemoveTokenInstruction,
     RefreshAbilityInstruction,
-    PushInstruction,
     ActionCost,
 )
 from grid import Grid
@@ -87,6 +89,80 @@ class PhotonBeamToken(Token):
     pass
 
 
+class SentryTurret(Object):
+    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity):
+        super().__init__(
+            engine=engine,
+            name="Sentry Turret",
+            hp=1,
+            pos=pos,
+            team=team,
+            summoner=summoner,
+        )
+
+        class TurretAttack(SummonModifier):
+            @before(TurnStartEvent)
+            def fire_at_nearest(self, event: TurnStartEvent):
+                if event.target == self.owner.summoner:
+                    # Find nearest enemy in range 2
+                    enemies = [
+                        e
+                        for e in self.owner.engine.living_entities
+                        if e.team != self.owner.team and self.owner.distance_to(e) <= 2
+                    ]
+                    if enemies:
+                        nearest = min(enemies, key=lambda e: self.owner.distance_to(e))
+                        DamageEvent(
+                            engine=self.owner.engine,
+                            source=self.owner,
+                            target=nearest,
+                            amount=1,
+                        ).resolve()
+
+        self.add_modifier(TurretAttack())
+
+
+class Teleporter(Object):
+    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity):
+        super().__init__(
+            engine=engine,
+            name="Teleporter",
+            hp=8,
+            pos=pos,
+            team=team,
+            summoner=summoner,
+        )
+        # todo, teleporter behavior
+
+
+@dataclass
+class CreateSentryTurretInstruction(Instruction):
+    def execute(self, ctx: ActionContext) -> None:
+        # todo, targeting should allow 3 empty spaces in unlimited range
+        for point in ctx.included:
+            if not ctx.engine.entity_at(point):
+                SentryTurret(
+                    engine=ctx.engine,
+                    pos=point,
+                    team=ctx.source.team,
+                    summoner=ctx.source,
+                )
+
+
+@dataclass
+class CreateTeleporterInstruction(Instruction):
+    def execute(self, ctx: ActionContext) -> None:
+        # todo, targeting should allow 1 empty space in range 1 and 1 in unlimited range
+        for point in ctx.included:
+            if not ctx.engine.entity_at(point):
+                Teleporter(
+                    engine=ctx.engine,
+                    pos=ctx.receiver,
+                    team=ctx.source.team,
+                    summoner=ctx.source,
+                )
+
+
 class Symmetra(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -118,6 +194,36 @@ class Symmetra(Hero):
                     GiveTokenInstruction(token_class=PhotonBeamToken, amount=1),
                 ],
                 is_default=True,
+                owner=self,
+            )
+        )
+
+        self.abilities.append(
+            Ability(
+                name="Photon Orb",
+                targeting=TargetUnit(in_range=4),
+                instructions=[DamageInstruction(amount=2)],
+                is_default=True,
+                owner=self,
+            )
+        )
+
+        self.abilities.append(
+            Ability(
+                name="Create Sentry Turret",
+                targeting=TargetArea(area=Square(side_length=1, in_range=99)), # todo space, not square
+                instructions=[CreateSentryTurretInstruction()],
+                max_charges=1,
+                owner=self,
+            )
+        )
+
+        self.abilities.append(
+            Ability(
+                name="Create Teleporter",
+                targeting=TargetArea(area=Square(side_length=1, in_range=99)), # todo space, not square
+                instructions=[CreateTeleporterInstruction()],
+                max_charges=1,
                 owner=self,
             )
         )
