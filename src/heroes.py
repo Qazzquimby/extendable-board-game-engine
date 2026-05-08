@@ -91,14 +91,14 @@ class Symmetra(Hero):
         super().__init__(
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
-        # STUBBED:
-        # - Missing End of Activation triggers
-        # - Missing Action Types (Free Action, Ultimate, Reaction)
-        # - Missing Object / Marker creation (Turrets, Teleporter, Barriers)
-        # - Missing "Unlimited" range targeting
-        # - Missing Delayed effects (e.g. At the beginning of your next activation)
-        # - Missing Facing and Edges for objects (Floating Barrier)
-        # - Missing Aura mechanics for maximum health buffs (Shield Generator)
+        # TODO:
+        #  Missing End of Activation triggers
+        #  Missing Action Types (Free Action, Ultimate, Reaction)
+        #  Missing Object / Marker creation (Turrets, Teleporter, Barriers)
+        #  Missing "Unlimited" range targeting
+        #  Missing Delayed effects (e.g. At the beginning of your next activation)
+        #  Missing Facing and Edges for objects (Floating Barrier)
+        #  Missing Aura mechanics for maximum health buffs (Shield Generator)
 
         self.abilities.append(
             Ability(
@@ -128,6 +128,58 @@ def _reinhardt_all_path_spaces_are_in_range_1(source: Entity, points: Set[Point]
         start=source.pos, max_range=1
     )
     return all([point in points_in_range_1 for point in points])
+
+
+@dataclass
+class ChargeInstruction(Instruction):
+    def execute(self, ctx: ActionContext) -> None:
+        first_enemy = None
+        last_point = ctx.source.pos
+
+        # todo not knowing if each item is a point or entity is bad
+        #  Everything technically targets a point. Make all targets points.
+        #  need to be able to efficiently get content of point
+        #  It's usually more convenient to treat targets as entities since its usually immediately resolved.
+        #  Don't want to need an expensive lookup many times during event handling.
+
+        # todo
+        #  For each space, check if there's a collision. The first collided entity is pushed along with you.
+        #  For each space that you or the collided entity is pushed into, try to push its content to the side (choose randomly if both are unoccupied).
+        #  If any space cannot be emptied, stop.
+        #  The below is teleporting to the end of the range and does nothing to prevent ending on top of another entity.
+
+        path = [ctx.source.pos] + ctx.included
+        last_point = path[-1]
+        second_last_point = path[-2]
+
+        for point in ctx.included:
+            entity = ctx.engine.entity_at(point)
+            if not entity:
+                continue
+            if not first_enemy:
+                first_enemy = entity
+                DamageEvent(
+                    engine=ctx.engine,
+                    source=ctx.source,
+                    target=entity,
+                    amount=6,
+                    ability=ctx.ability,
+                ).resolve()
+                entity.add_modifier(Immobile())
+                entity.pos = last_point
+            else:
+                DamageEvent(
+                    engine=ctx.engine,
+                    source=ctx.source,
+                    target=entity,
+                    amount=1,
+                    ability=ctx.ability,
+                ).resolve()
+
+        if first_enemy:
+            ctx.source.pos = second_last_point
+        else:
+            ctx.source.pos = last_point
 
 
 class Reinhardt(Hero):
@@ -164,14 +216,9 @@ class Reinhardt(Hero):
         )
         self.abilities.append(
             Ability(
-                # todo, implement collide and drag
                 name="Charge",
                 targeting=TargetArea(area=Line(length=99, in_range=0)),
-                instructions=[
-                    DamageInstruction(amount=6),
-                    PushInstruction(distance=99),
-                    ApplyModifierInstruction(modifier_class=Immobile),
-                ],
+                instructions=[ChargeInstruction()],
                 action_cost=ActionCost.MOVE_AND_STANDARD,
                 max_charges=1,
                 owner=self,
@@ -227,16 +274,32 @@ class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
                 self.owner.add_modifier(DefenseModifier(owner=entity, amount=2))
 
 
+@dataclass
+class KatanaBurstInstruction(Instruction):
+    def execute(self, ctx: ActionContext) -> None:
+        from engine import DamageEvent
+
+        if not ctx.target or not hasattr(ctx.target, "pos"):
+            return
+        points_in_range = ctx.engine.grid.get_points_in_range(
+            start=ctx.target.pos, max_range=1
+        )
+        for entity in ctx.engine.living_entities:
+            if (
+                entity != ctx.target
+                and entity.team != ctx.source.team
+                and entity.pos in points_in_range
+            ):
+                DamageEvent(
+                    ctx.engine, source=ctx.source, target=entity, amount=1
+                ).resolve()
+
+
 class Viktoria(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Viktoria", hp=6, speed=3, pos=pos, team=team
         )
-        # STUBBED:
-        # - Missing Summoning/Deploy mechanics without abilities
-        # - Missing Critical Hit mechanics
-        # - Missing Teleport movement
-
         self.add_modifier(AllViktoriasHealWhenAnyViktoriaKills())
         self.add_modifier(OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies())
 
@@ -244,9 +307,8 @@ class Viktoria(Hero):
             Ability(
                 name="Enchanted Katana",
                 targeting=TargetUnit(in_range=1),
-                instructions=[
-                    DamageInstruction(amount=2)
-                ],  # Missing Crit and Burst AoE
+                instructions=[DamageInstruction(amount=2), KatanaBurstInstruction()],
+                crit_chance=2,
                 is_default=True,
                 owner=self,
             )
@@ -270,13 +332,13 @@ class DamageOverTimeToken(Token):
 class Spy(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Spy", hp=6, speed=3, pos=pos, team=team)
-        # STUBBED:
-        # - Missing query_is_ally
-        # - Missing Redirect ability target
-        # - Missing Reactions to enemy movement
-        # - Missing Removal from board and hidden info (Face down markers)
-        # - Missing Damage over Time (DoT)
-        # - Missing Damage Resistance and conditional trigger prevention (Deadringer)
+        # TODO:
+        #  Missing query_is_ally
+        #  Missing Redirect ability target
+        #  Missing Reactions to enemy movement
+        #  Missing Removal from board and hidden info (Face down markers)
+        #  Missing Damage over Time (DoT)
+        #  Missing Damage Resistance and conditional trigger prevention (Deadringer)
 
         def revolver_damage(ctx: ActionContext) -> int:
             if ctx.target.get_token_count(KillCounter) > 0:
@@ -360,10 +422,10 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
 class Axe(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
-        # STUBBED:
-        # - Missing Movement cost modifiers (Battle Hunger)
-        # - Missing Temporary Condition tracking (Berserker's Call duration)
-        # - Missing "Refresh ability" mechanic
+        # TODO:
+        # TODO Missing Movement cost modifiers (Battle Hunger)
+        # TODO Missing Temporary Condition tracking (Berserker's Call duration)
+        # TODO Missing "Refresh ability" mechanic
 
         self.add_modifier(AxeCleaveOnTakeDamage())
         self.add_modifier(AxeReflectHalfOfDamageFromDefaults())

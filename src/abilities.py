@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 class ActionContext:
     engine: "Engine"
     source: "Entity"
-    receiver: "Entity"
-    target: Optional[Union["Entity", "Point"]] = None
-    included: List[Union["Entity", "Point"]] = field(default_factory=list)
+    receiver: "Point"
+    target: Optional["Point"] = None
+    included: List["Point"] = field(default_factory=list)
     ability: Optional["Ability"] = None
     is_hit: bool = True
     is_crit: bool = False
