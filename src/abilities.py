@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type
+from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type, Tuple, Set
 
-from aimings import Aiming
+from aimings import Aiming, AimingResult, MultipleAimingResults
 
 if TYPE_CHECKING:
     from engine import Engine, Entity, Token, DamageEvent
@@ -39,9 +39,11 @@ def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Instruction:
     """Base class for all ability effects."""
+
+    aiming_name: Optional[str] = field(default=None)
 
     def execute(self, ctx: ActionContext) -> None:
         pass
@@ -195,52 +197,51 @@ class Ability:
         self,
         engine: "Engine",
         source: "Entity",
-        targets: Optional[List["Point"]],
-        included: Optional[List["Point"]],
-    ) -> None:  # todo not used yet
+        aiming_result: Union[AimingResult, MultipleAimingResults],
+    ) -> None:  # todo, execute is not used yet
         if self.charges is not None:
             self.charges -= 1
         if self.taps:
             self.is_tapped = True
             self.tapped_this_turn = True
 
-        if target:
-            roll = engine.rng.randint(1, 6)  # todo rolling should be an event
-            defense = target.get_defense(attack_source=source, ability=self)
-            defense = min(4, defense)
-            is_hit = roll > defense
+        hit_target_points, crit_target_points = self._get_hit_and_crit_target_points(
+            aiming_result=aiming_result, engine=engine, source=source
+        )
 
-            crit_chance = source.get_crit(receiver=target, ability=self)
-            is_crit = roll >= 7 - crit_chance
+        for instruction in self.instructions:
+            if instruction.aiming_name:
+                assert isinstance(aiming_result, MultipleAimingResults)
+                instruction_aiming_result = aiming_result[instruction.aiming_name]
+            else:
+                instruction_aiming_result = aiming_result
 
-            ctx = ActionContext(
-                engine=engine,
-                source=source,
-                receiver_point=target,
-                target=target,
-                included_points=included,
-                ability=self,
-                is_hit=is_hit,
-                is_crit=is_crit,
-            )
+            for target_point in instruction_aiming_result.target_points:
+                is_hit = target_point in hit_target_points
+                is_crit = target_point in crit_target_points
 
-            if is_hit:
-                for instruction in self.instructions:
-                    instruction.execute(ctx)
-
-        if included:
-            # No roll
-            for included_entity in included:
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
-                    receiver_point=included_entity,
-                    target=target,
-                    included_points=included,
+                    receiver_point=target_point,
+                    target_points=instruction_aiming_result.target_points,
+                    included_points=instruction_aiming_result.included_points,
+                    ability=self,
+                    is_hit=is_hit,
+                    is_crit=is_crit,
+                )
+                instruction.execute(ctx)
+
+            for included_point in instruction_aiming_result.included_points:
+                ctx = ActionContext(
+                    engine=engine,
+                    source=source,
+                    receiver_point=included_point,
+                    target_points=instruction_aiming_result.target_points,
+                    included_points=instruction_aiming_result.included_points,
                     ability=self,
                 )
-                for instruction in self.instructions:
-                    instruction.execute(ctx)
+                instruction.execute(ctx)
 
     def get_hash(self) -> float:
         import hashlib
@@ -250,3 +251,31 @@ class Ability:
         key = f"{owner_set}__{owner_name}__{self.name}"
         hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
         return float(hash_int % 10000) / 100.0
+
+    def _get_hit_and_crit_target_points(
+        self,
+        aiming_result: Union[AimingResult, MultipleAimingResults],
+        engine: "Engine",
+        source: "Entity",
+    ) -> Tuple[Set["Point"], Set["Point"]]:
+        if isinstance(aiming_result, MultipleAimingResults):
+            all_target_points = set()
+            for aiming_result_set in aiming_result.values():
+                all_target_points.update(aiming_result_set.target_points)
+        else:
+            all_target_points = aiming_result.target_points
+        hit_target_points = set()
+        crit_target_points = set()
+        for target_point in all_target_points:
+            target = engine.entity_at(target_point)
+            if target:
+                roll = engine.rng.randint(1, 6)  # todo rolling should be an event
+                defense = target.get_defense(attack_source=source, ability=self)
+                defense = min(4, defense)
+                if roll > defense:
+                    hit_target_points.add(target_point)
+
+                crit_chance = source.get_crit(receiver=target, ability=self)
+                if roll >= 7 - crit_chance:
+                    crit_target_points.add(target_point)
+        return hit_target_points, crit_target_points

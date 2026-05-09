@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict
 
 from areas import Area
+from point import Point
 
 # Recipient: Anything being affected
 # Target Point: A point that has been individually chosen
@@ -11,10 +12,28 @@ from areas import Area
 
 
 @dataclass
+class AimingResult:
+    target_points: List[Point] = field(default_factory=list)
+    included_points: List[Point] = field(default_factory=list)
+
+
+MultipleAimingResults = Dict[str, AimingResult]
+
+
+@dataclass
 class Aiming:
     """Base class for how an ability finds its recipients."""
 
     pass
+
+
+class MultipleAiming(Aiming):
+    """Requires multiple aimings. The dict keys are just identifiers for the aimings, and can be used in instructions to refer to specific targets."""
+
+    def __init__(self, aimings: Union[List[Aiming], Dict[str, Aiming]]):
+        if isinstance(aimings, list):
+            aimings = {f"{i}": t for i, t in enumerate(aimings)}
+        self.aimings = aimings
 
 
 @dataclass
@@ -44,12 +63,3 @@ class IncludeArea(Aiming):
     """Targets an area on the grid."""
 
     area: "Area"
-
-
-class MultipleAiming(Aiming):
-    """Requires multiple aimings. The dict keys are just identifiers for the aimings, and can be used in instructions to refer to specific targets."""
-
-    def __init__(self, aimings: Union[List[Aiming], Dict[str, Aiming]]):
-        if isinstance(aimings, list):
-            aimings = {f"{i}": t for i, t in enumerate(aimings)}
-        self.aimings = aimings
