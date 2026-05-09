@@ -499,7 +499,7 @@ class PullEvent:
 class TurnStartEvent:
     def __init__(self, engine: "Engine", target: "Entity"):
         self.engine = engine
-        self.target = target
+        self.target = target  # todo rename. Hero, for turn start? It's nice having a consistent name to check for == self though.
 
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
@@ -673,12 +673,10 @@ class Immobile(Modifier):
     def prevent_move(self, q: QueryCanMove) -> None:
         q.result = False
 
+
+class ImmobileToken(Immobile, Token):
     @before(TurnEndEvent)
     def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        # todo, we'd rather modify the modifier somehow
-        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
-        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
-        #  eg Nearby enemies are immobile
         if self in self.owner.modifiers:
             self.owner.remove_modifier(self)
 
@@ -710,6 +708,8 @@ class Slow(Modifier):
     def reduce_speed(self, q: QuerySpeed) -> None:
         q.result = max(0, q.result - self.amount)
 
+
+class SlowToken(Slow, Token):
     @before(TurnEndEvent)
     def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
         # todo, we'd rather modify the modifier somehow

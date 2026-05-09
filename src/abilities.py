@@ -104,6 +104,7 @@ class GiveTokenInstruction(Instruction):
         receiver = ctx.engine.entity_at(ctx.receiver_point)
         if receiver:
             amount = resolve_int(self.amount, ctx)
+            # todo should be an event
             receiver.add_token(self.token_class, amount=amount)
 
 

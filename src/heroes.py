@@ -25,6 +25,7 @@ from engine import (
     TurnStartEvent,
     SummonModifier,
     SummonEvent,
+    SlowToken,
 )
 from abilities import (
     Ability,
@@ -85,6 +86,69 @@ class PhotonBeamToken(Token):
     pass
 
 
+def grant_photon_beam(owner_entity: Entity):
+    class PhotonBeamManager(Modifier):
+        def __init__(self):
+            self.entities_hit_this_turn = set()
+            super().__init__()
+
+        @after(TurnStartEvent)
+        def clear_tracker_on_turn_start(self, event: TurnStartEvent):
+            self.entities_hit_this_turn.clear()
+
+        @after(TurnEndEvent)
+        def fade_tokens_on_turn_end(self, event: TurnEndEvent):
+            for entity in self.owner.engine.living_entities:
+                if (
+                    entity.get_token_count(PhotonBeamToken) > 0
+                    and entity not in self.entities_hit_this_turn
+                ):
+                    entity.remove_token(PhotonBeamToken, amount=1)
+
+    manager = PhotonBeamManager()
+
+    @dataclass
+    class GivePhotonBeamTokenAndTrack(Instruction):
+        # We pass the manager instance in, creating a direct link.
+        tracker: PhotonBeamManager
+
+        def execute(self, ctx: ActionContext) -> None:
+            receiver = ctx.engine.entity_at(ctx.receiver_point)
+            if receiver:
+                receiver.add_token(PhotonBeamToken)
+            self.tracker.entities_hit_this_turn.add(receiver)
+
+    photon_beam_ability = Ability(
+        name="Photon Beam",
+        aiming=TargetEntity(in_range=2),
+        instructions=[
+            DamageInstruction(
+                amount=lambda ctx: 2
+                + (2 * ctx.receiver.get_token_count(PhotonBeamToken)),
+                undefendable=True,
+            ),
+            GivePhotonBeamTokenAndTrack(tracker=manager),
+        ],
+        is_default=True,
+        owner=owner_entity,
+    )
+
+    owner_entity.add_modifier(manager)
+    owner_entity.abilities.append(photon_beam_ability)
+
+
+class SentryTurretManager(Modifier):
+    def __init__(self):
+        self.target_hit_this_activation = set()
+        super().__init__()
+
+    @after(
+        TurnStartEvent
+    )  # todo should separate turn and activation. Hero and their summons activate on same turn.
+    def clear_on_turn_start(self, event: TurnStartEvent):
+        self.target_hit_this_activation.clear()
+
+
 class SentryTurret(Object):
     def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity):
         super().__init__(
@@ -97,28 +161,49 @@ class SentryTurret(Object):
         )
 
         class TurretAttack(SummonModifier):
-            #             1hp.
-            #             At start of creator's activation: ⌖Nearest enemy in range 2: *Undefendable*, 1dmg.
-            #             todo If another **Sentry Turret** already hit the target this activation, the target gets **slow** -1.
+            # At start of creator's activation: ⌖Nearest enemy in range 2: *Undefendable*, 1dmg.
+            # If another **Sentry Turret** already hit the target this activation, the target gets **slow** -1.
             @after(TurnStartEvent)
             def fire_at_nearest(self, event: TurnStartEvent):
-                if event.target == self.owner.summoner:
-                    # Find nearest enemy in range 2
-                    enemies = [
-                        e
-                        for e in self.owner.engine.living_entities
-                        if e.team != self.owner.team and self.owner.distance_to(e) <= 2
-                    ]
-                    if enemies:
-                        nearest = min(enemies, key=lambda e: self.owner.distance_to(e))
-                        DamageEvent(
-                            engine=self.owner.engine,
-                            source=self.owner,
-                            receiver=nearest,
-                            amount=1,
-                        ).resolve()
+                manager = self.owner.summoner.get_modifier(SentryTurretManager)  # todo
+
+                # Find nearest enemy in range 2
+                enemies = [
+                    e
+                    for e in self.owner.engine.living_entities
+                    if e.team != self.owner.team and self.owner.distance_to(e) <= 2
+                ]
+                if enemies:
+                    nearest = min(enemies, key=lambda e: self.owner.distance_to(e))
+                    if nearest in manager.targets_hit_this_activation:
+                        GiveTokenInstruction(token_class=SlowToken, amount=1).execute(
+                            ctx=ctx
+                        )  # ..?
+                    manager.targets_hit_this_activation.add(nearest)
+                    DamageEvent(
+                        engine=self.owner.engine,
+                        source=self.owner,
+                        receiver=nearest,
+                        amount=1,
+                    ).resolve()
 
         self.add_modifier(TurretAttack())
+
+
+def grant_sentry_turret_ability(owner_entity: Entity):
+    if not owner_entity.has_modifier(SentryTurretManager):
+        owner_entity.add_modifier(SentryTurretManager())
+
+    create_turret_ability = Ability(
+        name="Create Sentry Turret",
+        aiming=MultipleAiming(
+            [TargetPoint(in_range=None, empty=True) for _i in range(3)]
+        ),
+        instructions=[CreateSentryTurretInstruction()],
+        max_charges=1,
+        owner=owner_entity,
+    )
+    owner_entity.abilities.append(create_turret_ability)
 
 
 class Teleporter(Object):
@@ -178,53 +263,12 @@ class CreateTeleporterInstruction(Instruction):
                 )
 
 
-# todo itd be good to tie the pieces together, photon beam token, this, entities_given_photon_beam_token_this_turn, and the photon beam ability.
-#  it's all one ability. It would be good to be able to grant the whole thing with one line. Note that if someone copied the ability right now it'd crash since they dont have the entities_given_photon_beam_token_this_turn attribute.
-class PhotonBeamTokensFade(Modifier):
-    @after(TurnEndEvent)
-    def remove_photon_beam_tokens_from_units_who_didnt_gain_one_this_turn(self):
-        for entity in self.owner.engine.living_entities:
-            if (
-                entity.get_token_count(PhotonBeamToken) > 0
-                and not entity in self.owner.entities_given_photon_beam_token_this_turn
-            ):
-                entity.remove_token(PhotonBeamToken, amount=1)
-
-
 class Symmetra(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
-        self.entities_given_photon_beam_token_this_turn = set()
-
-        # TODO:
-        #  Missing End of Activation triggers
-        #  Missing Action Types (Free Action, Ultimate, Reaction)
-        #  Missing Object / Marker creation (Turrets, Teleporter, Barriers)
-        #  Missing Delayed effects (e.g. At the beginning of your next activation)
-        #  Missing Facing and Edges for objects (Floating Barrier)
-        #  Missing Aura mechanics for maximum health buffs (Shield Generator)
-
-        self.abilities.append(
-            Ability(
-                name="Photon Beam",
-                aiming=TargetEntity(in_range=2),
-                instructions=[
-                    DamageInstruction(
-                        amount=lambda ctx: 2
-                        + (2 * ctx.receiver.get_token_count(PhotonBeamToken)),
-                        undefendable=True,
-                    ),
-                    GiveTokenInstruction(token_class=PhotonBeamToken, amount=1),
-                    # todo update attribute
-                ],
-                is_default=True,
-                owner=self,
-                is_undefendable=True,
-            )
-        )
-        self.add_modifier(PhotonBeamTokensFade())
+        grant_photon_beam(self)
 
         self.abilities.append(
             # todo  Choose one --
@@ -239,17 +283,7 @@ class Symmetra(Hero):
             )
         )
 
-        self.abilities.append(
-            Ability(
-                name="Create Sentry Turret",
-                aiming=MultipleAiming(
-                    [TargetPoint(in_range=None, empty=True) for _i in range(3)]
-                ),
-                instructions=[CreateSentryTurretInstruction()],
-                max_charges=1,
-                owner=self,
-            )
-        )
+        grant_sentry_turret_ability(self)
 
         self.abilities.append(
             Ability(
@@ -352,7 +386,7 @@ class ChargeInstruction(Instruction):
                     amount=6,
                     ability=ctx.ability,
                 ).resolve()
-                entity.add_modifier(Immobile())
+                GiveTokenInstruction(token_class=ImmobileToken).execute(ctx=ctx)
                 entity.pos = last_point
             else:
                 DamageEvent(
