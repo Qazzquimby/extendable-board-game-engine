@@ -11,6 +11,9 @@ from point import Point
 # Included Entity: An entity in an included point, if any.
 
 
+# todo aimings should have their logic in the class, not in the agent.
+
+
 @dataclass
 class AimingResult:
     target_points: List[Point] = field(default_factory=list)
@@ -44,7 +47,7 @@ class TargetSelf(Aiming):
 
 
 @dataclass
-class TargetUnit(Aiming):
+class TargetEntity(Aiming):
     """Targets a point containing a unit within a given range. None means unlimited."""
 
     in_range: Optional[int] = None

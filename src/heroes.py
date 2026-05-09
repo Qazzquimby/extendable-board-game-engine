@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Set, Iterator
 
-from aimings import TargetUnit, MultipleAiming, TargetPoint, IncludeArea, TargetSelf
+from aimings import TargetEntity, MultipleAiming, TargetPoint, IncludeArea, TargetSelf
 from areas import PathArea, Line, Square
 from engine import (
     Engine,
@@ -24,6 +24,7 @@ from engine import (
     Object,
     TurnStartEvent,
     SummonModifier,
+    SummonEvent,
 )
 from abilities import (
     Ability,
@@ -35,6 +36,7 @@ from abilities import (
     RemoveTokenInstruction,
     RefreshAbilityInstruction,
     ActionCost,
+    TeleportInstruction,
 )
 from grid import Grid
 from mod_value import div
@@ -49,7 +51,7 @@ class MeleeHero(Hero):
         self.abilities.append(
             Ability(
                 name="Melee Attack",
-                aiming=TargetUnit(in_range=1),
+                aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -68,7 +70,7 @@ class RangedHero(Hero):
         self.abilities.append(
             Ability(
                 name="Ranged Attack",
-                aiming=TargetUnit(in_range=3),
+                aiming=TargetEntity(in_range=3),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -95,7 +97,10 @@ class SentryTurret(Object):
         )
 
         class TurretAttack(SummonModifier):
-            @before(TurnStartEvent)
+            #             1hp.
+            #             At start of creator's activation: ⌖Nearest enemy in range 2: *Undefendable*, 1dmg.
+            #             todo If another **Sentry Turret** already hit the target this activation, the target gets **slow** -1.
+            @after(TurnStartEvent)
             def fire_at_nearest(self, event: TurnStartEvent):
                 if event.target == self.owner.summoner:
                     # Find nearest enemy in range 2
@@ -109,7 +114,7 @@ class SentryTurret(Object):
                         DamageEvent(
                             engine=self.owner.engine,
                             source=self.owner,
-                            receiver=nearest.pos,
+                            receiver=nearest,
                             amount=1,
                         ).resolve()
 
@@ -127,6 +132,24 @@ class Teleporter(Object):
             summoner=summoner,
         )
         # todo, teleporter behavior. Everyone has action while in teleporter's space to teleport to other space.
+
+    @after(SummonEvent)
+    def give_teleport_ability(self):
+        for entity in self.engine.living_entities:
+            entity.abilities.append(
+                Ability(
+                    name="Use Teleporter",
+                    aiming=TargetEntity(),  # todo target teleporter, todo ignoring line of sight
+                    instructions=[
+                        TeleportInstruction(
+                            destination=lambda ctx: ctx.target.pos,
+                        )
+                    ],
+                    owner=self,
+                )
+            )
+            # todo no duplicate abilities
+            # todo entities can sometimes share spaces? non-blocking tag? Things targeting the space hit the top entity, and all are included in aoe
 
 
 @dataclass
@@ -155,11 +178,26 @@ class CreateTeleporterInstruction(Instruction):
                 )
 
 
+# todo itd be good to tie the pieces together, photon beam token, this, entities_given_photon_beam_token_this_turn, and the photon beam ability.
+#  it's all one ability. It would be good to be able to grant the whole thing with one line. Note that if someone copied the ability right now it'd crash since they dont have the entities_given_photon_beam_token_this_turn attribute.
+class PhotonBeamTokensFade(Modifier):
+    @after(TurnEndEvent)
+    def remove_photon_beam_tokens_from_units_who_didnt_gain_one_this_turn(self):
+        for entity in self.owner.engine.living_entities:
+            if (
+                entity.get_token_count(PhotonBeamToken) > 0
+                and not entity in self.owner.entities_given_photon_beam_token_this_turn
+            ):
+                entity.remove_token(PhotonBeamToken, amount=1)
+
+
 class Symmetra(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
+        self.entities_given_photon_beam_token_this_turn = set()
+
         # TODO:
         #  Missing End of Activation triggers
         #  Missing Action Types (Free Action, Ultimate, Reaction)
@@ -171,7 +209,7 @@ class Symmetra(Hero):
         self.abilities.append(
             Ability(
                 name="Photon Beam",
-                aiming=TargetUnit(in_range=2),
+                aiming=TargetEntity(in_range=2),
                 instructions=[
                     DamageInstruction(
                         amount=lambda ctx: 2
@@ -179,16 +217,22 @@ class Symmetra(Hero):
                         undefendable=True,
                     ),
                     GiveTokenInstruction(token_class=PhotonBeamToken, amount=1),
+                    # todo update attribute
                 ],
                 is_default=True,
                 owner=self,
+                is_undefendable=True,
             )
         )
+        self.add_modifier(PhotonBeamTokensFade())
 
         self.abilities.append(
+            # todo  Choose one --
+            #           - ⌖Range 4: +2 *miss*, 2dmg.
+            #           - At the beginning of your next activation: ⌖Range 4: +2 *miss*, 4dmg.
             Ability(
                 name="Photon Orb",
-                aiming=TargetUnit(in_range=4),
+                aiming=TargetEntity(in_range=4),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -221,6 +265,36 @@ class Symmetra(Hero):
                 owner=self,
             )
         )
+
+    #  todo     - name: Create Floating Barrier
+    #         art: floating_barrier.webp
+    #         text: |-
+    #           1/game:
+    #           Create a **Floating Barrier** marker in an edge in range 1, facing away from you.
+    #           It has:
+    #             This blocks line of sight for the creator's enemies.
+    #             At start of creator's activation: This moves forward 2 spaces.
+
+    # todo      - name: Create Shield Generator
+    #         art: shield_generator.webp
+    #         text: |-
+    #           *Ultimate* 3:
+    #           Create a **Shield Generator** object in an empty space in range 1.
+    #           Heal all allies 4.
+    #           It has:
+    #             4hp.
+    #             Allies of the creator have +4 maximum health.
+    #             When this is destroyed, allies of the creator lose 4 health.
+
+    # todo       - name: Create Photon Barrier
+    #         art: photon_barrier.jpg
+    #         text: |-
+    #           *Ultimate* 4:
+    #           Choose any edge across the map.
+    #           Create a **Photon Barrier** object along that edge.
+    #           It has:
+    #             12hp.
+    #             This blocks line of sight for the creator's enemies.
 
 
 class PathAllInRangeArea(PathArea):
@@ -295,20 +369,21 @@ class ChargeInstruction(Instruction):
             ctx.source.pos = last_point
 
 
+class CannotBePushedOrPulled(Modifier):
+    @before(PushEvent)
+    def prevent_movement(self, event):
+        event.canceled = True
+
+    @before(PullEvent)
+    def prevent_movement(self, event):
+        event.canceled = True
+
+
 class Reinhardt(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
             engine=engine, name="Reinhardt", hp=12, speed=3, pos=pos, team=team
         )
-
-        class CannotBePushedOrPulled(Modifier):
-            @before(PushEvent)
-            def prevent_movement(self, event):
-                event.canceled = True
-
-            @before(PullEvent)
-            def prevent_movement(self, event):
-                event.canceled = True
 
         self.add_modifier(CannotBePushedOrPulled())
 
@@ -418,7 +493,7 @@ class Viktoria(Hero):
         self.abilities.append(
             Ability(
                 name="Enchanted Katana",
-                aiming=TargetUnit(in_range=1),
+                aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=2), KatanaBurstInstruction()],
                 crit_chance=2,
                 is_default=True,
@@ -460,7 +535,7 @@ class Spy(Hero):
         self.abilities.append(
             Ability(
                 name="Revolver",
-                aiming=TargetUnit(),
+                aiming=TargetEntity(),
                 instructions=[
                     DamageInstruction(amount=revolver_damage, irreducible=True),
                     RemoveTokenInstruction(token_class=KillCounter, amount=1),
@@ -545,7 +620,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Axe",
-                aiming=TargetUnit(in_range=1),
+                aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 owner=self,
@@ -564,7 +639,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Battle Hunger",
-                aiming=TargetUnit(in_range=3),
+                aiming=TargetEntity(in_range=3),
                 instructions=[
                     GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
                     GiveTokenInstruction(token_class=BattleHungerToken, amount=1),
@@ -576,7 +651,7 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Culling Blade",
-                aiming=TargetUnit(in_range=1),
+                aiming=TargetEntity(in_range=1),
                 instructions=[CullingBladeInstruction()],
                 max_charges=1,
                 owner=self,
