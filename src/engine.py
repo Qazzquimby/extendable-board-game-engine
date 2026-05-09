@@ -281,7 +281,7 @@ class Entity:
         ability: Optional["Ability"] = None,
     ) -> int:
         q = QueryDefense(
-            receiver=self, attack_source=attack_source, ability=ability, result=0
+            target=self, attack_source=attack_source, ability=ability, result=0
         )
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
@@ -433,12 +433,12 @@ class PushEvent:
     def __init__(
         self,
         engine: "Engine",
-        target: "Entity",
+        recipient: "Entity",
         distance: int,
         source: Optional["Entity"] = None,
     ):
         self.engine = engine
-        self.target = target
+        self.recipient = recipient
         self.distance = ModValue(distance)
         self.source = source
         self.canceled = False
@@ -449,17 +449,17 @@ class PushEvent:
             return
         # Pushing is calculated based on pathing away from the source
         if (
-            getattr(self.target, "pos", None) is not None
+            getattr(self.recipient, "pos", None) is not None
             and self.source
             and getattr(self.source, "pos", None) is not None
         ):
             dist = max(0, self.distance.value)
             if dist > 0:
-                path = self.engine.grid.get_push_path(
-                    self.target.pos, None, self.source.pos
+                path = self.engine.grid.get_push_path(  # todo
+                    start=self.recipient.pos, target=None, push_from=self.source.pos
                 )
                 if path and len(path) >= dist:
-                    self.target.pos = path[dist - 1]
+                    self.recipient.pos = path[dist - 1]
         self.engine.router.publish(self, EventPhase.AFTER)
 
 
@@ -467,12 +467,12 @@ class PullEvent:
     def __init__(
         self,
         engine: "Engine",
-        target: "Entity",
+        recipient: "Entity",
         distance: int,
         source: Optional["Entity"] = None,
     ):
         self.engine = engine
-        self.target = target
+        self.recipient = recipient
         self.distance = ModValue(distance)
         self.source = source
         self.canceled = False
@@ -482,17 +482,17 @@ class PullEvent:
         if self.canceled:
             return
         if (
-            getattr(self.target, "pos", None) is not None
+            getattr(self.recipient, "pos", None) is not None
             and self.source
             and getattr(self.source, "pos", None) is not None
         ):
             dist = max(0, self.distance.value)
             if dist > 0:
                 path = self.engine.grid.get_pull_path(
-                    self.target.pos, self.source.pos, self.source.pos
+                    self.recipient.pos, self.source.pos, self.source.pos
                 )
                 if path and len(path) >= dist:
-                    self.target.pos = path[dist - 1]
+                    self.recipient.pos = path[dist - 1]
         self.engine.router.publish(self, EventPhase.AFTER)
 
 
@@ -529,44 +529,45 @@ class DamageEvent:
         self,
         engine: Engine,
         source: Optional[Entity],
-        target: Point,
+        receiver: Entity,
         amount: int,
         ability: Optional["Ability"] = None,
     ):
         self.engine = engine
         self.source = source
-        self.target = target
+        self.receiver = receiver
         self.amount = ModValue(amount)
         self.ability = ability
 
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
-        entity = self.engine.entity_at(self.target)
-        if entity:
-            if self.target.has_armor():
-                self.amount.add(-1)
+        if self.receiver.has_armor():
+            self.amount.add(-1)
 
-            final_damage = max(0, self.amount.value)
-            self.target.hp -= final_damage
+        final_damage = max(0, self.amount.value)
+        self.receiver.hp -= final_damage
 
-            if self.target.hp <= 0:
-                DeathEvent(
-                    self.engine, target=self.target, killer=self.source
-                ).resolve()
+        if self.receiver.hp <= 0:
+            DeathEvent(
+                self.engine, receiver=self.receiver, killer=self.source
+            ).resolve()
 
         self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class DeathEvent:
     # For on-kill use on-death and filter by killer
-    def __init__(self, engine: Engine, target: Entity, killer: Optional[Entity] = None):
+    def __init__(
+        self, engine: Engine, receiver: Entity, killer: Optional[Entity] = None
+    ):
         self.engine = engine
-        self.target = target
+        self.receiver = receiver
         self.killer = killer
 
     def resolve(self) -> None:
         self.engine.router.publish(self, EventPhase.BEFORE)
-        self.target.pos = None
+        self.receiver.pos = None
+        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class SummonEvent:
@@ -581,9 +582,9 @@ class SummonEvent:
 
 
 class HealEvent:
-    def __init__(self, engine: Engine, target: Entity, amount: int):
+    def __init__(self, engine: Engine, receiver: Entity, amount: int):
         self.engine = engine
-        self.target = target
+        self.target = receiver
         self.amount = ModValue(amount)
 
     def resolve(self) -> None:
@@ -599,44 +600,44 @@ class HealEvent:
 
 
 class QueryIsAlive:
-    def __init__(self, target: Entity):
-        self.target = target
-        self.result: bool = target.pos is not None and target.hp > 0
+    def __init__(self, entity: Entity):
+        self.entity = entity
+        self.result: bool = entity.pos is not None and entity.hp > 0
 
 
 class QueryHasArmor:
-    def __init__(self, target: Entity):
-        self.target = target
+    def __init__(self, entity: Entity):
+        self.entity = entity
         self.result: bool = False
 
 
 class QueryLegalActions:
-    def __init__(self, target: Entity, result: List[Ability]):
-        self.target = target
+    def __init__(self, entity: Entity, result: List[Ability]):
+        self.entity = entity
         self.result = result
 
 
 class QueryCanMove:
-    def __init__(self, target: Entity):
-        self.target = target
+    def __init__(self, entity: Entity):
+        self.entity = entity
         self.result: bool = True
 
 
 class QuerySpeed:
-    def __init__(self, target: Entity, result: int):
-        self.target = target
+    def __init__(self, entity: Entity, result: int):
+        self.entity = entity
         self.result = result
 
 
 class QueryDefense:
     def __init__(
         self,
-        receiver: Entity,
+        target: Entity,
         attack_source: Optional[Entity] = None,
         ability: Optional["Ability"] = None,
         result: int = 0,
     ):
-        self.target = receiver
+        self.target = target
         self.attack_source = attack_source
         self.ability = ability
         self.result = result
@@ -691,6 +692,15 @@ class Stunned(Modifier):
     def prevent_actions(self, q: QueryLegalActions) -> None:
         q.result = []
 
+    @before(TurnEndEvent)
+    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
+        # todo, we'd rather modify the modifier somehow
+        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
+        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
+        #  eg Nearby enemies are immobile
+        if self in self.owner.modifiers:
+            self.owner.remove_modifier(self)
+
 
 class Slow(Modifier):
     def __init__(self, amount: int):
@@ -699,6 +709,15 @@ class Slow(Modifier):
     @query(QuerySpeed)
     def reduce_speed(self, q: QuerySpeed) -> None:
         q.result = max(0, q.result - self.amount)
+
+    @before(TurnEndEvent)
+    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
+        # todo, we'd rather modify the modifier somehow
+        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
+        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
+        #  eg Nearby enemies are immobile
+        if self in self.owner.modifiers:
+            self.owner.remove_modifier(self)
 
 
 @dataclass
@@ -718,7 +737,7 @@ class Taunted(Modifier):
                 import copy
 
                 action = copy.deepcopy(ability)
-                action.target = self.taunter
+                action.receiver = self.taunter
                 forced_actions.append(action)
         q.result = forced_actions
         self.owner.remove_modifier(self)

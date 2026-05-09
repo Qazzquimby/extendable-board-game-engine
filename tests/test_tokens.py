@@ -12,7 +12,7 @@ class PoisonToken(Token):
     @before(TurnEndEvent)
     def take_poison_damage(self, event: TurnEndEvent):
         DamageEvent(
-            event.engine, source=None, target=self.owner, amount=self.amount
+            event.engine, source=None, receiver=self.owner, amount=self.amount
         ).resolve()
         self.remove(1)
 
@@ -23,7 +23,7 @@ venom_strike = Ability(
     instructions=[
         # Dynamic Callable damage formula evaluated exactly at Execution Time
         DamageInstruction(
-            amount=lambda ctx: 2 + (ctx.target.get_token_count(PoisonToken) * 3)
+            amount=lambda ctx: 2 + (ctx.receiver.get_token_count(PoisonToken) * 3)
         )
     ],
 )

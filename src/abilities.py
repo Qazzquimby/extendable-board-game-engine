@@ -5,7 +5,15 @@ from typing import List, Optional, TYPE_CHECKING, Union, Callable, Type, Tuple, 
 from aimings import Aiming, AimingResult, MultipleAimingResults
 
 if TYPE_CHECKING:
-    from engine import Engine, Entity, Token, DamageEvent
+    from engine import (
+        Engine,
+        Entity,
+        Token,
+        DamageEvent,
+        HealEvent,
+        PushEvent,
+        PullEvent,
+    )
     from point import Point
 
 
@@ -24,11 +32,15 @@ class ActionContext:
     is_hit: bool = True
     is_crit: bool = False
 
-    # @property
-    # def target(self):
-    #     if len(self.target_points) != 1:
-    #         raise ValueError("Cannot use `.target` when there are multiple targets.")
-    #     return self.target_points[0]
+    @property
+    def target_point(self):
+        if len(self.target_points) != 1:
+            raise ValueError("Cannot use `.target` when there are multiple targets.")
+        return self.target_points[0]
+
+    @property
+    def target(self):
+        return self.engine.entity_at(self.target_point)
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]
@@ -56,18 +68,20 @@ class DamageInstruction(Instruction):
     irreducible: bool = False
 
     def execute(self, ctx: ActionContext) -> None:
-        amount = resolve_int(self.amount, ctx)
-        if ctx.is_crit:
-            amount *= 2  # Critical hit grants +1x damage multiplier
-        # todo crit handling will likely need to be more extensible later
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            amount = resolve_int(self.amount, ctx)
+            if ctx.is_crit:
+                amount *= 2  # todo should be +1x damage multiplier. Use modvalue
+            # todo crit handling will likely need to be more extensible later
 
-        DamageEvent(
-            engine=ctx.engine,
-            source=ctx.source,
-            target=ctx.target,
-            amount=amount,
-            ability=ctx.ability,
-        ).resolve()
+            DamageEvent(
+                engine=ctx.engine,
+                source=ctx.source,
+                receiver=receiver,
+                amount=amount,
+                ability=ctx.ability,
+            ).resolve()
 
 
 @dataclass
@@ -75,10 +89,10 @@ class HealInstruction(Instruction):
     amount: DynamicInt
 
     def execute(self, ctx: ActionContext) -> None:
-        from engine import HealEvent
-
-        amount = resolve_int(self.amount, ctx)
-        HealEvent(engine=ctx.engine, target=ctx.target, amount=amount).resolve()
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            amount = resolve_int(self.amount, ctx)
+            HealEvent(engine=ctx.engine, receiver=ctx.rec, amount=amount).resolve()
 
 
 @dataclass
@@ -87,9 +101,10 @@ class GiveTokenInstruction(Instruction):
     amount: DynamicInt = 1
 
     def execute(self, ctx: ActionContext) -> None:
-        amt = resolve_int(self.amount, ctx)
-        if hasattr(ctx.target, "add_token"):
-            ctx.target.add_token(self.token_class, amt)
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            amount = resolve_int(self.amount, ctx)
+            receiver.add_token(self.token_class, amount=amount)
 
 
 @dataclass
@@ -98,9 +113,10 @@ class RemoveTokenInstruction(Instruction):
     amount: DynamicInt = 1
 
     def execute(self, ctx: ActionContext) -> None:
-        amt = resolve_int(self.amount, ctx)
-        if hasattr(ctx.target, "remove_token"):
-            ctx.target.remove_token(self.token_class, amt)
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            amount = resolve_int(self.amount, ctx)
+            ctx.target.remove_token(self.token_class, amount=amount)
 
 
 @dataclass
@@ -109,12 +125,14 @@ class PushInstruction(Instruction):
 
     # todo probably want direction param and update resolution
     def execute(self, ctx: ActionContext) -> None:
-        from engine import PushEvent
-
-        dist = resolve_int(self.distance, ctx)
-        if hasattr(ctx.target, "pos"):
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            dist = resolve_int(self.distance, ctx)
             PushEvent(
-                engine=ctx.engine, target=ctx.target, distance=dist, source=ctx.source
+                engine=ctx.engine,
+                recipient=ctx.target,
+                distance=dist,
+                source=ctx.source,
             ).resolve()
 
 
@@ -124,22 +142,29 @@ class PullInstruction(Instruction):
 
     # todo probably want direction param and update resolution
     def execute(self, ctx: ActionContext) -> None:
-        from engine import PullEvent
-
-        dist = resolve_int(self.distance, ctx)
-        if hasattr(ctx.target, "pos"):
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            dist = resolve_int(self.distance, ctx)
             PullEvent(
-                engine=ctx.engine, target=ctx.target, distance=dist, source=ctx.source
+                engine=ctx.engine,
+                recipient=ctx.target,
+                distance=dist,
+                source=ctx.source,
             ).resolve()
+
+
+# todo should really have an 'only affects entities' default flag to avoid the repeated filter logic.
 
 
 @dataclass
 class RefreshAbilityInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        if ctx.ability:
-            ctx.ability.is_tapped = False
-            ctx.ability.tapped_this_turn = False
-            ctx.ability.charges = ctx.ability.max_charges
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            if ctx.ability:
+                ctx.ability.is_tapped = False
+                ctx.ability.tapped_this_turn = False
+                ctx.ability.charges = ctx.ability.max_charges  # todo should be event
 
 
 @dataclass
@@ -147,9 +172,14 @@ class TeleportInstruction(Instruction):
     destination: DynamicPoint
 
     def execute(self, ctx: ActionContext) -> None:
-        dest = self.destination(ctx) if callable(self.destination) else self.destination
-        if hasattr(ctx.target, "pos"):
-            ctx.target.pos = dest
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            dest = (
+                self.destination(ctx)
+                if callable(self.destination)
+                else self.destination
+            )
+            receiver.pos = dest  # todo should be event
 
 
 @dataclass

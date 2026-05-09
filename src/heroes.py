@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Set, Iterator
 
+from aimings import TargetUnit, MultipleAiming, TargetPoint, IncludeArea, TargetSelf
+from areas import PathArea, Line, Square
 from engine import (
     Engine,
     Hero,
@@ -28,8 +30,6 @@ from abilities import (
     DamageInstruction,
     GiveTokenInstruction,
     ApplyModifierInstruction,
-    IncludeArea,
-    MultipleAiming,
     Instruction,
     ActionContext,
     RemoveTokenInstruction,
@@ -38,7 +38,6 @@ from abilities import (
 )
 from grid import Grid
 from mod_value import div
-from targeting import Square, Line, PathArea, TargetSelf, TargetUnit, TargetPoint
 from point import Point
 
 
@@ -110,7 +109,7 @@ class SentryTurret(Object):
                         DamageEvent(
                             engine=self.owner.engine,
                             source=self.owner,
-                            target=nearest,
+                            receiver=nearest.pos,
                             amount=1,
                         ).resolve()
 
@@ -127,7 +126,7 @@ class Teleporter(Object):
             team=team,
             summoner=summoner,
         )
-        # todo, teleporter behavior
+        # todo, teleporter behavior. Everyone has action while in teleporter's space to teleport to other space.
 
 
 @dataclass
@@ -176,7 +175,7 @@ class Symmetra(Hero):
                 instructions=[
                     DamageInstruction(
                         amount=lambda ctx: 2
-                        + (2 * ctx.target.get_token_count(PhotonBeamToken)),
+                        + (2 * ctx.receiver.get_token_count(PhotonBeamToken)),
                         undefendable=True,
                     ),
                     GiveTokenInstruction(token_class=PhotonBeamToken, amount=1),
@@ -275,7 +274,7 @@ class ChargeInstruction(Instruction):
                 DamageEvent(
                     engine=ctx.engine,
                     source=ctx.source,
-                    target=entity,
+                    receiver=entity,
                     amount=6,
                     ability=ctx.ability,
                 ).resolve()
@@ -285,7 +284,7 @@ class ChargeInstruction(Instruction):
                 DamageEvent(
                     engine=ctx.engine,
                     source=ctx.source,
-                    target=entity,
+                    receiver=entity,
                     amount=1,
                     ability=ctx.ability,
                 ).resolve()
@@ -365,7 +364,7 @@ class AllViktoriasHealWhenAnyViktoriaKills(Modifier):
         if event.killer == self.owner:
             for entity in self.owner.engine.living_entities:
                 if entity.name == "Viktoria":
-                    HealEvent(self.owner.engine, target=entity, amount=2).resolve()
+                    HealEvent(self.owner.engine, receiver=entity, amount=2).resolve()
 
 
 class DefenseModifier(Modifier):
@@ -383,7 +382,7 @@ class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
     def on_death(self):
         for entity in self.owner.engine.living_entities:
             if entity.name == "Viktoria" and entity != self.owner:
-                HealEvent(self.owner.engine, target=entity, amount=2).resolve()
+                HealEvent(self.owner.engine, receiver=entity, amount=2).resolve()
                 self.owner.add_modifier(DefenseModifier(owner=entity, amount=2))
 
 
@@ -404,7 +403,7 @@ class KatanaBurstInstruction(Instruction):
                 and entity.pos in points_in_range
             ):
                 DamageEvent(
-                    ctx.engine, source=ctx.source, target=entity, amount=1
+                    ctx.engine, source=ctx.source, receiver=entity, amount=1
                 ).resolve()
 
 
@@ -438,7 +437,7 @@ class DamageOverTimeToken(Token):
         from engine import DamageEvent
 
         DamageEvent(
-            engine=event.engine, source=None, target=self.owner, amount=self.amount
+            engine=event.engine, source=None, receiver=self.owner, amount=self.amount
         ).resolve()
 
 
@@ -485,7 +484,7 @@ class CullingBladeInstruction(Instruction):
         event = DamageEvent(
             engine=ctx.engine,
             source=ctx.source,
-            target=ctx.target,
+            receiver=ctx.target,
             amount=3,
             ability=ctx.ability,
         )
@@ -512,7 +511,7 @@ class AxeCleaveOnTakeDamage(Modifier):
             for entity in self.owner.engine.living_entities:
                 if entity.team != self.owner.team and entity.pos in points_in_range:
                     DamageEvent(
-                        self.owner.engine, source=self.owner, target=entity, amount=1
+                        self.owner.engine, source=self.owner, receiver=entity, amount=1
                     ).resolve()
 
 
@@ -527,7 +526,7 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
                 DamageEvent(
                     self.owner.engine,
                     source=self.owner,
-                    target=event.source,
+                    receiver=event.source,
                     amount=reflect_amt,
                 ).resolve()
 
