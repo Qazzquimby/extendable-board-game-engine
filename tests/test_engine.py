@@ -39,15 +39,14 @@ def test_marksmanship_disabled_by_adjacent_enemy():
     flanker = Entity(
         engine, "Flanker", hp=5, speed=3, pos=Point(0, 1), team=2
     )  # Range 1, adjacent enemy
-    axe = Entity(engine, "Axe", hp=10, speed=3, pos=Point(0, 4), team=2)
+    melee_hero = MeleeHero(engine, pos=Point(0, 4), team=2)
 
-    axe.add_modifier(InnateArmor())
+    melee_hero.add_modifier(InnateArmor())
     drow.add_modifier(Marksmanship())
 
     # Because Drow has an adjacent enemy, Marksmanship is disabled.
-    # Base dmg 2 -> Armor reduces to 1.
-    DamageEvent(engine, source=drow, receiver=axe, amount=2).resolve()
-    assert axe.hp == 9
+    DamageEvent(engine, source=drow, receiver=melee_hero, amount=2).resolve()
+    assert melee_hero.hp == 8
 
 
 def test_shallow_grave_multipliers_and_caps():
@@ -253,9 +252,9 @@ def test_engine_rng_seed():
 
 class PaladinAura(Modifier):
     @query(QueryHasArmor, target_self=False)
-    def grant_armor_to_adjacent(self, q):
+    def grant_armor_to_adjacent(self, q: QueryHasArmor):
         # Affects OTHERS: checks if the query target is near this aura's owner
-        if q.receiver != self.owner and q.receiver.distance_to(self.owner) <= 1:
+        if q.entity != self.owner and q.entity.distance_to(self.owner) <= 1:
             q.result = True
 
 

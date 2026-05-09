@@ -1,3 +1,4 @@
+from aimings import TargetSelf, TargetEntity
 from engine import Token, TurnEndEvent, QueryLegalActions, DamageEvent
 from engine import before, query
 from abilities import (
@@ -5,7 +6,6 @@ from abilities import (
     DamageInstruction,
     RemoveTokenInstruction,
 )
-from targeting import TargetSelf, TargetUnit
 
 
 class PoisonToken(Token):
@@ -19,7 +19,7 @@ class PoisonToken(Token):
 
 venom_strike = Ability(
     name="Venom Strike",
-    aiming=TargetUnit(in_range=1),
+    aiming=TargetEntity(in_range=1),
     instructions=[
         # Dynamic Callable damage formula evaluated exactly at Execution Time
         DamageInstruction(
@@ -36,7 +36,6 @@ class RootToken(Token):
             name="Rip Free",
             aiming=TargetSelf(),
             instructions=[RemoveTokenInstruction(token_class=RootToken, amount=1)],
-            cost_standard_action=True,
             owner=self.owner,
         )
         q.result.append(ability)

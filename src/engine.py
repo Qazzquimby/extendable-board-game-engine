@@ -545,7 +545,8 @@ class DamageEvent:
             self.amount.add(-1)
 
         final_damage = max(0, self.amount.value)
-        self.receiver.hp -= final_damage
+        new_hp = max(0, self.receiver.hp - final_damage)
+        self.receiver.hp = new_hp
 
         if self.receiver.hp <= 0:
             DeathEvent(
@@ -612,7 +613,9 @@ class QueryHasArmor:
 
 
 class QueryLegalAimings:
-    def __init__(self, actor: "Entity", ability: "Ability", result: List["AimingResult"]):
+    def __init__(
+        self, actor: "Entity", ability: "Ability", result: List["AimingResult"]
+    ):
         self.actor = actor
         self.ability = ability
         self.result = result
