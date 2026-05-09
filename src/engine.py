@@ -611,6 +611,13 @@ class QueryHasArmor:
         self.result: bool = False
 
 
+class QueryLegalAimings:
+    def __init__(self, actor: "Entity", ability: "Ability", result: List["AimingResult"]):
+        self.actor = actor
+        self.ability = ability
+        self.result = result
+
+
 class QueryLegalActions:
     def __init__(self, entity: Entity, result: List[Ability]):
         self.entity = entity

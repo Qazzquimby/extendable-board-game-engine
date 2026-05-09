@@ -2,23 +2,20 @@ from typing import List, Tuple, TYPE_CHECKING
 
 from einops import einops
 from jaxtyping import Float
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch import Tensor
+import torch.nn.functional as F
 
-from engine import Engine, Entity
+from engine import Engine, Entity, EventPhase, QueryLegalAimings
 from abilities import (
     Ability,
-    IncludeArea,
     DamageInstruction,
     HealInstruction,
 )
-from targeting import TargetSelf, TargetUnit
+from aimings import TargetSelf, TargetEntity, IncludeArea
 from point import Point
-
-import torch.nn.functional as F
 
 MAX_ENTITY_TYPES = 1024  # increase
 MAX_ABILITY_TYPES = MAX_ENTITY_TYPES * 4
@@ -251,7 +248,7 @@ def get_plausible_movements(
             # For each ability that can target units/areas, find a spot at optimal range
             for ability in actor.abilities:
                 attack_range = 0
-                if isinstance(ability.aiming, TargetUnit):
+                if isinstance(ability.aiming, TargetEntity):
                     attack_range = ability.aiming.in_range
                 elif isinstance(ability.aiming, IncludeArea):
                     attack_range = ability.aiming.area.in_range
@@ -317,34 +314,52 @@ def get_plausible_uses_of_ability_after_movement(
     is_positive = any(isinstance(e, HealInstruction) for e in ability.instructions)
     is_negative = any(isinstance(e, DamageInstruction) for e in ability.instructions)
 
-    if isinstance(ability.aiming, TargetUnit):
-        attack_range = ability.aiming.in_range
-        # Target anyone in range. Could be friend or foe.
-        for target in engine.entities:
-            if not target.pos or target == actor:
-                continue
-            if not is_positive and target.team == actor.team:
-                continue
-            if not is_negative and target.team != actor.team:
-                continue
-            # todo, no, check if it's in range. grid reachable points
-            if engine.grid.get_points_in_range(start=move_pos, max_range=attack_range):
-                plausible_uses_of_ability_after_movement[
-                    (move_pos, target.pos, ability.get_hash())
-                ] = PlausibleAction(
-                    move_pos=move_pos,
-                    target=target,
-                    ability=ability,
-                    movement_name=movement_name,
-                )
-    elif isinstance(ability.aiming, IncludeArea):
-        area = ability.aiming.area
-        for area_points in area.get_selections(engine.grid, move_pos):
-            affected_entities = {e for e in engine.entities if e.pos in area_points}
+    raw_aimings = ability.aiming.get_all_aimings(
+        engine=engine, actor=actor, start_pos=move_pos, require_los=True
+    )
+
+    q = QueryLegalAimings(actor=actor, ability=ability, result=raw_aimings)
+    engine.router.publish(q, EventPhase.QUERY)
+    legal_aimings = q.result
+
+    for aiming_res in legal_aimings:
+        if isinstance(ability.aiming, TargetEntity) or isinstance(
+            ability.aiming, TargetSelf
+        ):
+            for t_point in aiming_res.target_points:
+                target = engine.entity_at(t_point)
+                if not target:
+                    continue
+                if isinstance(ability.aiming, TargetEntity) and target == actor:
+                    continue
+                if (
+                    not is_positive
+                    and target.team == actor.team
+                    and isinstance(ability.aiming, TargetEntity)
+                ):
+                    continue
+                if (
+                    not is_negative
+                    and target.team != actor.team
+                    and isinstance(ability.aiming, TargetEntity)
+                ):
+                    continue
+
+                key = (move_pos, t_point, ability.get_hash())
+                if key not in plausible_uses_of_ability_after_movement:
+                    plausible_uses_of_ability_after_movement[key] = PlausibleAction(
+                        move_pos=move_pos,
+                        target=target,
+                        ability=ability,
+                        movement_name=movement_name,
+                    )
+        elif isinstance(ability.aiming, IncludeArea):
+            affected_entities = {
+                e for e in engine.entities if e.pos in aiming_res.included_points
+            }
             if not affected_entities:
                 continue
 
-            # One action per unique set of affected entities
             key = (
                 move_pos,
                 frozenset(e.pos for e in affected_entities),
@@ -371,16 +386,6 @@ def get_plausible_uses_of_ability_after_movement(
                     ability=ability,
                     movement_name=movement_name,
                 )
-    elif isinstance(ability.aiming, TargetSelf):
-        target = actor
-        key = (move_pos, target.pos, ability.get_hash())
-        if key not in plausible_uses_of_ability_after_movement:
-            plausible_uses_of_ability_after_movement[key] = PlausibleAction(
-                move_pos=move_pos,
-                target=target,
-                ability=ability,
-                movement_name=movement_name,
-            )
 
     return plausible_uses_of_ability_after_movement
 
