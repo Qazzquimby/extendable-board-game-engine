@@ -304,7 +304,7 @@ class Entity:
             target=self, attack_source=attack_source, ability=ability, result=0
         )
         self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
+        return q.result.value
 
     def get_crit(self, receiver: "Entity", ability: Optional["Ability"] = None) -> int:
         q = QueryCrit(
@@ -314,7 +314,7 @@ class Entity:
             result=ability.crit_chance,
         )
         self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
+        return q.result.value
 
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
@@ -656,7 +656,7 @@ class QueryCanMove:
 class QuerySpeed:
     def __init__(self, entity: Entity, result: int):
         self.entity = entity
-        self.result = result
+        self.result = ModValue(result)
 
 
 class QueryDefense:
@@ -670,7 +670,7 @@ class QueryDefense:
         self.target = target
         self.attack_source = attack_source
         self.ability = ability
-        self.result = result
+        self.result = ModValue(result)
 
 
 class QueryCrit:
@@ -684,7 +684,7 @@ class QueryCrit:
         self.target = target
         self.attack_source = attack_source
         self.ability = ability
-        self.result = result
+        self.result = ModValue(result)
 
 
 # ==========================================
@@ -736,7 +736,7 @@ class Slow(Modifier):
 
     @query(QuerySpeed)
     def reduce_speed(self, q: QuerySpeed) -> None:
-        q.result = max(0, q.result - self.amount)
+        q.result.add(-self.amount)
 
 
 class SlowToken(Slow, Token):
