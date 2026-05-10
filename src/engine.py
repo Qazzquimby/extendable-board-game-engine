@@ -218,6 +218,26 @@ class Entity:
         self.standard_actions = 1
         self.free_actions = 99  # Arbitrary large number
 
+    def gain_ability(self, ability: Ability):
+        ability.owner = self
+        self.abilities.append(ability)
+        for mod in ability.modifiers:
+            self.add_modifier(mod)
+
+    def lose_ability(self, ability: Ability):
+        if ability in self.abilities:
+            self.abilities.remove(ability)
+            ability.owner = None
+            for mod in ability.modifiers:
+                self.remove_modifier(mod)
+
+    def get_modifier(self, modifier_class):
+        # Utility to find a specific modifier on this entity
+        for mod in self.modifiers:
+            if isinstance(mod, modifier_class):
+                return mod
+        return None
+
     def to_model(self) -> EntityState:
         return EntityState(
             id=self.id,

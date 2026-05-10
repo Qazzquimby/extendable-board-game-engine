@@ -26,62 +26,48 @@ from engine import (
 )
 from point import Point
 
+# region Photon Beam
+
 
 class PhotonBeamToken(Token):
     pass
 
 
-def grant_photon_beam(owner_entity: Entity):
-    class PhotonBeamManager(Modifier):
-        def __init__(self):
-            self.entities_hit_this_turn = set()
-            super().__init__()
+class PhotonBeamManager(Modifier):
+    def __init__(self):
+        self.entities_hit_this_turn = set()
+        super().__init__()
 
-        @after(TurnStartEvent)
-        def clear_tracker_on_turn_start(self, event: TurnStartEvent):
-            self.entities_hit_this_turn.clear()
+    @after(TurnStartEvent)
+    def clear_tracker_on_turn_start(self, event: TurnStartEvent):
+        self.entities_hit_this_turn.clear()
 
-        @after(TurnEndEvent)
-        def fade_tokens_on_turn_end(self, event: TurnEndEvent):
-            for entity in self.owner.engine.living_entities:
-                if (
-                    entity.get_token_count(PhotonBeamToken) > 0
-                    and entity not in self.entities_hit_this_turn
-                ):
-                    entity.remove_token(PhotonBeamToken, amount=1)
-
-    manager = PhotonBeamManager()
-
-    @dataclass
-    class GivePhotonBeamTokenAndTrack(Instruction):
-        # We pass the manager instance in, creating a direct link.
-        tracker: PhotonBeamManager
-
-        def execute(self, ctx: ActionContext) -> None:
-            receiver = ctx.engine.entity_at(ctx.receiver_point)
-            if receiver:
-                receiver.add_token(PhotonBeamToken)
-            self.tracker.entities_hit_this_turn.add(receiver)
-
-    photon_beam_ability = Ability(
-        name="Photon Beam",
-        aiming=TargetEntity(in_range=2),
-        instructions=[
-            DamageInstruction(
-                amount=lambda ctx: 2
-                + (2 * ctx.receiver.get_token_count(PhotonBeamToken)),
-                undefendable=True,
-            ),
-            GivePhotonBeamTokenAndTrack(tracker=manager),
-        ],
-        is_default=True,
-        owner=owner_entity,
-    )
-
-    owner_entity.add_modifier(manager)
-    owner_entity.abilities.append(photon_beam_ability)
+    @after(TurnEndEvent)
+    def fade_tokens_on_turn_end(self, event: TurnEndEvent):
+        for entity in self.owner.engine.living_entities:
+            if (
+                entity.get_token_count(PhotonBeamToken) > 0
+                and entity not in self.entities_hit_this_turn
+            ):
+                entity.remove_token(PhotonBeamToken, amount=1)
 
 
+@dataclass
+class GivePhotonBeamTokenAndTrack(Instruction):
+    # We pass the manager instance in, creating a direct link.
+    tracker: PhotonBeamManager
+
+    def execute(self, ctx: ActionContext) -> None:
+        receiver = ctx.engine.entity_at(ctx.receiver_point)
+        if receiver:
+            receiver.add_token(PhotonBeamToken)
+        self.tracker.entities_hit_this_turn.add(receiver)
+
+
+# endregion
+
+
+# region Sentry Turret
 class SentryTurretManager(Modifier):
     def __init__(self):
         self.target_hit_this_activation = set()
@@ -215,7 +201,23 @@ class Symmetra(Hero):
         super().__init__(
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
-        grant_photon_beam(self)
+        self.grant_ability(
+            Ability(
+                name="Photon Beam",
+                aiming=TargetEntity(in_range=2),
+                instructions=[
+                    DamageInstruction(
+                        amount=lambda ctx: 2
+                        + (2 * ctx.receiver.get_token_count(PhotonBeamToken)),
+                        undefendable=True,
+                    ),
+                    GivePhotonBeamTokenAndTrack(),
+                ],
+                # The passive tracking logic is bundled directly into the ability
+                modifiers=[PhotonBeamManager()],
+                is_default=True,
+            )
+        )
 
         self.abilities.append(
             # todo  Choose one --
