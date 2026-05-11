@@ -193,8 +193,30 @@ class Engine:
             entities=[e.to_model() for e in self.entities],
         )
 
-    def clone(self) -> "Engine":
+    def copy(self) -> "Engine":
         return copy.deepcopy(self)
+
+    def is_done(self) -> bool:
+        if self.round_num > 6:
+            return True
+
+        alive_teams = {e.team for e in self.living_entities}
+        return len(alive_teams) <= 1
+
+    def hash(self) -> int:
+        entity_states = frozenset(
+            (e.id, e.hp, e.pos, e.move_actions, e.standard_actions, e.free_actions)
+            for e in self.entities
+            if getattr(e, "hp", 0) > 0
+        )
+        return hash(
+            (
+                self.round_num,
+                self.current_team,
+                self.active_entity.id if self.active_entity else None,
+                entity_states,
+            )
+        )
 
 
 class Entity:

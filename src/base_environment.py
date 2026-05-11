@@ -219,11 +219,8 @@ class BaseEnvironment(abc.ABC):
     @property
     def num_players(self) -> int:
         """The number of players in the game."""
-        if not self.state or "players" not in self.state:
-            raise RuntimeError(
-                "Environment state not initialized or has no 'players' table. "
-                "Cannot determine num_players."
-            )
+        if not self.state:
+            raise RuntimeError("Environment state not initialized.")
         return len(self.state.agents)
 
     def get_reward_for_player(self, player=0) -> float:

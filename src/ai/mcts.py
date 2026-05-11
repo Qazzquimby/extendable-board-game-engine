@@ -26,7 +26,7 @@ EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
 
 def _get_current_player_from_state(state: StateType) -> int:
     """Gets the current player from a state dictionary, accommodating both old and new env styles."""
-    return state["players"]["current_index"]
+    return state.current_team
 
 
 @dataclass
