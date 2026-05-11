@@ -1,0 +1,496 @@
+import math
+import random
+from typing import (
+    List,
+    Tuple,
+    Optional,
+    Dict,
+    Iterator,
+)
+import abc
+from dataclasses import dataclass, field
+
+from cachetools import LRUCache
+
+from base_environment import (
+    ActionType,
+    BaseEnvironment,
+    StateWithKey,
+    StateType,
+)
+
+DEBUG = True
+
+EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
+
+
+def _get_current_player_from_state(state: StateType) -> int:
+    """Gets the current player from a state dictionary, accommodating both old and new env styles."""
+    return state["players"]["current_index"]
+
+
+@dataclass
+class PathStep:
+    """A single step in the MCTS selection path."""
+
+    node: "MCTSNodeWithState"
+    # None iff first node
+    action_taken_to_reach_this_node: Optional[ActionType]
+
+
+class SearchPath:
+    """The path taken during one MCTS selection phase."""
+
+    def __init__(self, initial_node: "MCTSNode"):
+        self._steps: List[PathStep] = []
+        self._visited_keys: set[int] = set()
+        self.add(node=initial_node, action_leading_to_node=None)
+
+    def add(self, node: "MCTSNode", action_leading_to_node: Optional[ActionType]):
+        if isinstance(node, MCTSNodeWithState) and node.state_with_key:
+            self._visited_keys.add(node.state_with_key.key)
+        self._steps.append(PathStep(node, action_leading_to_node))
+
+    def has_visited_key(self, key: int) -> bool:
+        return key in self._visited_keys
+
+    def __iter__(self) -> Iterator[PathStep]:
+        return reversed(self._steps)
+
+    def __len__(self) -> int:
+        return len(self._steps)
+
+    @property
+    def last_node(self) -> "MCTSNodeWithState":
+        if not self._steps:
+            raise IndexError("SearchPath is empty, cannot get last node.")
+        return self._steps[-1].node
+
+    def get_step_details(
+        self, steps_from_end: int
+    ) -> Tuple[
+        "MCTSNodeWithState", Optional[ActionType], Optional["MCTSNodeWithState"]
+    ]:
+        """
+        Helper for backpropagation. Gets current node, action that led to it, and its parent.
+        steps_from_end=0 is the leaf, index_from_end=1 is its parent, etc.
+        Returns: (current_node, action_to_current, parent_node_of_current)
+        Parent is None if current_node is root.
+        Action is None if current_node is root.
+        """
+        actual_index = len(self._steps) - 1 - steps_from_end
+        if actual_index < 0:
+            raise IndexError("Index out of bounds for path steps.")
+
+        current_step = self._steps[actual_index]
+        current_node = current_step.node
+        action_to_current = current_step.action_taken_to_reach_this_node
+
+        parent_node = None
+        if actual_index > 0:  # If not the root node
+            parent_node = self._steps[actual_index - 1].node
+
+        return current_node, action_to_current, parent_node
+
+
+class Edge:
+    """Represents an action from a state"""
+
+    def __init__(
+        self,
+        prior: float,
+        num_visits: int = 0,
+        total_value: float = 0.0,
+        # from perspective of player taking the action
+    ):
+        self.prior = prior
+        self.num_visits = num_visits
+        self.total_value = total_value
+
+    @property
+    def value(self) -> float:
+        if self.num_visits == 0:
+            return 0.0
+        return self.total_value / self.num_visits
+
+
+class DeterministicEdge(Edge):
+    """Edge with only one child node"""
+
+    def __init__(
+        self,
+        prior: float,
+        num_visits: int = 0,
+        total_value: float = 0.0,  # from perspective of player taking the action
+        child_node: Optional["MCTSNodeWithState"] = None,
+    ):
+        super().__init__(prior=prior, num_visits=num_visits, total_value=total_value)
+        self.child_node = child_node
+
+
+class MCTSNode:
+    def __init__(
+        self,
+    ):
+        self.edges: Dict[int, DeterministicEdge] = {}
+        self.is_expanded = False
+
+        # for value estimate, not actually needed
+        self.num_visits = 0
+        self.total_value = 0.0
+
+
+class MCTSNodeWithState(MCTSNode):
+    """Represents a node in the MCTS tree."""
+
+    def __init__(
+        self,
+        state_with_key: StateWithKey,
+    ):
+        super().__init__()
+        self.state_with_key = state_with_key
+
+    @property
+    def current_player_index(self):
+        if hasattr(self, "player_idx"):
+            current_player_index = self.player_idx
+        else:
+            current_player_index = _get_current_player_from_state(
+                self.state_with_key.state
+            )
+        return current_player_index
+
+
+class MCTSNodeCache:
+    def __init__(self):
+        self.enabled = True
+        self._key_to_node: LRUCache[int, MCTSNodeWithState] = LRUCache(1024 * 8)
+
+    def get_matching_node(self, key: int) -> Optional[MCTSNodeWithState]:
+        if self.enabled:
+            return self._key_to_node.get(key, None)
+        return None
+
+    def cache_node(self, key: int, node: MCTSNodeWithState):
+        if self.enabled:
+            self._key_to_node[key] = node
+
+
+@dataclass
+class SelectionResult:
+    """Holds the results of the MCTS selection phase."""
+
+    path: SearchPath
+    leaf_env: (
+        BaseEnvironment  # worried these may be large and waste memory. Not needed?
+    )
+
+    @property
+    def leaf_node(self):
+        return self.path.last_node
+
+
+class SelectionStrategy(abc.ABC):
+    @abc.abstractmethod
+    def select(
+        self,
+        node: "MCTSNode",
+        # sim_env: BaseEnvironment,
+        # cache: "MCTSNodeCache",
+        remaining_sims: int,
+        contender_actions: Optional[set],
+    ) -> SelectionResult:
+        pass
+
+
+class ExpansionStrategy(abc.ABC):
+    @abc.abstractmethod
+    def expand(
+        self,
+        node: "MCTSNodeWithState",
+        # env: BaseEnvironment,
+    ) -> None:
+        """
+        Expand a leaf node by adding children based on legal actions.
+
+        Args:
+            node: The leaf node to expand.
+            env: The environment state corresponding to the leaf node.
+                 Should not be modified by the expansion strategy itself.
+        """
+        pass
+
+
+class EvaluationStrategy(abc.ABC):
+    @abc.abstractmethod
+    def evaluate(
+        self,
+        node: "MCTSNodeWithState",
+        # env: BaseEnvironment
+    ) -> float:
+        """
+        Evaluate a leaf node to estimate its value.
+        The value should be from the perspective of the player whose turn it is at the leaf node.
+
+        Args:
+            node: The leaf node to evaluate.
+            env: The environment state corresponding to the leaf node.
+                 Should not be modified by the evaluation strategy itself,
+                 though internal copies might be made (e.g., for rollouts).
+
+        Returns:
+            The estimated value (float).
+        """
+        pass
+
+
+class BackpropagationStrategy(abc.ABC):
+    @abc.abstractmethod
+    def backpropagate(
+        self, path: SearchPath, player_to_value: Dict[int, float]
+    ) -> None:
+        pass
+
+
+class MCTSSelectionStrategyBase(SelectionStrategy):
+    """
+    Abstract base class for MCTS selection strategies (UCB1, PUCT, etc.).
+    Contains the generic MCTS traversal logic.
+    """
+
+    def _score_edge(
+        self, edge: DeterministicEdge, parent_node_num_visits: int
+    ) -> float:
+        """Abstract method to calculate the score for a single edge."""
+        raise NotImplementedError
+
+    def select(
+        self,
+        node: MCTSNodeWithState,
+        sim_env: BaseEnvironment,
+        cache: "MCTSNodeCache",
+        remaining_sims: int,
+        contender_actions: Optional[set],
+    ) -> SelectionResult:
+        """
+        Generic traversal logic: Select child node with highest score until a leaf
+        node is reached or a cycle is detected. Modifies sim_env.
+        """
+        path = SearchPath(initial_node=node)
+        current_node: MCTSNodeWithState = node
+
+        while not sim_env.is_done:
+            if not current_node.is_expanded:
+                return SelectionResult(path=path, leaf_env=sim_env)
+
+            best_action_index = self._select_action_index_from_edges(
+                current_node=current_node,
+                start_node=node,
+                contender_actions=contender_actions,
+            )
+            legal_actions = sim_env.get_legal_actions()
+            best_action = legal_actions[best_action_index]
+            step_result = sim_env.step(best_action)
+
+            if path.has_visited_key(step_result.next_state_with_key.key):
+                # Cycle detected
+                return SelectionResult(path=path, leaf_env=sim_env)
+
+            next_node = cache.get_matching_node(key=step_result.next_state_with_key.key)
+            if not next_node:
+                next_node = MCTSNodeWithState(
+                    state_with_key=step_result.next_state_with_key
+                )
+                cache.cache_node(
+                    key=step_result.next_state_with_key.key, node=next_node
+                )
+                path.add(node=next_node, action_leading_to_node=best_action_index)
+                return SelectionResult(path=path, leaf_env=sim_env)
+
+            current_node = next_node
+            path.add(current_node, best_action_index)
+
+        # Reached a terminal state
+        return SelectionResult(path=path, leaf_env=sim_env)
+
+    def _select_action_index_from_edges(
+        self,
+        current_node: MCTSNode,
+        start_node: MCTSNode,
+        contender_actions: Optional[set],
+    ) -> int:
+        """Helper to find the action index with the maximum score using the abstract _score_edge."""
+        edges_to_consider = current_node.edges
+        if current_node is start_node and contender_actions is not None:
+            edges_to_consider = {
+                action: edge
+                for action, edge in current_node.edges.items()
+                if action in contender_actions
+            }
+
+        best_score = -float("inf")
+        best_action_index: Optional[ActionType] = None
+
+        # Use 1 if num_visits is 0 to avoid issues with log(0) in some UCB formulas if not handled by an IF statement
+        parent_visits = current_node.num_visits if current_node.num_visits > 0 else 1
+
+        for action_index, edge in edges_to_consider.items():
+            # Calls the specific _score_edge implemented in child classes (PUCT or UCB1)
+            score = self._score_edge(edge=edge, parent_node_num_visits=parent_visits)
+            if score > best_score:
+                best_score = score
+                best_action_index = action_index
+
+        assert best_action_index is not None
+        return best_action_index
+
+
+class UCB1Selection(MCTSSelectionStrategyBase):
+    """Selects nodes using the UCB1 algorithm."""
+
+    def __init__(self, exploration_constant: float):
+        if exploration_constant < 0:
+            raise ValueError("Exploration constant cannot be negative.")
+        self.exploration_constant = exploration_constant
+
+    def _score_edge(
+        self, edge: DeterministicEdge, parent_node_num_visits: int
+    ) -> float:
+        """Calculates the UCB1 score for a child node."""
+
+        # UCB Score = Avg_Reward + C * sqrt(log(N(parent)) / N(child))
+
+        if edge.num_visits == 0:
+            # Must return infinity to force selection of unvisited nodes first
+            return float("inf")
+
+        # The original UCB1 implementation typically does not use priors (edge.prior)
+        # and assumes edge.value is the running average reward for that edge.
+        exploitation_term = edge.value  # Assuming edge.value is already parent-relative
+
+        exploration_term = self.exploration_constant * math.sqrt(
+            math.log(parent_node_num_visits) / edge.num_visits
+        )
+        return exploitation_term + exploration_term
+
+
+class PUCTSelection(MCTSSelectionStrategyBase):
+    """Selects nodes using the AlphaZero PUCT algorithm."""
+
+    def __init__(self, exploration_constant: float = 1.0):
+        if exploration_constant < 0:
+            raise ValueError("Exploration constant cannot be negative.")
+        self.exploration_constant = exploration_constant
+
+    def _score_edge(
+        self, edge: DeterministicEdge, parent_node_num_visits: int
+    ) -> float:
+        """Calculates the PUCT score for a child edge."""
+        # It's the same as UCB1 except it doesn't force explore every option
+        # and it avoids div0 on unexplored options.
+
+        exploitation_term = edge.value
+
+        # Exploration term: C * P(s, a) * sqrt(N(s)) / (1 + N(s, a))
+        # parent_node_num_visits here is N(s)
+        exploration_term = (
+            self.exploration_constant
+            * edge.prior
+            * (math.sqrt(parent_node_num_visits) / (1 + edge.num_visits))
+        )
+
+        return exploitation_term + exploration_term
+
+
+class UniformExpansion(ExpansionStrategy):
+    """Expands a node by creating children for all legal actions with uniform priors."""
+
+    def expand(self, node: MCTSNodeWithState, env_at_node: BaseEnvironment) -> None:
+        if node.is_expanded or env_at_node.is_done:
+            return
+
+        legal_actions = env_at_node.get_legal_actions()
+        assert legal_actions
+        assert not node.edges
+        for action_index, action in enumerate(legal_actions):
+            node.edges[action_index] = DeterministicEdge(prior=1.0)
+        node.is_expanded = True
+
+
+class RandomRolloutEvaluation(EvaluationStrategy):
+    """Evaluates a node by performing a random rollout simulation."""
+
+    def __init__(self, max_rollout_depth: int = 50, discount_factor: float = 1.0):
+        self.max_rollout_depth = max_rollout_depth
+        self.discount_factor = discount_factor  # Usually 1.0 for MCTS terminal rewards
+
+    def evaluate(self, node: MCTSNodeWithState, env: BaseEnvironment) -> float:
+        """Simulate game from the given environment state using random policy."""
+        player_at_start = env.get_current_player()
+
+        if env.is_done:
+            winner = env.get_winning_player()
+            if winner is None:
+                return 0.0
+            return 1.0 if winner == player_at_start else -1.0
+
+        sim_env = env.copy()
+        current_step = 0
+
+        while not sim_env.is_done and current_step < self.max_rollout_depth:
+            legal_actions = sim_env.get_legal_actions()
+            if not legal_actions:
+                break
+            action = random.choice(legal_actions)
+            sim_env.step(action)
+            current_step += 1
+
+        if current_step >= self.max_rollout_depth:
+            return 0.0
+
+        winner = sim_env.get_winning_player()
+        value = 0.0
+        if winner is not None:
+            value = 1.0 if winner == player_at_start else -1.0
+
+        value *= self.discount_factor**current_step
+
+        return value
+
+
+class StandardBackpropagation(BackpropagationStrategy):
+    """Updates node statistics by backpropagating the evaluation value."""
+
+    def backpropagate(
+        self, path: SearchPath, player_to_value: Dict[int, float]
+    ) -> None:
+        for i in range(len(path)):
+            node, action_to_node, parent_of_node = path.get_step_details(
+                steps_from_end=i
+            )
+
+            node.num_visits += 1
+            node.total_value += player_to_value.get(node.current_player_index, 0.0)
+
+            if parent_of_node and action_to_node is not None:
+                # not start of path
+                action_key = (
+                    tuple(action_to_node)
+                    if isinstance(action_to_node, list)
+                    else action_to_node
+                )
+
+                edge_to_update = parent_of_node.edges[action_key]
+                edge_to_update.num_visits += 1
+
+                value = player_to_value.get(parent_of_node.current_player_index)
+                edge_to_update.total_value += value
+
+
+@dataclass
+class PolicyResult:
+    """Holds the results of the MCTS policy calculation."""
+
+    chosen_action: ActionType
+    action_probabilities: Dict[ActionType, float] = field(default_factory=dict)
+    action_visits: Dict[ActionType, int] = field(default_factory=dict)
