@@ -289,12 +289,6 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
-    def has_adjacent_enemies(self) -> bool:
-        for other in self.engine.entities:
-            if other.team != self.team and self.distance_to(other) <= 1:
-                return True
-        return False
-
     def get_legal_actions(self) -> List[Ability]:
         # Returns all abilities the entity has. Modifiers can alter this list.
         # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.

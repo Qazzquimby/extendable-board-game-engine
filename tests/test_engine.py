@@ -258,13 +258,23 @@ class Marksmanship(Modifier):
     def buff_long_range_attacks(self, e: DamageEvent) -> None:
         # Buff applies if owner or ally attacks an enemy from range 3+
         # and owner has no adjacent enemies.
-        if e.source and e.source.team == self.owner.team:
-            if (
-                not self.owner.has_adjacent_enemies()
-                and e.source.distance_to(e.subject) >= 3
-            ):
-                e.amount.add(1)
-                e.amount.is_irreducible = True
+
+        if not e.source or e.source.team != self.owner.team:
+            return
+
+        if e.source.distance_to(e.subject) < 3:
+            return
+
+        has_adjacent_enemies = False
+        for other in self.owner.engine.entities:
+            if other.team != self.owner.team and self.owner.distance_to(other) <= 1:
+                has_adjacent_enemies = True
+
+        if has_adjacent_enemies:
+            return
+
+        e.amount.add(1)
+        e.amount.is_irreducible = True
 
 
 class ShallowGrave(Modifier):

@@ -23,6 +23,7 @@ from engine import (
     DamageEvent,
     SummonEvent,
     Hero,
+    GiveTokenEvent,
 )
 from point import Point
 
@@ -107,9 +108,12 @@ class SentryTurret(Object):
                 if enemies:
                     nearest = min(enemies, key=lambda e: self.owner.distance_to(e))
                     if nearest in manager.targets_hit_this_activation:
-                        GiveTokenEvent(token_class=SlowToken, amount=1).execute(ctx=ctx)
-                        # todo a trigger response doesn't have a context.
-                        #  Ontology is unclear between trigger response, making direct changes, creating and resolving events, and executing instructions.
+                        GiveTokenEvent(
+                            engine=engine,
+                            subject=nearest,
+                            token_class=SlowToken,
+                            amount=1,
+                        ).resolve()
                     manager.targets_hit_this_activation.add(nearest)
                     DamageEvent(
                         engine=self.owner.engine,
