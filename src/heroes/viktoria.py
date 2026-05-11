@@ -21,7 +21,7 @@ from point import Point
 
 
 class AllViktoriasHealWhenAnyViktoriaKills(Modifier):
-    @after(DeathEvent, target_self=False)
+    @after(DeathEvent, only_self=False)
     def on_kill(self, event: DeathEvent):
         if event.killer == self.owner:
             for entity in self.owner.engine.living_entities:

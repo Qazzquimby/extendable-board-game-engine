@@ -246,7 +246,7 @@ def test_engine_rng_seed():
 
 
 class PaladinAura(Modifier):
-    @query(QueryHasArmor, target_self=False)
+    @query(QueryHasArmor, only_self=False)
     def grant_armor_to_adjacent(self, q: QueryHasArmor):
         # Affects OTHERS: checks if the query target is near this aura's owner
         if q.subject != self.owner and q.subject.distance_to(self.owner) <= 1:
@@ -254,7 +254,7 @@ class PaladinAura(Modifier):
 
 
 class Marksmanship(Modifier):
-    @before(DamageEvent, target_self=False)
+    @before(DamageEvent, only_self=False)
     def buff_long_range_attacks(self, e: DamageEvent) -> None:
         # Buff applies if owner or ally attacks an enemy from range 3+
         # and owner has no adjacent enemies.

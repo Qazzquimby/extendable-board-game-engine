@@ -49,7 +49,7 @@ class Router:
                         modifier=modifier,
                         event_type=method._listen_event,
                         phase=method._listen_phase,
-                        only_self=method._listen_target_self,
+                        only_self=method._listen_only_self,
                         func=method,
                     )
                 )
@@ -71,31 +71,31 @@ class Router:
 # ==========================================
 
 
-def before(event_type: Type, target_self: bool = True) -> Callable:
+def before(event_type: Type, only_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
         func._listen_event = event_type
         func._listen_phase = EventPhase.BEFORE
-        func._listen_target_self = target_self
+        func._listen_only_self = only_self
         return func
 
     return decorator
 
 
-def after(event_type: Type, target_self: bool = True) -> Callable:
+def after(event_type: Type, only_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
         func._listen_event = event_type
         func._listen_phase = EventPhase.AFTER
-        func._listen_target_self = target_self
+        func._listen_only_self = only_self
         return func
 
     return decorator
 
 
-def query(event_type: Type, target_self: bool = True) -> Callable:
+def query(event_type: Type, only_self: bool = True) -> Callable:
     def decorator(func: Callable) -> Callable:
         func._listen_event = event_type
         func._listen_phase = EventPhase.QUERY
-        func._listen_target_self = target_self
+        func._listen_only_self = only_self
         return func
 
     return decorator
