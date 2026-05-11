@@ -454,8 +454,18 @@ class Event(abc.ABC):
     def __init__(self, engine: "Engine", receiver: "Entity"):
         self.engine = engine
         self.receiver = receiver
+        self.canceled = False
 
     def resolve(self) -> None:
+        self.engine.router.publish(self, EventPhase.BEFORE)
+
+        if self.canceled:
+            return
+        self._resolve()
+
+        self.engine.router.publish(self, EventPhase.AFTER)
+
+    def _resolve(self) -> None:
         raise NotImplementedError("Events must implement resolve()")
 
 
@@ -470,12 +480,8 @@ class PushEvent(Event):
         super().__init__(engine=engine, receiver=receiver)
         self.distance = ModValue(distance)
         self.source = source
-        self.canceled = False
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
-        if self.canceled:
-            return
+    def _resolve(self) -> None:
         # Pushing is calculated based on pathing away from the source
         if (
             getattr(self.receiver, "pos", None) is not None
@@ -489,7 +495,6 @@ class PushEvent(Event):
                 )
                 if path and len(path) >= dist:
                     self.receiver.pos = path[dist - 1]
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class PullEvent(Event):
@@ -503,12 +508,8 @@ class PullEvent(Event):
         super().__init__(engine=engine, receiver=receiver)
         self.distance = ModValue(distance)
         self.source = source
-        self.canceled = False
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
-        if self.canceled:
-            return
+    def _resolve(self) -> None:
         if (
             getattr(self.receiver, "pos", None) is not None
             and self.source
@@ -521,33 +522,26 @@ class PullEvent(Event):
                 )
                 if path and len(path) >= dist:
                     self.receiver.pos = path[dist - 1]
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class TurnStartEvent(Event):
     def __init__(self, engine: "Engine", receiver: "Entity"):
         super().__init__(engine=engine, receiver=receiver)
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
+    def _resolve(self) -> None:
         self.engine.active_entity.start_turn()
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class TurnEndEvent(Event):
     def __init__(self, engine: "Engine", receiver: "Entity"):
         super().__init__(engine=engine, receiver=receiver)
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
-
+    def _resolve(self) -> None:
         for ability in self.receiver.abilities:
             if ability.taps:
                 if not ability.tapped_this_turn:
                     ability.is_tapped = False
                 ability.tapped_this_turn = False
-
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class DamageEvent(Event):
@@ -564,8 +558,7 @@ class DamageEvent(Event):
         self.amount = ModValue(amount)
         self.ability = ability
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
+    def _resolve(self) -> None:
         if self.receiver.has_armor():
             self.amount.add(-1)
 
@@ -578,8 +571,6 @@ class DamageEvent(Event):
                 self.engine, receiver=self.receiver, killer=self.source
             ).resolve()
 
-        self.engine.router.publish(self, EventPhase.AFTER)
-
 
 class DeathEvent(Event):
     # For on-kill use on-death and filter by killer
@@ -589,10 +580,8 @@ class DeathEvent(Event):
         super().__init__(engine=engine, receiver=receiver)
         self.killer = killer
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
+    def _resolve(self) -> None:
         self.receiver.pos = None
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class SummonEvent(Event):
@@ -600,9 +589,9 @@ class SummonEvent(Event):
         super().__init__(engine=engine, receiver=receiver)
         self.summoner = summoner
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
-        self.engine.router.publish(self, EventPhase.AFTER)
+    def _resolve(self) -> None:
+        pass  # should maybe set the summon's pos here?
+        # If this is doing nothing it means the summoning couldn't be modified or cancelled by the before stage
 
 
 class HealEvent(Event):
@@ -610,11 +599,9 @@ class HealEvent(Event):
         super().__init__(engine=engine, receiver=receiver)
         self.amount = ModValue(amount)
 
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
+    def _resolve(self) -> None:
         final_heal = max(0, self.amount.value)
         self.receiver.hp += final_heal
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 class GiveTokenEvent(Event):
@@ -625,10 +612,8 @@ class GiveTokenEvent(Event):
         self.token_class = token_class
         self.amount = amount
 
-    def resolve(self):
-        self.engine.router.publish(self, EventPhase.BEFORE)
+    def _resolve(self):
         self.receiver.add_token(self.token_class, amount=self.amount)
-        self.engine.router.publish(self, EventPhase.AFTER)
 
 
 # ==========================================
