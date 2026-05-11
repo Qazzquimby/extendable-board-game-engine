@@ -78,7 +78,7 @@ class ChargeInstruction(Instruction):
                 DamageEvent(
                     engine=ctx.engine,
                     source=ctx.source,
-                    receiver=entity,
+                    subject=entity,
                     amount=6,
                     ability=ctx.ability,
                 ).resolve()
@@ -88,7 +88,7 @@ class ChargeInstruction(Instruction):
                 DamageEvent(
                     engine=ctx.engine,
                     source=ctx.source,
-                    receiver=entity,
+                    subject=entity,
                     amount=1,
                     ability=ctx.ability,
                 ).resolve()

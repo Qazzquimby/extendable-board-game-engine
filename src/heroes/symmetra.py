@@ -58,10 +58,10 @@ class GivePhotonBeamTokenAndTrack(Instruction):
     tracker: PhotonBeamManager
 
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
-            receiver.add_token(PhotonBeamToken)
-        self.tracker.entities_hit_this_turn.add(receiver)
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
+            subject.add_token(PhotonBeamToken)
+        self.tracker.entities_hit_this_turn.add(subject)
 
 
 # endregion
@@ -114,7 +114,7 @@ class SentryTurret(Object):
                     DamageEvent(
                         engine=self.owner.engine,
                         source=self.owner,
-                        receiver=nearest,
+                        subject=nearest,
                         amount=1,
                     ).resolve()
 
@@ -158,7 +158,7 @@ class Teleporter(Object):
                     aiming=TargetEntity(),  # todo target teleporter, todo ignoring line of sight
                     instructions=[
                         TeleportInstruction(
-                            destination=lambda ctx: ctx.receiver.pos,
+                            destination=lambda ctx: ctx.subject.pos,
                         )
                     ],
                     owner=self,
@@ -206,7 +206,7 @@ class Symmetra(Hero):
                 instructions=[
                     DamageInstruction(
                         amount=lambda ctx: 2
-                        + (2 * ctx.receiver.get_token_count(PhotonBeamToken)),
+                        + (2 * ctx.subject.get_token_count(PhotonBeamToken)),
                         undefendable=True,
                     ),
                     GivePhotonBeamTokenAndTrack(),

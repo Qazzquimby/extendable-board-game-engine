@@ -32,7 +32,7 @@ class DamageOverTimeToken(Token):
         from engine import DamageEvent
 
         DamageEvent(
-            engine=event.engine, source=None, receiver=self.owner, amount=self.amount
+            engine=event.engine, source=None, subject=self.owner, amount=self.amount
         ).resolve()
 
 
@@ -49,7 +49,7 @@ class CullingBladeInstruction(Instruction):
         event = DamageEvent(
             engine=ctx.engine,
             source=ctx.source,
-            receiver=ctx.target,
+            subject=ctx.target,
             amount=3,
             ability=ctx.ability,
         )
@@ -76,7 +76,7 @@ class AxeCleaveOnTakeDamage(Modifier):
             for entity in self.owner.engine.living_entities:
                 if entity.team != self.owner.team and entity.pos in points_in_range:
                     DamageEvent(
-                        self.owner.engine, source=self.owner, receiver=entity, amount=1
+                        self.owner.engine, source=self.owner, subject=entity, amount=1
                     ).resolve()
 
 
@@ -91,7 +91,7 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
                 DamageEvent(
                     self.owner.engine,
                     source=self.owner,
-                    receiver=event.source,
+                    subject=event.source,
                     amount=reflect_amt,
                 ).resolve()
 

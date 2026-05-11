@@ -29,7 +29,7 @@ def test_marksmanship_conditional_irreducible():
     # Drow attacks Axe from range 4. Base dmg = 2.
     # Marksmanship adds +1 dmg and makes it irreducible. Axe's armor is ignored.
     # Total damage should be 3.
-    DamageEvent(engine, source=drow, receiver=axe, amount=2).resolve()
+    DamageEvent(engine, source=drow, subject=axe, amount=2).resolve()
     assert axe.hp == 7
 
 
@@ -45,7 +45,7 @@ def test_marksmanship_disabled_by_adjacent_enemy():
     drow.add_modifier(Marksmanship())
 
     # Because Drow has an adjacent enemy, Marksmanship is disabled.
-    DamageEvent(engine, source=drow, receiver=melee_hero, amount=2).resolve()
+    DamageEvent(engine, source=drow, subject=melee_hero, amount=2).resolve()
     assert melee_hero.hp == 8
 
 
@@ -55,11 +55,11 @@ def test_shallow_grave_multipliers_and_caps():
     dazzle.add_modifier(ShallowGrave())
 
     # Heal for 2 -> +50% multiplier -> 3
-    HealEvent(engine, receiver=dazzle, amount=2).resolve()
+    HealEvent(engine, subject=dazzle, amount=2).resolve()
     assert dazzle.hp == 8
 
     # Take massive damage (50) -> Cap triggers preventing HP < 1.
-    DamageEvent(engine, source=None, receiver=dazzle, amount=50).resolve()
+    DamageEvent(engine, source=None, subject=dazzle, amount=50).resolve()
     assert dazzle.hp == 1
 
 
@@ -96,7 +96,7 @@ def test_armor_and_damage():
     axe.add_modifier(InnateArmor())
 
     # 3 damage attack -> reduced by 1 from armor -> 2 damage taken
-    DamageEvent(engine, source=enemy, receiver=axe, amount=3).resolve()
+    DamageEvent(engine, source=enemy, subject=axe, amount=3).resolve()
     assert axe.hp == 8
 
 
@@ -107,7 +107,7 @@ def test_shallow_grave_cap():
     dazzle.add_modifier(ShallowGrave())
 
     # Massive 50 damage attack
-    DamageEvent(engine, source=None, receiver=dazzle, amount=50).resolve()
+    DamageEvent(engine, source=None, subject=dazzle, amount=50).resolve()
 
     # Cap ensures HP doesn't drop below 1
     assert dazzle.hp == 1
@@ -124,11 +124,11 @@ def test_paladin_aura_affects_others():
     reinhardt.add_modifier(PaladinAura())
 
     # Attack adjacent ally (has armor from aura) -> 3 dmg becomes 2
-    DamageEvent(engine, source=None, receiver=ally, amount=3).resolve()
+    DamageEvent(engine, source=None, subject=ally, amount=3).resolve()
     assert ally.hp == 3
 
     # Attack far ally (no aura) -> 3 dmg stays 3
-    DamageEvent(engine, source=None, receiver=far_ally, amount=3).resolve()
+    DamageEvent(engine, source=None, subject=far_ally, amount=3).resolve()
     assert far_ally.hp == 2
 
 
@@ -266,7 +266,7 @@ class Marksmanship(Modifier):
         if e.source and e.source.team == self.owner.team:
             if (
                 not self.owner.has_adjacent_enemies()
-                and e.source.distance_to(e.receiver) >= 3
+                and e.source.distance_to(e.subject) >= 3
             ):
                 e.amount.add(1)
                 e.amount.is_irreducible = True

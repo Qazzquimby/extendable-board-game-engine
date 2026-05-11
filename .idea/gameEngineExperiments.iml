@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.aider.tags.cache.v4" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/game_logs" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

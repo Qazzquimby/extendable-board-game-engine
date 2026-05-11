@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 class ActionContext:
     engine: "Engine"
     source: "Entity"
-    receiver_point: "Point"  # The point currently being affected
+    subject_point: "Point"  # The point currently being affected
 
     # all points with targets
     target_points: List["Point"] = field(default_factory=list)
@@ -70,8 +70,8 @@ class DamageInstruction(Instruction):
     irreducible: bool = False
 
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             amount = resolve_int(self.amount, ctx)
             if ctx.is_crit:
                 amount *= 2  # todo should be +1x damage multiplier. Use modvalue
@@ -80,7 +80,7 @@ class DamageInstruction(Instruction):
             DamageEvent(
                 engine=ctx.engine,
                 source=ctx.source,
-                receiver=receiver,
+                subject=subject,
                 amount=amount,
                 ability=ctx.ability,
             ).resolve()
@@ -91,10 +91,10 @@ class HealInstruction(Instruction):
     amount: DynamicInt
 
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             amount = resolve_int(self.amount, ctx)
-            HealEvent(engine=ctx.engine, receiver=receiver, amount=amount).resolve()
+            HealEvent(engine=ctx.engine, subject=subject, amount=amount).resolve()
 
 
 @dataclass
@@ -103,12 +103,12 @@ class GiveTokenInstruction(Instruction):
     amount: DynamicInt = 1
 
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             amount = resolve_int(self.amount, ctx)
             GiveTokenEvent(
                 engine=ctx.engine,
-                receiver=receiver,
+                subject=subject,
                 token_class=self.token_class,
                 amount=amount,
             ).resolve()
@@ -120,8 +120,8 @@ class RemoveTokenInstruction(Instruction):
     amount: DynamicInt = 1
 
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             amount = resolve_int(self.amount, ctx)
             ctx.target.remove_token(self.token_class, amount=amount)
 
@@ -132,12 +132,12 @@ class PushInstruction(Instruction):
 
     # todo probably want direction param and update resolution
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             dist = resolve_int(self.distance, ctx)
             PushEvent(
                 engine=ctx.engine,
-                receiver=ctx.target,
+                subject=ctx.target,
                 distance=dist,
                 source=ctx.source,
             ).resolve()
@@ -149,12 +149,12 @@ class PullInstruction(Instruction):
 
     # todo probably want direction param and update resolution
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             dist = resolve_int(self.distance, ctx)
             PullEvent(
                 engine=ctx.engine,
-                receiver=ctx.target,
+                subject=ctx.target,
                 distance=dist,
                 source=ctx.source,
             ).resolve()
@@ -166,8 +166,8 @@ class PullInstruction(Instruction):
 @dataclass
 class RefreshAbilityInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             if ctx.ability:
                 ctx.ability.is_tapped = False
                 ctx.ability.tapped_this_turn = False
@@ -179,14 +179,14 @@ class TeleportInstruction(Instruction):
     destination: DynamicPoint
 
     def execute(self, ctx: ActionContext) -> None:
-        receiver = ctx.engine.entity_at(ctx.receiver_point)
-        if receiver:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
             dest = (
                 self.destination(ctx)
                 if callable(self.destination)
                 else self.destination
             )
-            receiver.pos = dest  # todo should be event
+            subject.pos = dest  # todo should be event
 
 
 @dataclass
@@ -262,7 +262,7 @@ class Ability:
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
-                    receiver_point=target_point,
+                    subject_point=target_point,
                     target_points=instruction_aiming_result.target_points,
                     included_points=instruction_aiming_result.included_points,
                     ability=self,
@@ -275,7 +275,7 @@ class Ability:
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
-                    receiver_point=included_point,
+                    subject_point=included_point,
                     target_points=instruction_aiming_result.target_points,
                     included_points=instruction_aiming_result.included_points,
                     ability=self,
@@ -314,7 +314,7 @@ class Ability:
                 if roll > defense:
                     hit_target_points.add(target_point)
 
-                crit_chance = source.get_crit(receiver=target, ability=self)
+                crit_chance = source.get_crit(subject=target, ability=self)
                 if roll >= 7 - crit_chance:
                     crit_target_points.add(target_point)
         return hit_target_points, crit_target_points

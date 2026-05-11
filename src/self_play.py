@@ -67,13 +67,13 @@ def run_game(agent: AIAgent) -> GameLog:
                     DamageEvent(
                         engine=sim_engine,
                         source=sim_actor,
-                        receiver=sim_target,
+                        subject=sim_target,
                         amount=instruction.amount,
                     ).resolve()
                 elif isinstance(instruction, HealInstruction):
                     HealEvent(
                         engine=sim_engine,
-                        receiver=sim_target,
+                        subject=sim_target,
                         amount=instruction.amount,
                     ).resolve()
 
@@ -124,12 +124,12 @@ def run_game(agent: AIAgent) -> GameLog:
                 DamageEvent(
                     engine=engine,
                     source=actor,
-                    receiver=target,
+                    subject=target,
                     amount=instruction.amount,
                 ).resolve()
             elif isinstance(instruction, HealInstruction):
                 HealEvent(
-                    engine=engine, receiver=target, amount=instruction.amount
+                    engine=engine, subject=target, amount=instruction.amount
                 ).resolve()
 
         # Check win condition

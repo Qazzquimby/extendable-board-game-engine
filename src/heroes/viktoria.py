@@ -26,7 +26,7 @@ class AllViktoriasHealWhenAnyViktoriaKills(Modifier):
         if event.killer == self.owner:
             for entity in self.owner.engine.living_entities:
                 if entity.name == "Viktoria":
-                    HealEvent(self.owner.engine, receiver=entity, amount=2).resolve()
+                    HealEvent(self.owner.engine, subject=entity, amount=2).resolve()
 
 
 class DefenseModifier(Modifier):
@@ -44,7 +44,7 @@ class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
     def on_death(self):
         for entity in self.owner.engine.living_entities:
             if entity.name == "Viktoria" and entity != self.owner:
-                HealEvent(self.owner.engine, receiver=entity, amount=2).resolve()
+                HealEvent(self.owner.engine, subject=entity, amount=2).resolve()
                 self.owner.add_modifier(DefenseModifier(owner=entity, amount=2))
 
 
@@ -65,7 +65,7 @@ class KatanaBurstInstruction(Instruction):
                 and entity.pos in points_in_range
             ):
                 DamageEvent(
-                    ctx.engine, source=ctx.source, receiver=entity, amount=1
+                    ctx.engine, source=ctx.source, subject=entity, amount=1
                 ).resolve()
 
 
