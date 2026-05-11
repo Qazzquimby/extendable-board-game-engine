@@ -14,7 +14,7 @@ from engine import (
     QueryCanMove,
     Taunted,
 )
-from mod_value import ModValue
+from mod_value import ModInt
 from point import Point
 from heroes import MeleeHero
 
@@ -144,7 +144,7 @@ def test_taunted_dataclass():
 
 
 def test_modvalue_multiply_before_add():
-    mod = ModValue(2)
+    mod = ModInt(2)
     mod.add(1)
     mod.mult(2.0)  # +100%
     # 2 * 2.0 + 1 = 5
@@ -152,7 +152,7 @@ def test_modvalue_multiply_before_add():
 
 
 def test_modvalue_cancellation():
-    mod = ModValue(2)
+    mod = ModInt(2)
     mod.mult(2.0)  # +100%
     mod.add_resistance()  # Resistance
     # Cancel out -> 2
@@ -160,14 +160,14 @@ def test_modvalue_cancellation():
 
 
 def test_modvalue_round_up():
-    mod = ModValue(3)
+    mod = ModInt(3)
     mod.add_resistance()
     # 3 * 0.5 = 1.5 -> rounds up to 2
     assert mod.value == 2
 
 
 def test_modvalue_additive_multipliers():
-    mod = ModValue(2)
+    mod = ModInt(2)
     mod.mult(1.5)  # +50%
     mod.mult(2.0)  # +100%
     # 1.0 + 0.5 + 1.0 = 2.5
@@ -176,7 +176,7 @@ def test_modvalue_additive_multipliers():
 
 
 def test_modvalue_irreducible():
-    mod = ModValue(4)
+    mod = ModInt(4)
     mod.add(-2)
     mod.add_resistance()
     mod.is_irreducible = True

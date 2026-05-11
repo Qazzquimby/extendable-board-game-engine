@@ -3,10 +3,10 @@ import random
 import copy
 from enum import Enum, auto
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Type, Any, Dict
+from typing import Callable, List, Optional, Type, Any, Dict, TypeVar, Generic
 
 from grid import Grid
-from mod_value import ModValue
+from mod_value import ModInt
 from point import Point
 from abilities import Ability
 from schemas import EngineState, EntityState
@@ -32,7 +32,7 @@ class Subscription:
     modifier: "Modifier"
     event_type: Type
     phase: EventPhase
-    target_self: bool
+    only_self: bool
     func: Callable[[Any], None]
 
 
@@ -49,7 +49,7 @@ class Router:
                         modifier=modifier,
                         event_type=method._listen_event,
                         phase=method._listen_phase,
-                        target_self=method._listen_target_self,
+                        only_self=method._listen_target_self,
                         func=method,
                     )
                 )
@@ -60,9 +60,8 @@ class Router:
     def publish(self, event: Any, phase: EventPhase) -> None:
         for sub in list(self.subscribers):  # iterate copy
             if sub.event_type == type(event) and sub.phase == phase:
-                if sub.target_self:
-                    target = getattr(event, "target", None)
-                    if target != sub.modifier.owner:
+                if sub.only_self:
+                    if event.receiver != sub.modifier.owner:
                         continue
                 sub.func(event)
 
@@ -107,9 +106,21 @@ def query(event_type: Type, target_self: bool = True) -> Callable:
 # ==========================================
 
 
+class Agent(abc.ABC):
+    @abc.abstractmethod
+    def choose(self, choices: List[Any]) -> int:
+        pass
+
+
 class Engine:
-    def __init__(self, seed: int = 42, grid: Grid = None) -> None:
+    def __init__(
+        self,
+        seed: int = 42,
+        grid: Grid = None,
+        agents: Optional[Dict[int, Agent]] = None,
+    ) -> None:
         self.router = Router()
+        self.agents: Dict[int, Agent] = agents or {}
         self.entities: List["Entity"] = []
         self.markers: List["Marker"] = []
         self.rng = random.Random(seed)
@@ -120,6 +131,15 @@ class Engine:
         self._next_id: int = 1
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
+
+    def request_choice(self, team: int, choices: List[Any]) -> int:
+        if not choices:
+            raise ValueError("Cannot request a choice from an empty list.")
+        if len(choices) == 1:
+            return 0
+        if team in self.agents:
+            return self.agents[team].choose(choices)
+        return self.rng.randrange(len(choices))
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
         return self._entity_by_pos.get(pos)
@@ -302,14 +322,14 @@ class Entity:
         ability: Optional["Ability"] = None,
     ) -> int:
         q = QueryDefense(
-            target=self, attack_source=attack_source, ability=ability, result=0
+            subject=self, attack_source=attack_source, ability=ability, result=0
         )
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result.value
 
     def get_crit(self, receiver: "Entity", ability: Optional["Ability"] = None) -> int:
         q = QueryCrit(
-            target=receiver,
+            subject=receiver,
             attack_source=self,
             ability=ability,
             result=ability.crit_chance,
@@ -478,7 +498,7 @@ class PushEvent(Event):
         source: Optional["Entity"] = None,
     ):
         super().__init__(engine=engine, receiver=receiver)
-        self.distance = ModValue(distance)
+        self.distance = ModInt(distance)
         self.source = source
 
     def _resolve(self) -> None:
@@ -506,7 +526,7 @@ class PullEvent(Event):
         source: Optional["Entity"] = None,
     ):
         super().__init__(engine=engine, receiver=receiver)
-        self.distance = ModValue(distance)
+        self.distance = ModInt(distance)
         self.source = source
 
     def _resolve(self) -> None:
@@ -555,7 +575,7 @@ class DamageEvent(Event):
     ):
         super().__init__(engine=engine, receiver=receiver)
         self.source = source
-        self.amount = ModValue(amount)
+        self.amount = ModInt(amount)
         self.ability = ability
 
     def _resolve(self) -> None:
@@ -597,7 +617,7 @@ class SummonEvent(Event):
 class HealEvent(Event):
     def __init__(self, engine: Engine, receiver: Entity, amount: int):
         super().__init__(engine=engine, receiver=receiver)
-        self.amount = ModValue(amount)
+        self.amount = ModInt(amount)
 
     def _resolve(self) -> None:
         final_heal = max(0, self.amount.value)
@@ -620,72 +640,74 @@ class GiveTokenEvent(Event):
 # QUERIES
 # ==========================================
 
+QueryResultT = TypeVar("QueryResultT")
 
-class QueryIsAlive:
+
+class Query(Generic[QueryResultT]):
+    def __init__(self, subject: Entity, result: QueryResultT):
+        self.subject = subject
+        self.result = result
+
+
+class QueryIsAlive(Query[bool]):
     def __init__(self, entity: Entity):
-        self.entity = entity
-        self.result: bool = entity.pos is not None and entity.hp > 0
+        super().__init__(
+            subject=entity, result=entity.pos is not None and entity.hp > 0
+        )
 
 
-class QueryHasArmor:
-    def __init__(self, entity: Entity):
-        self.entity = entity
-        self.result: bool = False
+class QueryHasArmor(Query[bool]):
+    def __init__(self, subject: Entity):
+        super().__init__(subject=subject, result=False)
 
 
-class QueryLegalAimings:
+class QueryLegalAimings(Query["AimingResult"]):
     def __init__(
-        self, actor: "Entity", ability: "Ability", result: List["AimingResult"]
+        self, subject: "Entity", ability: "Ability", result: List["AimingResult"]
     ):
-        self.actor = actor
+        super().__init__(subject=subject, result=result)
         self.ability = ability
-        self.result = result
 
 
-class QueryLegalActions:
-    def __init__(self, entity: Entity, result: List[Ability]):
-        self.entity = entity
-        self.result = result
+class QueryLegalActions(Query[List[Ability]]):
+    def __init__(self, subject: Entity, result: List[Ability]):
+        super().__init__(subject=subject, result=result)
 
 
-class QueryCanMove:
-    def __init__(self, entity: Entity):
-        self.entity = entity
-        self.result: bool = True
+class QueryCanMove(Query[bool]):
+    def __init__(self, subject: Entity):
+        super().__init__(subject=subject, result=True)
 
 
-class QuerySpeed:
-    def __init__(self, entity: Entity, result: int):
-        self.entity = entity
-        self.result = ModValue(result)
+class QuerySpeed(Query[ModInt]):
+    def __init__(self, subject: Entity, result: int):
+        super().__init__(subject=subject, result=result)
 
 
-class QueryDefense:
+class QueryDefense(Query[ModInt]):
     def __init__(
         self,
-        target: Entity,
+        subject: Entity,
         attack_source: Optional[Entity] = None,
         ability: Optional["Ability"] = None,
         result: int = 0,
     ):
-        self.target = target
+        super().__init__(subject=subject, result=ModInt(result))
         self.attack_source = attack_source
         self.ability = ability
-        self.result = ModValue(result)
 
 
-class QueryCrit:
+class QueryCrit(Query[ModInt]):
     def __init__(
         self,
-        target: Entity,
+        subject: Entity,
         attack_source: Optional[Entity] = None,
         ability: Optional["Ability"] = None,
         result: int = 0,
     ):
-        self.target = target
+        super().__init__(subject=subject, result=ModInt(result))
         self.attack_source = attack_source
         self.ability = ability
-        self.result = ModValue(result)
 
 
 # ==========================================

@@ -216,7 +216,7 @@ class Ability:
     is_default: bool = False
     action_cost: ActionCost = ActionCost.STANDARD
 
-    modifiers: List[Modifier] = field(default_factory=list)
+    modifiers: List["Modifier"] = field(default_factory=list)
 
     taps: bool = False
     is_tapped: bool = False

@@ -318,7 +318,7 @@ def get_plausible_uses_of_ability_after_movement(
         engine=engine, actor=actor, start_pos=move_pos, require_los=True
     )
 
-    q = QueryLegalAimings(actor=actor, ability=ability, result=raw_aimings)
+    q = QueryLegalAimings(subject=actor, ability=ability, result=raw_aimings)
     engine.router.publish(q, EventPhase.QUERY)
     legal_aimings = q.result
 

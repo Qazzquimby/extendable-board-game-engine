@@ -9,7 +9,7 @@ def div(numerator: int, denominator: int) -> int:
     return math.ceil(numerator / denominator)
 
 
-class ModValue:
+class ModInt:
     def __init__(self, base: int):
         self.base: int = base
         self._adds: List[Union[int, Callable[[], int]]] = []
