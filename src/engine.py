@@ -648,9 +648,9 @@ class Query(Generic[QueryResultT]):
 
 
 class QueryIsAlive(Query[bool]):
-    def __init__(self, entity: Entity):
+    def __init__(self, subject: Entity):
         super().__init__(
-            subject=entity, result=entity.pos is not None and entity.hp > 0
+            subject=subject, result=subject.pos is not None and subject.hp > 0
         )
 
 

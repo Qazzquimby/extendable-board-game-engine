@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from engine import (
     Engine,
     Entity,
@@ -10,8 +8,6 @@ from engine import (
     query,
     QueryHasArmor,
     before,
-    QueryLegalActions,
-    QueryCanMove,
     Taunted,
 )
 from mod_value import ModInt
@@ -41,7 +37,6 @@ def test_marksmanship_disabled_by_adjacent_enemy():
     )  # Range 1, adjacent enemy
     melee_hero = MeleeHero(engine, pos=Point(0, 4), team=2)
 
-    melee_hero.add_modifier(InnateArmor())
     drow.add_modifier(Marksmanship())
 
     # Because Drow has an adjacent enemy, Marksmanship is disabled.
@@ -254,7 +249,7 @@ class PaladinAura(Modifier):
     @query(QueryHasArmor, target_self=False)
     def grant_armor_to_adjacent(self, q: QueryHasArmor):
         # Affects OTHERS: checks if the query target is near this aura's owner
-        if q.entity != self.owner and q.entity.distance_to(self.owner) <= 1:
+        if q.subject != self.owner and q.subject.distance_to(self.owner) <= 1:
             q.result = True
 
 
