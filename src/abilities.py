@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         PushEvent,
         PullEvent,
         Modifier,
+        GiveTokenEvent,
     )
     from point import Point
 
@@ -93,7 +94,7 @@ class HealInstruction(Instruction):
         receiver = ctx.engine.entity_at(ctx.receiver_point)
         if receiver:
             amount = resolve_int(self.amount, ctx)
-            HealEvent(engine=ctx.engine, receiver=ctx.rec, amount=amount).resolve()
+            HealEvent(engine=ctx.engine, receiver=receiver, amount=amount).resolve()
 
 
 @dataclass
@@ -105,8 +106,12 @@ class GiveTokenInstruction(Instruction):
         receiver = ctx.engine.entity_at(ctx.receiver_point)
         if receiver:
             amount = resolve_int(self.amount, ctx)
-            # todo should be an event
-            receiver.add_token(self.token_class, amount=amount)
+            GiveTokenEvent(
+                engine=ctx.engine,
+                receiver=receiver,
+                token_class=self.token_class,
+                amount=amount,
+            ).resolve()
 
 
 @dataclass
@@ -132,7 +137,7 @@ class PushInstruction(Instruction):
             dist = resolve_int(self.distance, ctx)
             PushEvent(
                 engine=ctx.engine,
-                recipient=ctx.target,
+                receiver=ctx.target,
                 distance=dist,
                 source=ctx.source,
             ).resolve()
@@ -149,7 +154,7 @@ class PullInstruction(Instruction):
             dist = resolve_int(self.distance, ctx)
             PullEvent(
                 engine=ctx.engine,
-                recipient=ctx.target,
+                receiver=ctx.target,
                 distance=dist,
                 source=ctx.source,
             ).resolve()

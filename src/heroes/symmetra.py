@@ -107,9 +107,7 @@ class SentryTurret(Object):
                 if enemies:
                     nearest = min(enemies, key=lambda e: self.owner.distance_to(e))
                     if nearest in manager.targets_hit_this_activation:
-                        GiveTokenInstruction(token_class=SlowToken, amount=1).execute(
-                            ctx=ctx
-                        )
+                        GiveTokenEvent(token_class=SlowToken, amount=1).execute(ctx=ctx)
                         # todo a trigger response doesn't have a context.
                         #  Ontology is unclear between trigger response, making direct changes, creating and resolving events, and executing instructions.
                     manager.targets_hit_this_activation.add(nearest)
@@ -160,7 +158,7 @@ class Teleporter(Object):
                     aiming=TargetEntity(),  # todo target teleporter, todo ignoring line of sight
                     instructions=[
                         TeleportInstruction(
-                            destination=lambda ctx: ctx.target.pos,
+                            destination=lambda ctx: ctx.receiver.pos,
                         )
                     ],
                     owner=self,

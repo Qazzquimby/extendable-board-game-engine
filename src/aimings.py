@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from engine import Engine
     from engine import Entity
 
-# Recipient: Anything being affected
+# receiver: Anything being affected
 # Target Point: A point that has been individually chosen
 # Target: The entity or marker at the target point, if any.
 # Included Point: A point that is in a chosen area. Not a target.
@@ -29,7 +29,7 @@ MultipleAimingResults = Dict[str, AimingResult]
 
 @dataclass
 class Aiming:
-    """Base class for how an ability finds its recipients."""
+    """Base class for how an ability finds its receivers."""
 
     def get_all_aimings(
         self,
