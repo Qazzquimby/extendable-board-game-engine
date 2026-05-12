@@ -18,6 +18,7 @@ from base_environment import (
     StateWithKey,
     StateType,
 )
+from engine import Agent
 
 DEBUG = True
 
@@ -494,3 +495,70 @@ class PolicyResult:
     chosen_action: ActionType
     action_probabilities: Dict[ActionType, float] = field(default_factory=dict)
     action_visits: Dict[ActionType, int] = field(default_factory=dict)
+
+
+class MCTSAgent(Agent):
+    """An agent that uses MCTS to select actions."""
+
+    def __init__(self, num_simulations: int = 50):
+        self.num_simulations = num_simulations
+        self.selection = PUCTSelection(exploration_constant=1.0)
+        self.expansion = UniformExpansion()
+        self.evaluation = RandomRolloutEvaluation(max_rollout_depth=20)
+        self.backprop = StandardBackpropagation()
+        self.cache = MCTSNodeCache()
+
+    def choose(self, choices: List[ActionType]) -> int:
+        if len(choices) <= 1:
+            return 0
+
+        actor = getattr(choices[0], "ability", None)
+        if not actor or not hasattr(actor, "owner") or not actor.owner:
+            return 0
+
+        env = actor.owner.engine
+
+        root_node = self.cache.get_matching_node(env.hash())
+        if not root_node:
+            root_node = MCTSNodeWithState(StateWithKey.from_state(env))
+            self.cache.cache_node(env.hash(), root_node)
+
+        for _ in range(self.num_simulations):
+            sim_env = env.copy()
+            result = self.selection.select(
+                root_node, sim_env, self.cache, self.num_simulations, None
+            )
+
+            if not result.leaf_env.is_done:
+                self.expansion.expand(result.leaf_node, result.leaf_env)
+                val = self.evaluation.evaluate(result.leaf_node, result.leaf_env)
+            else:
+                winner = result.leaf_env.get_winning_player()
+                curr_player = result.leaf_node.current_player_index
+                if winner is None:
+                    val = 0.0
+                else:
+                    val = 1.0 if winner == curr_player else -1.0
+
+            player_to_value = {
+                result.leaf_node.current_player_index: val,
+                1 - result.leaf_node.current_player_index: -val,
+            }
+            self.backprop.backpropagate(result.path, player_to_value)
+
+        best_idx = 0
+        best_visits = -1
+        for action_idx, edge in root_node.edges.items():
+            if edge.num_visits > best_visits:
+                best_visits = edge.num_visits
+                best_idx = action_idx
+
+        # In case the best index tracked by MCTS logic isn't aligned with choices bounds
+        if best_idx >= len(choices):
+            best_idx = 0
+
+        return best_idx
+
+    def select_action(self, choices: List[ActionType]) -> ActionType:
+        idx = self.choose(choices)
+        return choices[idx]

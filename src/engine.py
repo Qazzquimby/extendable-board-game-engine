@@ -198,22 +198,6 @@ class Engine(BaseEnvironment):
     def copy(self) -> "Engine":
         return copy.deepcopy(self)
 
-    def _reset(self):
-        # A true reset would recreate the initial state; for now we just return current
-        return self.get_state_with_key()
-
-    def _step(self, action):
-        pass
-        # Engine was written to use request_choice(legal_actions). BaseEnvironment was built to use get_legal_actions and step. Resolve without stubbing. Write a **WORKING IMPLEMENTATION**.
-
-    def _get_legal_actions(self):
-        from ai_agent import generate_plausible_actions
-
-        if not self.active_entity or self.active_entity.hp <= 0:
-            return []
-        return generate_plausible_actions(self.active_entity, self)
-        # No, the agent can be given any arbitrary choice. They do not just choose actions that play themselves. See request_choice
-
     def get_current_player(self) -> int:
         return self.current_team
 

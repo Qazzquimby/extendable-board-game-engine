@@ -17,8 +17,11 @@ from abilities import DamageInstruction, HealInstruction
 from schemas import ActionState, LogEntry, GameLog, ActionSim
 
 
-def run_game(agent: AIAgent) -> GameLog:
-    engine = Engine(grid=Grid(6, 6))
+from ai.mcts import MCTSAgent
+
+
+def run_game(agent: MCTSAgent) -> GameLog:
+    engine = Engine(grid=Grid(6, 6), agents={0: agent, 1: agent})
 
     # Randomize teams slightly
     team_0_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
@@ -50,7 +53,7 @@ def run_game(agent: AIAgent) -> GameLog:
         simulations = []
         for p_action in plausible_actions:
             # todo use ability.execute()
-            sim_engine = engine.clone()
+            sim_engine = engine.copy()
             sim_actor = next(e for e in sim_engine.entities if e.id == actor.id)
             sim_target = next(
                 (
@@ -106,31 +109,12 @@ def run_game(agent: AIAgent) -> GameLog:
                 )
             )
 
-        chosen_action = agent.select_action(
-            actor=actor,
-            engine=engine,
-            plausible_actions=plausible_actions,
-            temperature=0.1,
-        )
+        chosen_action = agent.select_action(choices=plausible_actions)
 
         path = engine.grid.get_path(actor.pos, chosen_action.move_pos)
 
-        # Execute actual action
-        actor.pos = chosen_action.move_pos
-        ability = chosen_action.ability
-        target = chosen_action.target
-        for instruction in ability.instructions:
-            if isinstance(instruction, DamageInstruction):
-                DamageEvent(
-                    engine=engine,
-                    source=actor,
-                    subject=target,
-                    amount=instruction.amount,
-                ).resolve()
-            elif isinstance(instruction, HealInstruction):
-                HealEvent(
-                    engine=engine, subject=target, amount=instruction.amount
-                ).resolve()
+        # Execute actual action using environment step
+        engine.step(chosen_action)
 
         # Check win condition
         time_up = engine.round_num >= 6
@@ -166,14 +150,11 @@ def run_game(agent: AIAgent) -> GameLog:
         if done:
             break
 
-        engine.next_turn()
-
     return GameLog(winner_team=winner_team, logs=logs)
 
 
 if __name__ == "__main__":
-    agent = AIAgent()
-    agent.load()
+    agent = MCTSAgent(num_simulations=50)
     all_games = []
     num_games = 10_000
     existing_game_logs = Path("../game_logs").glob("*.json")
