@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch import Tensor
 import torch.nn.functional as F
 
-from engine import Engine, Entity, EventPhase, QueryLegalAimings
+from engine import Engine, Entity, EventPhase, QueryLegalAimings, Agent
 from abilities import (
     Ability,
     DamageInstruction,
@@ -390,8 +390,9 @@ def get_plausible_uses_of_ability_after_movement(
     return plausible_uses_of_ability_after_movement
 
 
-class AIAgent:
+class AIAgent(Agent):
     def __init__(self):
+        super().__init__()
         self.net: AIPolicyValueNet = AIPolicyValueNet(
             entity_vocab_size=MAX_ENTITY_TYPES,
             ability_vocab_size=MAX_ABILITY_TYPES,
@@ -409,6 +410,16 @@ class AIAgent:
             print(f"Loaded model from {filepath}")
         else:
             print(f"No model found at {filepath}, starting fresh.")
+
+    def choose(self, choices: List[PlausibleAction]) -> int:
+        # Fulfills the Agent interface
+        actor = choices[0].ability.owner if choices and choices[0].ability else None
+        if not actor:
+            return 0
+        
+        # Engine is reachable through actor
+        chosen_action = self.select_action(actor, actor.engine, choices, temperature=0.1)
+        return choices.index(chosen_action)
 
     def select_action(
         self,

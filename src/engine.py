@@ -10,6 +10,7 @@ from mod_value import ModInt
 from point import Point
 from abilities import Ability
 from schemas import EngineState, EntityState
+from base_environment import BaseEnvironment
 
 # ==========================================
 # ENUMS & TYPES
@@ -112,13 +113,14 @@ class Agent(abc.ABC):
         pass
 
 
-class Engine:
+class Engine(BaseEnvironment):
     def __init__(
         self,
         seed: int = 42,
         grid: Grid = None,
         agents: Optional[Dict[int, Agent]] = None,
     ) -> None:
+        BaseEnvironment.__init__(self)
         self.router = Router()
         self.agents: Dict[int, Agent] = agents or {}
         self.entities: List["Entity"] = []
@@ -195,6 +197,42 @@ class Engine:
 
     def copy(self) -> "Engine":
         return copy.deepcopy(self)
+
+    def _reset(self):
+        # A true reset would recreate the initial state; for now we just return current
+        return self.get_state_with_key()
+
+    def _step(self, action):
+        pass
+        # Engine was written to use request_choice(legal_actions). BaseEnvironment was built to use get_legal_actions and step. Resolve without stubbing. Write a **WORKING IMPLEMENTATION**.
+
+    def _get_legal_actions(self):
+        from ai_agent import generate_plausible_actions
+
+        if not self.active_entity or self.active_entity.hp <= 0:
+            return []
+        return generate_plausible_actions(self.active_entity, self)
+        # No, the agent can be given any arbitrary choice. They do not just choose actions that play themselves. See request_choice
+
+    def get_current_player(self) -> int:
+        return self.current_team
+
+    def _get_state(self):
+        return self
+
+    def get_winning_player(self) -> Optional[int]:
+        if not self.is_done():
+            return None
+        team_0 = [e for e in self.entities if e.team == 0 and e.hp > 0]
+        team_1 = [e for e in self.entities if e.team == 1 and e.hp > 0]
+        if len(team_0) > len(team_1):
+            return 0
+        elif len(team_1) > len(team_0):
+            return 1
+        return None
+
+    def get_network_spec(self) -> Dict:
+        return {}
 
     def is_done(self) -> bool:
         if self.round_num > 6:

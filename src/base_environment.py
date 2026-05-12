@@ -2,12 +2,13 @@ import abc
 from collections import OrderedDict
 from dataclasses import dataclass
 from functools import wraps
-from typing import Dict, List, Optional, TypeVar, Union, Tuple, Any
+from typing import Dict, List, Optional, TypeVar, TYPE_CHECKING
 
-from engine import Engine
+if TYPE_CHECKING:
+    pass
 
 ActionType = TypeVar("ActionType")
-StateType = Engine
+StateType = "Engine"
 
 
 class LRUCache(OrderedDict):
