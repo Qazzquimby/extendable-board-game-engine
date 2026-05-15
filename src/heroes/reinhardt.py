@@ -16,13 +16,11 @@ from engine import (
     Immobile,
     Engine,
     Hero,
-    PullEvent,
     before,
-    PushEvent,
     Modifier,
-    DamageEvent,
     ImmobileToken,
 )
+from events import PushEvent, PullEvent, DamageEvent
 from grid import Grid
 from point import Point
 

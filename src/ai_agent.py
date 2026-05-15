@@ -8,7 +8,8 @@ import torch.optim as optim
 from torch import Tensor
 import torch.nn.functional as F
 
-from engine import Engine, Entity, EventPhase, QueryLegalAimings, Agent
+from engine import Engine, Entity, EventPhase, Agent
+from queries import QueryLegalAimings
 from abilities import (
     Ability,
     DamageInstruction,
@@ -416,9 +417,11 @@ class AIAgent(Agent):
         actor = choices[0].ability.owner if choices and choices[0].ability else None
         if not actor:
             return 0
-        
+
         # Engine is reachable through actor
-        chosen_action = self.select_action(actor, actor.engine, choices, temperature=0.1)
+        chosen_action = self.select_action(
+            actor, actor.engine, choices, temperature=0.1
+        )
         return choices.index(chosen_action)
 
     def select_action(

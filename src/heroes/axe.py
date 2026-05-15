@@ -4,14 +4,13 @@ from aimings import TargetEntity, TargetSelf
 from engine import (
     Engine,
     Hero,
-    TurnEndEvent,
     before,
-    InnateArmor,
     Token,
     Modifier,
     after,
-    DamageEvent,
 )
+from queries import InnateArmor
+from events import TurnEndEvent, DamageEvent
 from abilities import (
     Ability,
     DamageInstruction,

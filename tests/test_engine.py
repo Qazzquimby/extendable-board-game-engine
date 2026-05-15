@@ -1,15 +1,14 @@
 from engine import (
     Engine,
     Entity,
-    DamageEvent,
     HealEvent,
-    InnateArmor,
     Modifier,
     query,
-    QueryHasArmor,
     before,
     Taunted,
 )
+from queries import QueryHasArmor, InnateArmor
+from events import DamageEvent
 from mod_value import ModInt
 from point import Point
 from heroes import MeleeHero

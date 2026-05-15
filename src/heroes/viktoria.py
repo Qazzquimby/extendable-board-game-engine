@@ -6,11 +6,11 @@ from engine import (
     Hero,
     Modifier,
     after,
-    DeathEvent,
     HealEvent,
     query,
-    QueryDefense,
 )
+from queries import QueryDefense
+from events import DeathEvent
 from abilities import (
     Ability,
     DamageInstruction,
@@ -51,7 +51,7 @@ class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
 @dataclass
 class KatanaBurstInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
-        from engine import DamageEvent
+        from events import DamageEvent
 
         if not ctx.target or not hasattr(ctx.target, "pos"):
             return

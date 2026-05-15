@@ -9,13 +9,11 @@ if TYPE_CHECKING:
         Engine,
         Entity,
         Token,
-        DamageEvent,
         HealEvent,
-        PushEvent,
-        PullEvent,
         Modifier,
         GiveTokenEvent,
     )
+    from events import PushEvent, PullEvent, DamageEvent
     from point import Point
 
 
@@ -192,11 +190,6 @@ class TeleportInstruction(Instruction):
 @dataclass
 class ApplyModifierInstruction(Instruction):
     modifier_class: type
-
-
-# ==========================================
-# ABILITY
-# ==========================================
 
 
 class ActionCost(Enum):

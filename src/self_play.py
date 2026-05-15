@@ -5,7 +5,8 @@ from typing import List, Type, Union
 
 from tqdm import tqdm
 
-from engine import DamageEvent, Engine, HealEvent
+from engine import Engine, HealEvent
+from events import DamageEvent
 from grid import Grid
 from heroes import MeleeHero, RangedHero
 from ai_agent import (
