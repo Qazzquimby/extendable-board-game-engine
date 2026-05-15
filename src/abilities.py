@@ -12,53 +12,14 @@ if TYPE_CHECKING:
         HealEvent,
         Modifier,
         GiveTokenEvent,
+        ActionContext,
+        DynamicInt,
+        DynamicPoint,
+        resolve_int,
+        Instruction,
     )
     from events import PushEvent, PullEvent, DamageEvent
     from point import Point
-
-
-@dataclass
-class ActionContext:
-    engine: "Engine"
-    source: "Entity"
-    subject_point: "Point"  # The point currently being affected
-
-    # all points with targets
-    target_points: List["Point"] = field(default_factory=list)
-
-    # all points included in areas
-    included_points: List["Point"] = field(default_factory=list)
-    ability: Optional["Ability"] = None
-    is_hit: bool = True
-    is_crit: bool = False
-
-    @property
-    def target_point(self):
-        if len(self.target_points) != 1:
-            raise ValueError("Cannot use `.target` when there are multiple targets.")
-        return self.target_points[0]
-
-    @property
-    def target(self):
-        return self.engine.entity_at(self.target_point)
-
-
-DynamicInt = Union[int, Callable[[ActionContext], int]]
-DynamicPoint = Union["Point", Callable[[ActionContext], "Point"]]
-
-
-def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
-    return val(ctx) if callable(val) else val
-
-
-@dataclass(kw_only=True)
-class Instruction:
-    """Base class for all ability effects."""
-
-    aiming_name: Optional[str] = field(default=None)
-
-    def execute(self, ctx: ActionContext) -> None:
-        pass
 
 
 @dataclass

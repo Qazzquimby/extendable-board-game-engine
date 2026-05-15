@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 
 from abilities import (
-    Instruction,
-    ActionContext,
     Ability,
     DamageInstruction,
     GiveTokenInstruction,
@@ -20,6 +18,8 @@ from engine import (
     SlowToken,
     Hero,
     GiveTokenEvent,
+    ActionContext,
+    Instruction,
 )
 from events import TurnStartEvent, TurnEndEvent, DamageEvent, SummonEvent
 from point import Point

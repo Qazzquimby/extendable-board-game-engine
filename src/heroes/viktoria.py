@@ -8,14 +8,14 @@ from engine import (
     after,
     HealEvent,
     query,
+    ActionContext,
+    Instruction,
 )
 from queries import QueryDefense
 from events import DeathEvent
 from abilities import (
     Ability,
     DamageInstruction,
-    Instruction,
-    ActionContext,
 )
 from point import Point
 

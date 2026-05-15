@@ -7,8 +7,6 @@ from abilities import (
     DamageInstruction,
     ActionCost,
     GiveTokenInstruction,
-    ActionContext,
-    Instruction,
 )
 from aimings import IncludeArea
 from areas import Square, PathArea, Line
@@ -19,6 +17,8 @@ from engine import (
     before,
     Modifier,
     ImmobileToken,
+    ActionContext,
+    Instruction,
 )
 from events import PushEvent, PullEvent, DamageEvent
 from grid import Grid

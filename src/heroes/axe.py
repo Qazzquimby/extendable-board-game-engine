@@ -8,6 +8,8 @@ from engine import (
     Token,
     Modifier,
     after,
+    ActionContext,
+    Instruction,
 )
 from queries import InnateArmor
 from events import TurnEndEvent, DamageEvent
@@ -16,8 +18,6 @@ from abilities import (
     DamageInstruction,
     GiveTokenInstruction,
     ApplyModifierInstruction,
-    Instruction,
-    ActionContext,
     RefreshAbilityInstruction,
     ActionCost,
 )
