@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch import Tensor
 import torch.nn.functional as F
 
-from engine import Engine, Entity, EventPhase, Agent
+from engine import Engine, Entity, EventPhase, Agent, Choice
 from queries import QueryLegalAimings
 from abilities import (
     Ability,
@@ -397,115 +397,24 @@ class LinearWeightAgent(Agent):
         self.weights: dict[str, float] = {}
         self.default_weight = default_weight
 
-    def choose(self, choices: List[Any]) -> int:
+    def choose(self, choices: List[Choice]) -> int:
         if not choices:
             return 0
         if len(choices) == 1:
             return 0
-            
+
         best_idx = 0
-        best_score = float('-inf')
-        
+        best_score = float("-inf")
+
         for i, choice in enumerate(choices):
             score = 0.0
-            if hasattr(choice, 'features'):
+            if hasattr(choice, "features"):
                 for key, val in choice.features.items():
                     weight = self.weights.get(key, self.default_weight)
                     score += weight * val
-                    
+
             if score > best_score:
                 best_score = score
                 best_idx = i
-                
+
         return best_idx
-
-
-class AIAgent(Agent):
-    def __init__(self):
-        super().__init__()
-        self.net: AIPolicyValueNet = AIPolicyValueNet(
-            entity_vocab_size=MAX_ENTITY_TYPES,
-            ability_vocab_size=MAX_ABILITY_TYPES,
-        )
-        self.optimizer = optim.Adam(self.net.parameters(), lr=0.0001)
-
-    def save(self, filepath: str = "model.pth") -> None:
-        torch.save(self.net.state_dict(), filepath)
-
-    def load(self, filepath: str = "model.pth") -> None:
-        import os
-
-        if os.path.exists(filepath):
-            self.net.load_state_dict(torch.load(filepath, weights_only=True))
-            print(f"Loaded model from {filepath}")
-        else:
-            print(f"No model found at {filepath}, starting fresh.")
-
-    def choose(self, choices: List[PlausibleAction]) -> int:
-        # Fulfills the Agent interface
-        actor = choices[0].ability.owner if choices and choices[0].ability else None
-        if not actor:
-            return 0
-
-        # Engine is reachable through actor
-        chosen_action = self.select_action(
-            actor, actor.engine, choices, temperature=0.1
-        )
-        return choices.index(chosen_action)
-
-    def select_action(
-        self,
-        actor: Entity,
-        engine: Engine,
-        plausible_actions: List[PlausibleAction],
-        temperature=1.0,
-    ) -> PlausibleAction:
-        entity_features = get_entity_features(engine, actor)
-        action_features = get_plausible_action_features(plausible_actions)
-
-        with torch.no_grad():
-            policy_scores, _value = self.net(entity_features, action_features)
-            assert policy_scores.shape[0] == 1  # only batch size 1 right now
-            policy_scores = policy_scores.squeeze()
-            if temperature <= 0:
-                chosen_index = torch.argmax(policy_scores).item()
-            else:
-                probs = torch.softmax(policy_scores / temperature, dim=0)
-                chosen_index = torch.multinomial(probs, 1).item()
-        chosen_action = plausible_actions[chosen_index]
-        return chosen_action
-
-    def get_value(self, states_tensor: torch.Tensor) -> torch.Tensor:
-        with torch.no_grad():
-            state_embs, _all_entities_emb = self.net.state_encoder(states_tensor)
-            values = self.net.value_head(state_embs)
-        return values
-
-    def train_value_step(
-        self, states_tensor: torch.Tensor, actual_rewards: torch.Tensor
-    ) -> float:
-        self.optimizer.zero_grad()
-        state_embs, _all_entities_emb = self.net.state_encoder(states_tensor)
-        values = self.net.value_head(state_embs)
-        loss = nn.MSELoss()(values, actual_rewards)
-        loss.backward()
-        self.optimizer.step()
-        return loss.item()
-
-    def train_policy_step(
-        self,
-        states_tensor: torch.Tensor,
-        actions_tensor: torch.Tensor,
-        target_probs: torch.Tensor,
-    ) -> float:
-        self.optimizer.zero_grad()
-        # policy_logits shape: (num_actions, 1) -> squeeze to (num_actions,)
-        policy_logits, _ = self.net(states_tensor, actions_tensor)
-        policy_logits = policy_logits.squeeze()
-        policy_probs = torch.softmax(policy_logits, dim=0)
-
-        loss = F.cross_entropy(policy_probs.unsqueeze(0), target_probs.unsqueeze(0))
-
-        loss.backward()
-        self.optimizer.step()
-        return loss.item()
