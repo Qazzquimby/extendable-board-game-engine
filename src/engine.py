@@ -116,6 +116,17 @@ def query(event_type: Type, only_self: bool = True) -> Callable:
 # ==========================================
 
 
+class Choice:
+    def __init__(self, features: Optional[Dict[str, float]] = None):
+        self.features = features or {}
+
+class ActionChoice(Choice):
+    def __init__(self, move_pos: Point, ability: Optional["Ability"] = None, target_point: Optional[Point] = None, features: Optional[Dict[str, float]] = None):
+        super().__init__(features)
+        self.move_pos = move_pos
+        self.ability = ability
+        self.target_point = target_point
+
 class Agent(abc.ABC):
     @abc.abstractmethod
     def choose(self, choices: List[Any]) -> int:
@@ -144,6 +155,7 @@ class Engine(BaseEnvironment):
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
 
     def request_choice(self, team: int, choices: List[Any]) -> int:
+        # todo should pass subclass Choice objects which agent can evaluate with weights
         if not choices:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
