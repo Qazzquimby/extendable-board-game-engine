@@ -1,128 +1,34 @@
 import abc
 import random
 import copy
-from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import (
-    Callable,
     List,
     Optional,
-    Type,
-    Any,
     Dict,
-    TypeVar,
-    Generic,
-    Union,
-    Tuple,
-    Set,
 )
 
-from aimings import Aiming, AimingResult, MultipleAimingResults
-from events import TurnStartEvent, TurnEndEvent, SummonEvent
+from entities import Entity, Summon
+from events import (
+    TurnStartEvent,
+    TurnEndEvent,
+    EventPhase,
+    query,
+    before,
+    Router,
+)
 from grid import Grid
 from point import Point
-from abilities import Ability, ActionCost
+from abilities import Ability
 from queries import (
     QueryIsAlive,
     QueryHasArmor,
     QueryLegalActions,
     QueryCanMove,
     QuerySpeed,
-    QueryDefense,
-    QueryCrit,
 )
-from schemas import EngineState, EntityState
+from schemas import EngineState
 from base_environment import BaseEnvironment
-
-# ==========================================
-# ENUMS & TYPES
-# ==========================================
-
-
-class EventPhase(Enum):
-    BEFORE = auto()
-    AFTER = auto()
-    QUERY = auto()
-
-
-# ==========================================
-# ROUTER & SUBSCRIPTIONS
-# ==========================================
-
-
-@dataclass
-class Subscription:
-    modifier: "Modifier"
-    event_type: Type
-    phase: EventPhase
-    only_self: bool
-    func: Callable[[Any], None]
-
-
-class Router:
-    def __init__(self) -> None:
-        self.subscribers: List[Subscription] = []
-
-    def subscribe(self, modifier: "Modifier") -> None:
-        for name in dir(modifier):
-            method = getattr(modifier, name)
-            if hasattr(method, "_listen_event"):
-                self.subscribers.append(
-                    Subscription(
-                        modifier=modifier,
-                        event_type=method._listen_event,
-                        phase=method._listen_phase,
-                        only_self=method._listen_only_self,
-                        func=method,
-                    )
-                )
-
-    def unsubscribe(self, modifier: "Modifier") -> None:
-        self.subscribers = [sub for sub in self.subscribers if sub.modifier != modifier]
-
-    def publish(self, event: Any, phase: EventPhase) -> None:
-        for sub in list(self.subscribers):  # iterate copy
-            if sub.event_type == type(event) and sub.phase == phase:
-                if sub.only_self:
-                    if event.subject != sub.modifier.owner:
-                        continue
-                sub.func(event)
-
-
-# ==========================================
-# DECORATORS
-# ==========================================
-
-
-def before(event_type: Type, only_self: bool = True) -> Callable:
-    def decorator(func: Callable) -> Callable:
-        func._listen_event = event_type
-        func._listen_phase = EventPhase.BEFORE
-        func._listen_only_self = only_self
-        return func
-
-    return decorator
-
-
-def after(event_type: Type, only_self: bool = True) -> Callable:
-    def decorator(func: Callable) -> Callable:
-        func._listen_event = event_type
-        func._listen_phase = EventPhase.AFTER
-        func._listen_only_self = only_self
-        return func
-
-    return decorator
-
-
-def query(event_type: Type, only_self: bool = True) -> Callable:
-    def decorator(func: Callable) -> Callable:
-        func._listen_event = event_type
-        func._listen_phase = EventPhase.QUERY
-        func._listen_only_self = only_self
-        return func
-
-    return decorator
-
 
 # ==========================================
 # CORE ENGINE & ENTITIES
@@ -134,7 +40,7 @@ class Choice:
         self.features = features or {}
 
 
-class ActionChoice(Choice):
+class MoveAndActionChoice(Choice):
     def __init__(
         self,
         move_pos: Point,
@@ -154,7 +60,7 @@ class Agent(abc.ABC):
         pass
 
 
-class Engine(BaseEnvironment):
+class Engine:
     def __init__(
         self,
         seed: int = 42,
@@ -282,249 +188,6 @@ class Engine(BaseEnvironment):
         )
 
 
-class Entity:
-    def __init__(
-        self, engine: Engine, name: str, hp: int, speed: int, pos: Point, team: int
-    ):
-        self.engine = engine
-        self.id = self.engine.generate_id()
-        self.set = "development"
-        self.name = name
-
-        self.hp = hp
-        self.speed = speed
-
-        self._pos: Optional[Point] = None
-        self.team = team
-
-        self.modifiers: List["Modifier"] = []
-        self.abilities: List["Ability"] = []
-
-        self.move_actions: int = 0
-        self.standard_actions: int = 0
-        self.free_actions: int = 0
-        self.engine.add_entity(self)
-        self.pos = pos
-
-    @property
-    def pos(self) -> Optional[Point]:
-        return self._pos
-
-    @pos.setter
-    def pos(self, value: Optional[Point]) -> None:
-        if self._pos is not None:
-            if self.engine.entity_at(self._pos) == self:
-                del self.engine._entity_by_pos[self._pos]
-        self._pos = value
-        if value is not None:
-            self.engine._entity_by_pos[value] = self
-
-    def start_turn(self) -> None:
-        self.move_actions = 1
-        self.standard_actions = 1
-        self.free_actions = 99  # Arbitrary large number
-
-    def gain_ability(self, ability: Ability):
-        ability.owner = self
-        self.abilities.append(ability)
-        for mod in ability.modifiers:
-            self.add_modifier(mod)
-
-    def lose_ability(self, ability: Ability):
-        if ability in self.abilities:
-            self.abilities.remove(ability)
-            ability.owner = None
-            for mod in ability.modifiers:
-                self.remove_modifier(mod)
-
-    def get_modifier(self, modifier_class):
-        # Utility to find a specific modifier on this entity
-        for mod in self.modifiers:
-            if isinstance(mod, modifier_class):
-                return mod
-        return None
-
-    def to_model(self) -> EntityState:
-        return EntityState(
-            id=self.id,
-            name=self.name,
-            hp=self.hp,
-            pos=self.pos,
-            team=self.team,
-            move_actions=self.move_actions,
-            standard_actions=self.standard_actions,
-            free_actions=self.free_actions,
-        )
-
-    def get_hash(self) -> float:
-        import hashlib
-
-        key = f"{self.set}__{self.name}"
-        hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
-        return float(hash_int % 10000) / 100.0
-
-    # --- Engine Query Helpers ---
-    def has_armor(self) -> bool:
-        q = QueryHasArmor(self)
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
-
-    def can_move(self) -> bool:
-        q = QueryCanMove(self)
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
-
-    def get_legal_actions(self) -> List[Ability]:
-        # Returns all abilities the entity has. Modifiers can alter this list.
-        # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.
-        legal = []
-        for ability in self.abilities:
-            if ability.is_tapped:
-                continue
-            if ability.charges is not None and ability.charges <= 0:
-                continue
-            if (
-                ability.is_ultimate
-                and ability.ultimate_turn is not None
-                and self.engine.round_num < ability.ultimate_turn
-            ):
-                continue
-            legal.append(ability)
-
-        q = QueryLegalActions(self, result=legal)
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
-
-    def get_defense(
-        self,
-        attack_source: Optional["Entity"] = None,
-        ability: Optional["Ability"] = None,
-    ) -> int:
-        q = QueryDefense(
-            subject=self, attack_source=attack_source, ability=ability, result=0
-        )
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result.value
-
-    def get_crit(self, subject: "Entity", ability: Optional["Ability"] = None) -> int:
-        q = QueryCrit(
-            subject=subject,
-            attack_source=self,
-            ability=ability,
-            result=ability.crit_chance,
-        )
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result.value
-
-    def distance_to(self, other: "Entity") -> int:
-        return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
-
-    def add_modifier(self, modifier: "Modifier") -> None:
-        modifier.owner = self
-        self.modifiers.append(modifier)
-        self.engine.router.subscribe(modifier)
-
-    def remove_modifier(self, modifier: "Modifier") -> None:
-        if modifier in self.modifiers:
-            self.modifiers.remove(modifier)
-            self.engine.router.unsubscribe(modifier)
-
-    def add_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        for mod in self.modifiers:
-            if isinstance(mod, token_class):
-                mod.add(amount)
-                return
-        new_token = token_class(amount)
-        self.add_modifier(new_token)
-
-    def remove_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        for mod in self.modifiers:
-            if isinstance(mod, token_class):
-                mod.remove(amount)
-                return
-
-    def get_token_count(self, token_class: Type["Token"]) -> int:
-        for mod in self.modifiers:
-            if isinstance(mod, token_class):
-                return mod.amount
-        return 0
-
-
-class Hero(Entity):
-    def __init__(
-        self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
-    ):
-        super().__init__(
-            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
-        )
-
-
-class Summon(Entity):
-    def __init__(
-        self,
-        engine: "Engine",
-        name: str,
-        hp: int,
-        speed: int,
-        pos: Point,
-        team: int,
-        summoner: Entity,
-    ):
-        super().__init__(
-            engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
-        )
-        self.summoner = summoner
-        SummonEvent(self.engine, summoner=self.summoner, subject=self).resolve()
-
-
-class Object(Summon):
-    def __init__(
-        self,
-        engine: "Engine",
-        name: str,
-        hp: int,
-        pos: Point,
-        team: int,
-        summoner: Entity,
-    ):
-        super().__init__(
-            engine=engine,
-            name=name,
-            hp=hp,
-            speed=0,
-            pos=pos,
-            team=team,
-            summoner=summoner,
-        )
-
-
-class Marker:
-    def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
-        self.engine = engine
-        self.id = self.engine.generate_id()
-        self.name = name
-        self._pos: Optional[Point] = None
-        self.team = team
-        self.modifiers: List["Modifier"] = []
-        self.engine.markers.append(self)
-        self.pos = pos
-
-    @property
-    def pos(self) -> Optional[Point]:
-        return self._pos
-
-    @pos.setter
-    def pos(self, value: Optional[Point]) -> None:
-        if self._pos is not None:
-            if self in self.engine._markers_by_pos.get(self._pos, []):
-                self.engine._markers_by_pos[self._pos].remove(self)
-                if not self.engine._markers_by_pos[self._pos]:
-                    del self.engine._markers_by_pos[self._pos]
-        self._pos = value
-        if value is not None:
-            self.engine._markers_by_pos.setdefault(value, []).append(self)
-
-
 class Modifier:
     owner: Entity = field(init=False)
 
@@ -544,37 +207,6 @@ class Token(Modifier):
         self.amount -= amount
         if self.amount <= 0:
             self.owner.remove_modifier(self)
-
-
-# ==========================================
-# EVENTS
-# ==========================================
-class Event(abc.ABC):
-    def __init__(self, engine: "Engine", subject: "Entity"):
-        self.engine = engine
-        self.subject = subject
-        self.canceled = False
-
-    def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
-
-        if self.canceled:
-            return
-        self._resolve()
-
-        self.engine.router.publish(self, EventPhase.AFTER)
-
-    def _resolve(self) -> None:
-        raise NotImplementedError("Events must implement resolve()")
-
-
-QueryResultT = TypeVar("QueryResultT")
-
-
-class Query(Generic[QueryResultT]):
-    def __init__(self, subject: Entity, result: QueryResultT):
-        self.subject = subject
-        self.result = result
 
 
 class Immobile(Modifier):
@@ -656,158 +288,7 @@ class Taunted(Modifier):
         q.result = False
 
 
-@dataclass
-class ActionContext:
-    engine: "Engine"
-    source: "Entity"
-    subject_point: "Point"  # The point currently being affected
-
-    # all points with targets
-    target_points: List["Point"] = field(default_factory=list)
-
-    # all points included in areas
-    included_points: List["Point"] = field(default_factory=list)
-    ability: Optional["Ability"] = None
-    is_hit: bool = True
-    is_crit: bool = False
-
-    @property
-    def target_point(self):
-        if len(self.target_points) != 1:
-            raise ValueError("Cannot use `.target` when there are multiple targets.")
-        return self.target_points[0]
-
-    @property
-    def target(self):
-        return self.engine.entity_at(self.target_point)
-
-
-DynamicInt = Union[int, Callable[[ActionContext], int]]
-DynamicPoint = Union["Point", Callable[[ActionContext], "Point"]]
-
-
-def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
-    return val(ctx) if callable(val) else val
-
-
-@dataclass(kw_only=True)
-class Instruction:
-    """Base class for all ability effects."""
-
-    aiming_name: Optional[str] = field(default=None)
-
-    def execute(self, ctx: ActionContext) -> None:
-        pass
-
-
-@dataclass
-class Ability:
-    name: str
-    aiming: Aiming
-    instructions: List[Instruction] = field(default_factory=list)
-    owner: Optional["Entity"] = None
-    is_default: bool = False
-    action_cost: ActionCost = ActionCost.STANDARD
-
-    modifiers: List["Modifier"] = field(default_factory=list)
-
-    taps: bool = False
-    is_tapped: bool = False
-    tapped_this_turn: bool = False
-    max_charges: Optional[int] = None
-    is_ultimate: bool = False
-    ultimate_turn: Optional[int] = None
-
-    is_undefendable: bool = False
-    defense: int = 0
-    crit_chance: int = 0
-
-    def __post_init__(self):
-        self.charges = self.max_charges
-
-    def execute(
-        self,
-        engine: "Engine",
-        source: "Entity",
-        aiming_result: Union[AimingResult, MultipleAimingResults],
-    ) -> None:  # todo, execute is not used yet
-        if self.charges is not None:
-            self.charges -= 1
-        if self.taps:
-            self.is_tapped = True
-            self.tapped_this_turn = True
-
-        hit_target_points, crit_target_points = self._get_hit_and_crit_target_points(
-            aiming_result=aiming_result, engine=engine, source=source
-        )
-
-        for instruction in self.instructions:
-            if instruction.aiming_name:
-                assert isinstance(aiming_result, MultipleAimingResults)
-                instruction_aiming_result = aiming_result[instruction.aiming_name]
-            else:
-                instruction_aiming_result = aiming_result
-
-            for target_point in instruction_aiming_result.target_points:
-                is_hit = target_point in hit_target_points
-                is_crit = target_point in crit_target_points
-
-                ctx = ActionContext(
-                    engine=engine,
-                    source=source,
-                    subject_point=target_point,
-                    target_points=instruction_aiming_result.target_points,
-                    included_points=instruction_aiming_result.included_points,
-                    ability=self,
-                    is_hit=is_hit,
-                    is_crit=is_crit,
-                )
-                instruction.execute(ctx)
-
-            for included_point in instruction_aiming_result.included_points:
-                ctx = ActionContext(
-                    engine=engine,
-                    source=source,
-                    subject_point=included_point,
-                    target_points=instruction_aiming_result.target_points,
-                    included_points=instruction_aiming_result.included_points,
-                    ability=self,
-                )
-                instruction.execute(ctx)
-
-    def get_hash(self) -> float:
-        import hashlib
-
-        owner_set = getattr(self.owner, "set", "unknown") if self.owner else "unknown"
-        owner_name = getattr(self.owner, "name", "unknown") if self.owner else "unknown"
-        key = f"{owner_set}__{owner_name}__{self.name}"
-        hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
-        return float(hash_int % 10000) / 100.0
-
-    def _get_hit_and_crit_target_points(
-        self,
-        aiming_result: Union[AimingResult, MultipleAimingResults],
-        engine: "Engine",
-        source: "Entity",
-    ) -> Tuple[Set["Point"], Set["Point"]]:
-        if isinstance(aiming_result, MultipleAimingResults):
-            all_target_points = set()
-            for aiming_result_set in aiming_result.values():
-                all_target_points.update(aiming_result_set.target_points)
-        else:
-            all_target_points = aiming_result.target_points
-        hit_target_points = set()
-        crit_target_points = set()
-        for target_point in all_target_points:
-            target = engine.entity_at(target_point)
-            if target:
-                roll = engine.rng.randint(1, 6)  # todo rolling should be an event
-                defense = target.get_defense(attack_source=source, ability=self)
-                defense = min(4, defense)
-                if roll > defense:
-                    hit_target_points.add(target_point)
-
-                crit_chance = source.get_crit(subject=target, ability=self)
-                if roll >= 7 - crit_chance:
-                    crit_target_points.add(target_point)
-        return hit_target_points, crit_target_points
+class InnateArmor(Modifier):
+    @query(QueryHasArmor)
+    def grant_armor(self, q: QueryHasArmor) -> None:
+        q.result = True

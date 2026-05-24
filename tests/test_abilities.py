@@ -1,7 +1,8 @@
 from abilities import Ability
 from aimings import IncludeArea, TargetSelf
 from areas import Burst, Square
-from engine import Engine, Entity
+from engine import Engine
+from entities import Entity
 from point import Point
 
 
