@@ -13,7 +13,7 @@ from ai_agent import (
     AIAgent,
     get_entity_features,
     get_plausible_action_features,
-    PlausibleAction,
+    PlausibleMoveAndAction,
 )
 import os
 
@@ -110,7 +110,7 @@ def preprocess_log(game: GameLog, log: LogEntry) -> Optional[TrainData]:
         ability = Ability(name=sim.action.ability, aiming=Aiming())
         ability.owner = actor
 
-        sim_action = PlausibleAction(
+        sim_action = PlausibleMoveAndAction(
             move_pos=sim.action.move_pos,
             target=target_ent,
             ability=ability,

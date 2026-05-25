@@ -11,7 +11,7 @@ from grid import Grid
 from heroes import MeleeHero, RangedHero
 from ai_agent import (
     AIAgent,
-    generate_plausible_actions,
+    generate_plausible_move_and_action,
 )
 from point import Point
 from abilities import DamageInstruction, HealInstruction
@@ -49,7 +49,7 @@ def run_game(agent: MCTSAgent) -> GameLog:
             continue
 
         before_state = engine.to_model()
-        plausible_actions = generate_plausible_actions(actor, engine)
+        plausible_actions = generate_plausible_move_and_action(actor, engine)
 
         simulations = []
         for p_action in plausible_actions:

@@ -6,9 +6,11 @@ from typing import (
     List,
     Optional,
     Dict,
+    TypeVar,
 )
 
-from entities import Entity, Summon
+from choices import get_plausible_move_and_actions, Choice, PlausibleMoveAndAction
+from entities import Entity, Summon, Marker
 from events import (
     TurnStartEvent,
     TurnEndEvent,
@@ -16,10 +18,10 @@ from events import (
     query,
     before,
     Router,
+    Query,
 )
 from grid import Grid
 from point import Point
-from abilities import Ability
 from queries import (
     QueryIsAlive,
     QueryHasArmor,
@@ -27,36 +29,14 @@ from queries import (
     QueryCanMove,
     QuerySpeed,
 )
-from schemas import EngineState
-from base_environment import BaseEnvironment
+from schemas import EngineState, GameLog, LogEntry
 
-# ==========================================
-# CORE ENGINE & ENTITIES
-# ==========================================
-
-
-class Choice:
-    def __init__(self, features: Optional[Dict[str, float]] = None):
-        self.features = features or {}
-
-
-class MoveAndActionChoice(Choice):
-    def __init__(
-        self,
-        move_pos: Point,
-        ability: Optional["Ability"] = None,
-        target_point: Optional[Point] = None,
-        features: Optional[Dict[str, float]] = None,
-    ):
-        super().__init__(features)
-        self.move_pos = move_pos
-        self.ability = ability
-        self.target_point = target_point
+ChoiceT = TypeVar("ChoiceT", bound="Choice")
 
 
 class Agent(abc.ABC):
     @abc.abstractmethod
-    def choose(self, choices: List[Choice]) -> int:
+    def choose(self, choices: List["Choice"]) -> int:
         pass
 
 
@@ -67,7 +47,6 @@ class Engine:
         grid: Grid = None,
         agents: Optional[Dict[int, Agent]] = None,
     ) -> None:
-        BaseEnvironment.__init__(self)
         self.router = Router()
         self.agents: Dict[int, Agent] = agents or {}
         self.entities: List["Entity"] = []
@@ -81,14 +60,13 @@ class Engine:
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
 
-    def request_choice(self, team: int, choices: List[Choice]) -> int:
+    def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
         if not choices:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
-            return 0
-        if team in self.agents:
-            return self.agents[team].choose(choices)
-        return self.rng.randrange(len(choices))
+            return choices[0]
+        index = self.agents[team].choose(choices)
+        return choices[index]
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
         return self._entity_by_pos.get(pos)
@@ -114,6 +92,44 @@ class Engine:
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
 
+    def run_game(self) -> GameLog:
+        logs: List[LogEntry] = []
+
+        winner_team = None
+        self.next_turn()
+        while self.round_num <= 6:
+            if self.active_entity.hp <= 0:
+                self.next_turn()  # todo doesn't work with summons
+                continue
+
+            plausible_actions: List[PlausibleMoveAndAction] = (
+                get_plausible_move_and_actions(actor=self.active_entity, engine=self)
+            ) # todo
+            chosen_action: PlausibleMoveAndAction = self.get_choice(
+                team=self.active_entity.team, choices=plausible_actions
+            )
+            self.step(chosen_action)  # todo
+
+            # Check win condition
+            time_up = self.round_num >= 6
+            team_0_living_members = [
+                e for e in self.entities if e.team == 0 and e.hp > 0
+            ]
+            team_1_living_members = [
+                e for e in self.entities if e.team == 1 and e.hp > 0
+            ]
+            done = time_up or not team_0_living_members or not team_1_living_members
+            if done:
+                if len(team_0_living_members) > len(team_1_living_members):
+                    winner_team = 0
+                elif len(team_1_living_members) > len(team_0_living_members):
+                    winner_team = 1
+            # todo log entry
+            if done:
+                break
+
+        return GameLog(winner_team=winner_team, logs=logs)
+
     def next_turn(self) -> None:
         if not self.entities:
             return
@@ -133,6 +149,10 @@ class Engine:
         self.current_team = self.active_entity.team
 
         TurnStartEvent(self, self.active_entity).resolve()
+
+    def ask(self, query: "Query"):
+        self.router.publish(query, EventPhase.QUERY)
+        return query.result
 
     def to_model(self) -> EngineState:
         return EngineState(
