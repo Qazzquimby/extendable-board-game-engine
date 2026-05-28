@@ -40,6 +40,11 @@ class Agent(abc.ABC):
         pass
 
 
+class RandomAgent(Agent):
+    def choose(self, choices: List["Choice"]) -> int:
+        return random.randint(0, len(choices) - 1)
+
+
 class Engine:
     def __init__(
         self,
@@ -104,7 +109,7 @@ class Engine:
 
             plausible_actions: List[PlausibleMoveAndAction] = (
                 get_plausible_move_and_actions(actor=self.active_entity, engine=self)
-            ) # todo
+            )  # todo
             chosen_action: PlausibleMoveAndAction = self.get_choice(
                 team=self.active_entity.team, choices=plausible_actions
             )

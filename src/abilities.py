@@ -62,9 +62,14 @@ class Instruction:
     """Base class for all ability effects."""
 
     aiming_name: Optional[str] = field(default=None)
+    plausibly_positive: bool = False
+    plausibly_negative: bool = False
 
     def execute(self, ctx: ActionContext) -> None:
         pass
+
+    def get_features(self, ctx: "ActionContext") -> dict:
+        return {}
 
 
 @dataclass
@@ -186,6 +191,19 @@ class DamageInstruction(Instruction):
     undefendable: bool = False
     irreducible: bool = False
 
+    def __post_init__(self):
+        self.plausibly_negative = True
+
+    def get_features(self, ctx: ActionContext) -> dict:
+        features = {}
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject and ctx.is_hit:
+            amount = resolve_int(self.amount, ctx)
+            features[f"damage_dealt_to_{subject.name}_{subject.id}"] = amount
+            if subject.hp > 0 and subject.hp - amount <= 0:
+                features[f"kills_{subject.name}_{subject.id}"] = True
+        return features
+
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
@@ -206,6 +224,18 @@ class DamageInstruction(Instruction):
 @dataclass
 class HealInstruction(Instruction):
     amount: DynamicInt
+
+    def __post_init__(self):
+        self.plausibly_positive = True
+
+    def get_features(self, ctx: ActionContext) -> dict:
+        features = {}
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
+            amount = resolve_int(self.amount, ctx)
+            key = f"heal_dealt_to_{subject.name}_{subject.id}"
+            features[key] = amount
+        return features
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -294,6 +324,18 @@ class RefreshAbilityInstruction(Instruction):
 @dataclass
 class TeleportInstruction(Instruction):
     destination: DynamicPoint
+
+    def get_features(self, ctx: ActionContext) -> dict:
+        features = {}
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
+            dest = (
+                self.destination(ctx)
+                if callable(self.destination)
+                else self.destination
+            )
+            features[f"new_location_{subject.name}_{subject.id}"] = dest
+        return features
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)

@@ -1,15 +1,17 @@
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
-from abilities import Ability, HealInstruction, DamageInstruction
-from aimings import TargetEntity, IncludeArea
-from engine import Engine
+from abilities import Ability, ActionContext
+from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult
 from entities import Entity
 from point import Point
 from queries import QueryLegalAimings
 
+if TYPE_CHECKING:
+    from engine import Engine
+
 
 class Choice:
-    def __init__(self, features: Dict[str, float]):
+    def __init__(self, features: Dict[str, Any]):
         self.features = features
 
 
@@ -20,6 +22,9 @@ class PlausibleMoveAndAction(Choice):
         target: Optional["Entity"],
         ability: "Ability",
         movement_name: str = "",
+        engine: "Engine" = None,
+        actor: "Entity" = None,
+        aiming_result: "AimingResult" = None,
     ):
         # todo right now aoe uses target None.
         #  Probably better to have a list of targets. Ml will need adjusting
@@ -27,9 +32,68 @@ class PlausibleMoveAndAction(Choice):
         self.target = target
         self.ability = ability
         self.movement_name = movement_name
+        self.aiming_result = aiming_result
 
-        features = {} # todo we basically want to go through all instructions. Each instructions has features. Sum the features. Summing logic may vary per instruction. State context is needed to determine features, eg which is the target of the instruction.
+        features = (
+            self._compute_features(actor, engine)
+            if engine and actor and aiming_result
+            else {}
+        )
         super().__init__(features=features)
+
+    def _compute_features(self, actor: "Entity", engine: "Engine") -> Dict[str, Any]:
+        features = {f"new_location_{actor.name}_{actor.id}": self.move_pos}
+        if self.move_pos != actor.pos:
+            features[f"moved_{actor.name}_{actor.id}"] = True
+
+        all_points = set(self.aiming_result.target_points) | set(
+            self.aiming_result.included_points
+        )
+
+        for instruction in self.ability.instructions:
+            for point in all_points:
+                ctx = ActionContext(
+                    engine=engine,
+                    source=actor,
+                    subject_point=point,
+                    target_points=self.aiming_result.target_points,
+                    included_points=self.aiming_result.included_points,
+                    ability=self.ability,
+                    is_hit=True,
+                    is_crit=False,
+                )
+                instruction_features = instruction.get_features(ctx)
+
+                for key, value in instruction_features.items():
+                    if key in features:
+                        if isinstance(value, (int, float)):
+                            features[key] += value
+                        else:
+                            features[key] = value
+                    else:
+                        features[key] = value
+
+        # Derived features
+        for entity in engine.entities:
+            new_pos_key = f"new_location_{entity.name}_{entity.id}"
+            entity_pos = features.get(new_pos_key, entity.pos)
+            if not entity_pos:
+                continue
+
+            for other_entity in engine.entities:
+                if entity.id >= other_entity.id:
+                    continue
+
+                other_pos_key = f"new_location_{other_entity.name}_{other_entity.id}"
+                other_pos = features.get(other_pos_key, other_entity.pos)
+                if not other_pos:
+                    continue
+
+                dist = entity_pos.get_distance(other_pos)
+                key = f"distance_{entity.name}_{entity.id}_to_{other_entity.name}_{other_entity.id}"
+                features[key] = dist
+
+        return features
 
 
 def get_plausible_move_and_actions(
@@ -149,14 +213,18 @@ def get_plausible_actions_after_movement(
 
 def get_plausible_uses_of_ability_after_movement(
     actor: Entity,
-    engine: Engine,
+    engine: "Engine",
     move_pos: Point,
     movement_name: str,
     ability: "Ability",
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_uses_of_ability_after_movement = {}
-    is_positive = any(instruction.is_negative for instruction in ability.instructions)
-    is_negative = any(instruction.is_positive for instruction in ability.instructions)
+    is_positive = any(
+        instruction.plausibly_positive for instruction in ability.instructions
+    )
+    is_negative = any(
+        instruction.plausibly_negative for instruction in ability.instructions
+    )
 
     raw_aimings = ability.aiming.get_all_aimings(
         engine=engine, actor=actor, start_pos=move_pos, require_los=True
@@ -197,6 +265,9 @@ def get_plausible_uses_of_ability_after_movement(
                             target=target,
                             ability=ability,
                             movement_name=movement_name,
+                            engine=engine,
+                            actor=actor,
+                            aiming_result=aiming_res,
                         )
                     )
         elif isinstance(ability.aiming, IncludeArea):
@@ -231,6 +302,9 @@ def get_plausible_uses_of_ability_after_movement(
                     target=None,
                     ability=ability,
                     movement_name=movement_name,
+                    engine=engine,
+                    actor=actor,
+                    aiming_result=aiming_res,
                 )
 
     return plausible_uses_of_ability_after_movement
