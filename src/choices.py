@@ -219,10 +219,10 @@ def get_plausible_uses_of_ability_after_movement(
     ability: "Ability",
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_uses_of_ability_after_movement = {}
-    is_positive = any(
+    plausibly_positive = any(
         instruction.plausibly_positive for instruction in ability.instructions
     )
-    is_negative = any(
+    plausibly_negative = any(
         instruction.plausibly_negative for instruction in ability.instructions
     )
 
@@ -245,13 +245,13 @@ def get_plausible_uses_of_ability_after_movement(
                 if isinstance(ability.aiming, TargetEntity) and target == actor:
                     continue
                 if (
-                    not is_positive
+                    not plausibly_positive
                     and target.team == actor.team
                     and isinstance(ability.aiming, TargetEntity)
                 ):
                     continue
                 if (
-                    not is_negative
+                    not plausibly_negative
                     and target.team != actor.team
                     and isinstance(ability.aiming, TargetEntity)
                 ):
@@ -283,11 +283,11 @@ def get_plausible_uses_of_ability_after_movement(
                 ability.get_hash(),
             )
             if key not in plausible_uses_of_ability_after_movement:
-                if is_positive:
+                if plausibly_positive:
                     valid_targets = [
                         e for e in affected_entities if e.team == actor.team
                     ]
-                elif is_negative:
+                elif plausibly_negative:
                     valid_targets = [
                         e for e in affected_entities if e.team != actor.team
                     ]

@@ -109,11 +109,11 @@ class Engine:
 
             plausible_actions: List[PlausibleMoveAndAction] = (
                 get_plausible_move_and_actions(actor=self.active_entity, engine=self)
-            )  # todo
+            )
             chosen_action: PlausibleMoveAndAction = self.get_choice(
                 team=self.active_entity.team, choices=plausible_actions
             )
-            self.step(chosen_action)  # todo
+            self.step(actor=self.active_entity, action=chosen_action)
 
             # Check win condition
             time_up = self.round_num >= 6
@@ -134,6 +134,13 @@ class Engine:
                 break
 
         return GameLog(winner_team=winner_team, logs=logs)
+
+    def step(self, actor: Entity, action: PlausibleMoveAndAction) -> None:
+        # todo move along path
+        actor.pos = action.move_pos
+        action.ability.execute(
+            engine=self, source=actor, aiming_result=action.aiming_result
+        )
 
     def next_turn(self) -> None:
         if not self.entities:

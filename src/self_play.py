@@ -150,7 +150,7 @@ from ai.mcts import MCTSAgent
 
 
 def setup_game():
-    engine = Engine(grid=Grid(6, 6), agents={0: agent, 1: agent})
+    engine = Engine(grid=Grid(4, 4), agents={0: agent, 1: agent})
     team_0_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
         random.choice([MeleeHero, RangedHero]) for _ in range(2)
     ]

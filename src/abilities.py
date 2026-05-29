@@ -162,7 +162,7 @@ class Ability:
         engine: "Engine",
         source: "Entity",
     ) -> Tuple[Set["Point"], Set["Point"]]:
-        if isinstance(aiming_result, MultipleAimingResults):
+        if isinstance(aiming_result, dict):
             all_target_points = set()
             for aiming_result_set in aiming_result.values():
                 all_target_points.update(aiming_result_set.target_points)
