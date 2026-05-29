@@ -148,21 +148,26 @@ from ai.mcts import MCTSAgent
 #
 #     return GameLog(winner_team=winner_team, logs=logs)
 
+# POSSIBLE_HEROES = [MeleeHero, RangedHero]
+POSSIBLE_HEROES = [RangedHero]
+
+grid_size = 3
+
 
 def setup_game():
-    engine = Engine(grid=Grid(4, 4), agents={0: agent, 1: agent})
+    engine = Engine(grid=Grid(grid_size, grid_size), agents={0: agent, 1: agent})
     team_0_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
-        random.choice([MeleeHero, RangedHero]) for _ in range(2)
+        random.choice(POSSIBLE_HEROES) for _ in range(2)
     ]
     team_1_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
-        random.choice([MeleeHero, RangedHero]) for _ in range(2)
+        random.choice(POSSIBLE_HEROES) for _ in range(2)
     ]
 
     team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
     team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
 
-    team_1_classes[0](engine=engine, pos=Point(5, 5), team=1)
-    team_1_classes[1](engine=engine, pos=Point(5, 4), team=1)
+    team_1_classes[0](engine=engine, pos=Point(grid_size - 1, grid_size - 1), team=1)
+    team_1_classes[1](engine=engine, pos=Point(grid_size - 1, grid_size - 2), team=1)
     return engine
 
 

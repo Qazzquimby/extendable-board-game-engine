@@ -83,11 +83,12 @@ class TargetEntity(Aiming):
                 continue
 
             if self.in_range is not None:
-                if engine.grid.get_range(start_pos, e.pos) > self.in_range:
+                distance = engine.grid.get_range(start_pos, e.pos)
+                if distance > self.in_range:
                     continue
 
             if require_los:
-                visible, _ = engine.grid.get_line_of_sight(start_pos, e.pos)
+                visible, _has_cover = engine.grid.get_line_of_sight(start_pos, e.pos)
                 if not visible:
                     continue
 

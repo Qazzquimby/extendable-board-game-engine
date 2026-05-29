@@ -89,7 +89,7 @@ class PlausibleMoveAndAction(Choice):
                 if not other_pos:
                     continue
 
-                dist = entity_pos.get_distance(other_pos)
+                dist = engine.grid.get_path(start=entity.pos, target=other_pos)
                 key = f"distance_{entity.name}_{entity.id}_to_{other_entity.name}_{other_entity.id}"
                 features[key] = dist
 
