@@ -52,13 +52,21 @@ class ChoiceFeatureEvaluator:
         # This assumes names are unique, which may not be true.
         entities_by_name = {e.name: e for e in engine.entities}
 
+        allies = [e for e in engine.entities if e.team == actor.team]
+        enemies = [e for e in engine.entities if e.team != actor.team]
+
         def get_entity(id_or_name: Union[int, str]) -> Optional["Entity"]:
             if isinstance(id_or_name, int):
                 return entities_by_id.get(id_or_name)
             return entities_by_name.get(id_or_name)
 
-        def hypothetical_hp(entity_id: int) -> Optional[int]:
-            entity = entities_by_id.get(entity_id)
+        def get_future_pos(entity: "Entity"):
+            if not entity or not entity.pos:
+                return None
+            pos_key = f"new_location_{entity.name}_{entity.id}"
+            return core_features.get(pos_key, entity.pos)
+
+        def hypothetical_hp(entity: "Entity") -> Optional[int]:
             if not entity:
                 return None
 
@@ -81,44 +89,20 @@ class ChoiceFeatureEvaluator:
                     hit_enemies += 1
             return hit_enemies
 
-        def target_is_within_dist_of_enemy(dist: int) -> bool:
-            if not choice.target:
-                return False
-
-            target_pos_key = f"new_location_{choice.target.name}_{choice.target.id}"
-            target_pos = core_features.get(target_pos_key, choice.target.pos)
-            if not target_pos:
-                return False
-
-            enemies = [
-                e
-                for e in engine.entities
-                if e.team != actor.team and e.id != choice.target.id
-            ]
-            for enemy in enemies:
-                enemy_pos_key = f"new_location_{enemy.name}_{enemy.id}"
-                enemy_pos = core_features.get(enemy_pos_key, enemy.pos)
-                if not enemy_pos:
-                    continue
-                if engine.grid.get_range(target_pos, enemy_pos) <= dist:
-                    return True
-            return False
-
         context = {
             "engine": engine,
             "actor": actor,
             "choice": choice,
             "core_features": core_features,
+            "allies": allies,
+            "enemies": enemies,
             "get_entity": get_entity,
+            "get_future_pos": get_future_pos,
             "hypothetical_hp": hypothetical_hp,
             "num_enemies_hit": num_enemies_hit,
-            "target_is_within_dist_of_enemy": target_is_within_dist_of_enemy,
             "len": len,
             "sum": sum,
             "min": min,
             "max": max,
         }
         return context
-
-
-# todo, we want the string to be able to define arbitrary features *without* needing to write in specific context items for them like "target_is_within_dist_of_enemy" which is obviously ridiculous.
