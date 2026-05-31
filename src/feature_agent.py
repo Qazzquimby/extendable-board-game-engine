@@ -49,40 +49,49 @@ class FeatureWeightedAgent(Agent):
 def get_example_feature_agent():
     weighted_features = [
         WeightedFeature(
-            name="Damage Dealt to enemies",
-            eval_string="sum(core_features.get(f'damage_dealt_to_{e.name}_{e.id}', 0) for e in enemies)",
+            name="Damage to enemy Ranged",
+            eval_string="sum(damage_dealt(e) for e in get_enemy('RangedHero'))",
+            weight=1.2,
+        ),
+        WeightedFeature(
+            name="Damage to enemy Melee",
+            eval_string="sum(damage_dealt(e) for e in get_enemy('MeleeHero'))",
             weight=1.0,
         ),
         WeightedFeature(
             name="Healing done to allies",
-            eval_string="sum(core_features.get(f'heal_dealt_to_{a.name}_{a.id}', 0) for a in allies)",
-            weight=0.7,
+            eval_string="sum(heal_received(a) for a in allies)",
+            weight=1.5,
         ),
         WeightedFeature(
             name="Enemies killed",
-            eval_string="sum(1 for e in enemies if new_hp(e) is not None and hypothetical_hp(e) <= 0)",
+            eval_string="sum(1 for e in enemies if new_hp(e) is not None and new_hp(e) <= 0)",
             weight=100.0,
         ),
+        WeightedFeature(name="Self HP", eval_string="new_hp(actor)", weight=0.1),
         WeightedFeature(
-            name="self HP", eval_string="hypothetical_hp(actor)", weight=0.5
+            name="Enemy Ranged Hero has HP <= 3",
+            eval_string="any(new_hp(e) is not None and new_hp(e) <= 3 for e in get_enemy('Ranged Hero'))",
+            weight=10.0,
         ),
         WeightedFeature(
-            name="Min Range to Enemies",
-            eval_string="min([engine.grid.get_range(get_future_pos(actor), get_future_pos(e)) for e in enemies if get_future_pos(e) and get_future_pos(actor)] or [99])",
-            weight=-0.1,
+            name="Do Nothing used on turn 4",
+            eval_string="choice.ability.name == 'Do Nothing' and engine.round_num == 4",
+            weight=-50.0,
+        ),
+        WeightedFeature(
+            name="Allied Melee near enemy Ranged",
+            eval_string="any(distance_after(am, er) is not None and distance_after(am, er) <= 2 for am in allied_melee for er in enemy_ranged)",
+            weight=5.0,
+        ),
+        WeightedFeature(
+            name="Used Ranged Attack",
+            eval_string="choice.ability.name == 'Ranged Attack' and actor.name == 'Ranged Hero'",
+            weight=1.5,
         ),
         WeightedFeature(
             name="Number of Enemies Hit",
-            eval_string="""\
-            hit_enemies = 0
-            all_points = set(choice.aiming_result.target_points) | set(
-                choice.aiming_result.included_points
-            )
-            for point in all_points:
-                entity = engine.entity_at(point)
-                if entity and entity.team != actor.team:
-                    hit_enemies += 1
-            return hit_enemies""",
+            eval_string="len(get_hit_enemies())",
             weight=2.0,
         ),
     ]
