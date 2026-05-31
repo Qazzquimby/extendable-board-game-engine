@@ -60,13 +60,13 @@ class ChoiceFeatureEvaluator:
                 return entities_by_id.get(id_or_name)
             return entities_by_name.get(id_or_name)
 
-        def get_future_pos(entity: "Entity"):
+        def new_pos(entity: "Entity"):
             if not entity or not entity.pos:
                 return None
             pos_key = f"new_location_{entity.name}_{entity.id}"
             return core_features.get(pos_key, entity.pos)
 
-        def hypothetical_hp(entity: "Entity") -> Optional[int]:
+        def new_hp(entity: "Entity") -> Optional[int]:
             if not entity:
                 return None
 
@@ -78,17 +78,6 @@ class ChoiceFeatureEvaluator:
 
             return entity.hp - damage + heal
 
-        def num_enemies_hit() -> int:
-            hit_enemies = 0
-            all_points = set(choice.aiming_result.target_points) | set(
-                choice.aiming_result.included_points
-            )
-            for point in all_points:
-                entity = engine.entity_at(point)
-                if entity and entity.team != actor.team:
-                    hit_enemies += 1
-            return hit_enemies
-
         context = {
             "engine": engine,
             "actor": actor,
@@ -97,9 +86,8 @@ class ChoiceFeatureEvaluator:
             "allies": allies,
             "enemies": enemies,
             "get_entity": get_entity,
-            "get_future_pos": get_future_pos,
-            "hypothetical_hp": hypothetical_hp,
-            "num_enemies_hit": num_enemies_hit,
+            "new_pos": new_pos,
+            "new_hp": new_hp,
             "len": len,
             "sum": sum,
             "min": min,

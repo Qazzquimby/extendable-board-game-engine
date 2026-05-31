@@ -5,7 +5,7 @@ from typing import List, Type, Union
 
 from tqdm import tqdm
 
-from engine import RandomAgent, Engine
+from engine import Engine
 from events import DamageEvent
 from grid import Grid
 from heroes import MeleeHero, RangedHero
@@ -15,6 +15,7 @@ from schemas import ActionState, LogEntry, GameLog, ActionSim
 
 
 from ai.mcts import MCTSAgent
+from feature_agent import FeatureWeightedAgent, get_example_feature_agent
 
 # def run_game(agent: MCTSAgent) -> GameLog:
 #     engine = Engine(grid=Grid(6, 6), agents={0: agent, 1: agent})
@@ -172,7 +173,7 @@ def setup_game():
 
 
 if __name__ == "__main__":
-    agent = RandomAgent()  # MCTSAgent(num_simulations=50)
+    agent = get_example_feature_agent()
     all_games = []
     num_games = 10  # _000
     existing_game_logs = Path("../game_logs").glob("*.json")

@@ -107,8 +107,14 @@ class Engine:
                 self.next_turn()  # todo doesn't work with summons
                 continue
 
+            agent = self.agents[self.active_entity.team]
+            feature_evaluator = getattr(agent, "feature_evaluator", None)
             plausible_actions: List[PlausibleMoveAndAction] = (
-                get_plausible_move_and_actions(actor=self.active_entity, engine=self)
+                get_plausible_move_and_actions(
+                    actor=self.active_entity,
+                    engine=self,
+                    feature_evaluator=feature_evaluator,
+                )
             )
             chosen_action: PlausibleMoveAndAction = self.get_choice(
                 team=self.active_entity.team, choices=plausible_actions
