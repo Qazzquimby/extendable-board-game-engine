@@ -8,6 +8,7 @@ from queries import QueryLegalAimings
 
 if TYPE_CHECKING:
     from engine import Engine
+    from features import ChoiceFeatureEvaluator
 
 
 class Choice:
@@ -25,6 +26,7 @@ class PlausibleMoveAndAction(Choice):
         engine: "Engine" = None,
         actor: "Entity" = None,
         aiming_result: "AimingResult" = None,
+        feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
     ):
         # todo right now aoe uses target None.
         #  Probably better to have a list of targets. Ml will need adjusting
@@ -35,13 +37,18 @@ class PlausibleMoveAndAction(Choice):
         self.aiming_result = aiming_result
 
         features = (
-            self._compute_features(actor, engine)
+            self._compute_features(actor, engine, feature_evaluator)
             if engine and actor and aiming_result
             else {}
         )
         super().__init__(features=features)
 
-    def _compute_features(self, actor: "Entity", engine: "Engine") -> Dict[str, Any]:
+    def _compute_features(
+        self,
+        actor: "Entity",
+        engine: "Engine",
+        feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
+    ) -> Dict[str, Any]:
         features = {f"new_location_{actor.name}_{actor.id}": self.move_pos}
         if self.move_pos != actor.pos:
             features[f"moved_{actor.name}_{actor.id}"] = True
@@ -93,11 +100,22 @@ class PlausibleMoveAndAction(Choice):
                 key = f"distance_{entity.name}_{entity.id}_to_{other_entity.name}_{other_entity.id}"
                 features[key] = dist
 
+        if feature_evaluator:
+            eval_features = feature_evaluator.evaluate(
+                engine=engine,
+                actor=actor,
+                choice=self,
+                core_features=features,
+            )
+            features.update(eval_features)
+
         return features
 
 
 def get_plausible_move_and_actions(
-    actor: "Entity", engine: "Engine"
+    actor: "Entity",
+    engine: "Engine",
+    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> List[PlausibleMoveAndAction]:
     proposed_moves = get_plausible_movements(
         actor=actor,
@@ -111,6 +129,7 @@ def get_plausible_move_and_actions(
             engine=engine,
             move_pos=move_pos,
             movement_name=movement_name,
+            feature_evaluator=feature_evaluator,
         )
         actions_map.update(plausible_actions_after_movement)
 
@@ -192,7 +211,11 @@ def get_plausible_movements(
 
 
 def get_plausible_actions_after_movement(
-    actor: "Entity", engine: "Engine", move_pos: Point, movement_name: str
+    actor: "Entity",
+    engine: "Engine",
+    move_pos: Point,
+    movement_name: str,
+    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_actions_after_movement = {}
     for ability in actor.abilities:
@@ -203,6 +226,7 @@ def get_plausible_actions_after_movement(
                 move_pos=move_pos,
                 movement_name=movement_name,
                 ability=ability,
+                feature_evaluator=feature_evaluator,
             )
         )
         plausible_actions_after_movement.update(
@@ -217,6 +241,7 @@ def get_plausible_uses_of_ability_after_movement(
     move_pos: Point,
     movement_name: str,
     ability: "Ability",
+    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_uses_of_ability_after_movement = {}
     plausibly_positive = any(
@@ -268,6 +293,7 @@ def get_plausible_uses_of_ability_after_movement(
                             engine=engine,
                             actor=actor,
                             aiming_result=aiming_res,
+                            feature_evaluator=feature_evaluator,
                         )
                     )
         elif isinstance(ability.aiming, IncludeArea):
@@ -305,6 +331,7 @@ def get_plausible_uses_of_ability_after_movement(
                     engine=engine,
                     actor=actor,
                     aiming_result=aiming_res,
+                    feature_evaluator=feature_evaluator,
                 )
 
     return plausible_uses_of_ability_after_movement
