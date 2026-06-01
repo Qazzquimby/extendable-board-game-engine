@@ -183,7 +183,7 @@ class TurnStartEvent(Event):
         super().__init__(engine=engine, subject=subject)
 
     def _resolve(self) -> None:
-        self.engine.active_entity.start_turn()
+        self.engine.current_hero.start_turn()
 
 
 class TurnEndEvent(Event):
@@ -196,6 +196,22 @@ class TurnEndEvent(Event):
                 if not ability.tapped_this_turn:
                     ability.is_tapped = False
                 ability.tapped_this_turn = False
+
+
+class RoundStartEvent(Event):
+    def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
+        super().__init__(engine=engine, subject=subject)
+
+    def _resolve(self) -> None:
+        pass
+
+
+class RoundEndEvent(Event):
+    def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
+        super().__init__(engine=engine, subject=subject)
+
+    def _resolve(self) -> None:
+        pass
 
 
 class DamageEvent(Event):

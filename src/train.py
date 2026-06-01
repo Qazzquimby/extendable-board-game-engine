@@ -54,7 +54,7 @@ def state_to_engine(state: EngineState) -> Engine:
         )
         ent.id = ent_state.id
         if ent.id == state.active_entity:
-            engine.active_entity = ent
+            engine.current_hero = ent
     return engine
 
 
@@ -88,7 +88,7 @@ def preprocess_game(game: GameLog) -> list[TrainData]:
 
 def preprocess_log(game: GameLog, log: LogEntry) -> Optional[TrainData]:
     engine = state_to_engine(log.before_state)
-    actor = engine.active_entity
+    actor = engine.current_hero
     if not actor:
         return None
 
@@ -120,7 +120,7 @@ def preprocess_log(game: GameLog, log: LogEntry) -> Optional[TrainData]:
 
         sim_next_engine = state_to_engine(sim.after_state)
         next_state_tensors.append(
-            get_entity_features(sim_next_engine, sim_next_engine.active_entity)
+            get_entity_features(sim_next_engine, sim_next_engine.current_hero)
         )
         sim_dones.append(sim.done)
         sim_rewards.append(1.0 if sim.winner_team == actor.team else 0.0)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GameLog, LogEntry } from './types';
+import { GameLog } from './types';
 import PhaserComponent from './PhaserComponent';
 
 function App() {
@@ -51,6 +51,14 @@ function App() {
   const currentLogEntry = log[currentStep];
   const stateToRender = currentLogEntry?.before_state;
 
+  const getDestination = (logEntry: typeof currentLogEntry) => {
+    if (logEntry.action.move_path?.length) {
+      return logEntry.action.move_path[logEntry.action.move_path.length - 1];
+    } else {
+      return 'same space'
+    }
+  }
+
   return (
     <div>
       <h1>Game Log Visualizer</h1>
@@ -87,7 +95,7 @@ function App() {
             <div>
               <h3>Action</h3>
               <p>Actor: {currentLogEntry.action.actor}</p>
-              <p>"{currentLogEntry.action.movement_name}" to [{String(currentLogEntry.action.move_pos)}], then performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
+              <p>"{currentLogEntry.action.movement_name}" to [{String(getDestination(currentLogEntry))}], then performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
             </div>
           )}
           {stateToRender && <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action} />}

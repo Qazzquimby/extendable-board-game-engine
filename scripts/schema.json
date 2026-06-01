@@ -39,9 +39,6 @@
           "title": "Actor",
           "type": "integer"
         },
-        "move_pos": {
-          "$ref": "#/$defs/Point"
-        },
         "target": {
           "anyOf": [
             {
@@ -57,7 +54,7 @@
           "title": "Ability",
           "type": "string"
         },
-        "path": {
+        "move_path": {
           "anyOf": [
             {
               "items": {
@@ -70,7 +67,7 @@
             }
           ],
           "default": null,
-          "title": "Path"
+          "title": "Move Path"
         },
         "movement_name": {
           "default": "",
@@ -80,7 +77,6 @@
       },
       "required": [
         "actor",
-        "move_pos",
         "target",
         "ability"
       ],

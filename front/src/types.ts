@@ -25,7 +25,7 @@ export type Entities = EntityState[];
 export type Actor = number;
 export type Target = number | null;
 export type Ability = string;
-export type Path = Point[] | null;
+export type MovePath = Point[] | null;
 export type MovementName = string;
 export type Done = boolean;
 export type Done1 = boolean;
@@ -66,10 +66,9 @@ export interface EntityState {
 }
 export interface ActionState {
   actor: Actor;
-  move_pos: Point;
   target: Target;
   ability: Ability;
-  path?: Path;
+  move_path: MovePath;
   movement_name?: MovementName;
   [k: string]: unknown;
 }

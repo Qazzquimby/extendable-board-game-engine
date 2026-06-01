@@ -184,23 +184,23 @@ def test_engine_turn_management():
     e2 = Entity(engine, "Hero2", hp=10, speed=3, pos=Point(1, 1), team=2)
 
     assert engine.round_num == 1
-    assert engine.active_entity is None
+    assert engine.current_hero is None
 
     # First turn
     engine.next_turn()
-    assert engine.active_entity == e1
+    assert engine.current_hero == e1
     assert engine.current_team == 1
     assert e1.move_actions == 1
     assert e1.standard_actions == 1
 
     # Second turn
     engine.next_turn()
-    assert engine.active_entity == e2
+    assert engine.current_hero == e2
     assert engine.current_team == 2
 
     # Next round
     engine.next_turn()
-    assert engine.active_entity == e1
+    assert engine.current_hero == e1
     assert engine.round_num == 2
 
 

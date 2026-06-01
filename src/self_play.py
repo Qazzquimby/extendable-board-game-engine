@@ -169,6 +169,7 @@ def setup_game():
 
     team_1_classes[0](engine=engine, pos=Point(grid_size - 1, grid_size - 1), team=1)
     team_1_classes[1](engine=engine, pos=Point(grid_size - 1, grid_size - 2), team=1)
+    engine.finalize_setup()
     return engine
 
 
@@ -185,17 +186,17 @@ if __name__ == "__main__":
         game_log = engine.run_game()
         all_games.append(game_log)
 
-    #     if len(all_games) == 10:
-    #         filename = f"../game_logs/{file_idx}.json"
-    #         with open(filename, "w") as f:
-    #             json.dump(
-    #                 [game.model_dump(mode="json") for game in all_games], f, indent=2
-    #             )
-    #         all_games = []
-    #         file_idx += 1
-    #
-    # if all_games:
-    #     filename = f"game_logs/{file_idx}.json"
-    #     with open(filename, "w") as f:
-    #         json.dump([game.model_dump(mode="json") for game in all_games], f, indent=2)
-    #     print(f"Saved {len(all_games)} games to {filename}")
+        if len(all_games) == 10:
+            filename = f"../game_logs/{file_idx}.json"
+            with open(filename, "w") as f:
+                json.dump(
+                    [game.model_dump(mode="json") for game in all_games], f, indent=2
+                )
+            all_games = []
+            file_idx += 1
+
+    if all_games:
+        filename = f"game_logs/{file_idx}.json"
+        with open(filename, "w") as f:
+            json.dump([game.model_dump(mode="json") for game in all_games], f, indent=2)
+        print(f"Saved {len(all_games)} games to {filename}")

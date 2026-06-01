@@ -10,7 +10,7 @@ from typing import (
 )
 
 from choices import get_plausible_move_and_actions, Choice, PlausibleMoveAndAction
-from entities import Entity, Summon, Marker
+from entities import Entity, Summon, Marker, Hero
 from events import (
     TurnStartEvent,
     TurnEndEvent,
@@ -20,6 +20,8 @@ from events import (
     Router,
     Query,
     ChangeLocationEvent,
+    RoundEndEvent,
+    RoundStartEvent,
 )
 from grid import Grid
 from point import Point
@@ -33,6 +35,8 @@ from queries import (
 from schemas import EngineState, GameLog, LogEntry, ActionState
 
 ChoiceT = TypeVar("ChoiceT", bound="Choice")
+
+NUM_TEAMS = 2
 
 
 class Agent(abc.ABC):
@@ -59,12 +63,24 @@ class Engine:
         self.markers: List["Marker"] = []
         self.rng = random.Random(seed)
         self.round_num: int = 1
-        self.current_team: int = 1
+
+        self.team_heroes: List[List[Hero]] = None  # run finalize
+        self.num_hero_rows: int = None  # run finalize
+
+        self.current_team: int = 0
+        self.current_hero_row_index = 0
+
         self.grid: Grid = grid
-        self.active_entity: Optional["Entity"] = None
+        self.current_hero: Optional["Entity"] = None
         self._next_id: int = 1
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
+
+    def finalize_setup(self):
+        self.team_heroes = [
+            [e for e in self.entities if e.team == team] for team in range(NUM_TEAMS)
+        ]
+        self.num_hero_rows = max([len(team) for team in self.team_heroes])
 
     def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
         if not choices:
@@ -102,27 +118,35 @@ class Engine:
         logs: List[LogEntry] = []
 
         winner_team = None
-        self.next_turn()
-        before_state = self.to_model()
+
+        after_state = None
+
+        RoundStartEvent(engine=self).resolve()
 
         while self.round_num <= 6:
-            if self.active_entity.hp <= 0:
+            self.next_turn()
+            if after_state:
+                before_state = after_state
+            else:
+                before_state = self.to_model()
+
+            if self.current_hero.hp <= 0:
                 self.next_turn()  # todo doesn't work with summons
                 continue
 
-            agent = self.agents[self.active_entity.team]
+            agent = self.agents[self.current_hero.team]
             feature_evaluator = getattr(agent, "feature_evaluator", None)
             plausible_actions: List[PlausibleMoveAndAction] = (
                 get_plausible_move_and_actions(
-                    actor=self.active_entity,
+                    actor=self.current_hero,
                     engine=self,
                     feature_evaluator=feature_evaluator,
                 )
             )
             chosen_action: PlausibleMoveAndAction = self.get_choice(
-                team=self.active_entity.team, choices=plausible_actions
+                team=self.current_hero.team, choices=plausible_actions
             )
-            self.step(actor=self.active_entity, action=chosen_action)
+            self.step(actor=self.current_hero, action=chosen_action)
 
             # Check win condition
             time_up = self.round_num >= 6
@@ -140,7 +164,7 @@ class Engine:
                     winner_team = 1
 
             action_state = ActionState(
-                actor=self.active_entity.id,
+                actor=self.current_hero.id,
                 target=chosen_action.target.id if chosen_action.target else None,
                 ability=chosen_action.ability.name,
                 move_path=chosen_action.move_path,
@@ -154,7 +178,6 @@ class Engine:
                 done=done,
             )
             logs.append(log_entry)
-            before_state = after_state
 
             if done:
                 break
@@ -169,24 +192,25 @@ class Engine:
         )
 
     def next_turn(self) -> None:
-        if not self.entities:
-            return
+        will_be_first_turn = self.current_hero is None
 
-        if self.active_entity is not None:
-            TurnEndEvent(self, self.active_entity).resolve()
-        if self.active_entity is None:
-            self.active_entity = self.entities[0]
-        else:
-            idx = self.entities.index(self.active_entity)
-            if idx + 1 < len(self.entities):
-                self.active_entity = self.entities[idx + 1]
-            else:
-                self.active_entity = self.entities[0]
-                self.round_num += 1
+        if not will_be_first_turn:
+            TurnEndEvent(self, self.current_hero).resolve()
 
-        self.current_team = self.active_entity.team
+            self.current_team = (self.current_team + 1) % NUM_TEAMS
+            if self.current_team == 0:  # just wrapped, get new hero index
+                self.current_hero_row_index = (
+                    self.current_hero_row_index + 1
+                ) % self.num_hero_rows
+                if self.current_hero_row_index == 0:  # New round
+                    RoundEndEvent(self).resolve()
+                    RoundStartEvent(self).resolve()
 
-        TurnStartEvent(self, self.active_entity).resolve()
+        self.current_hero = self._get_current_hero()
+        TurnStartEvent(self, self.current_hero).resolve()
+
+    def _get_current_hero(self):
+        return self.team_heroes[self.current_team][self.current_hero_row_index]
 
     def ask(self, query: "Query"):
         self.router.publish(query, EventPhase.QUERY)
@@ -196,7 +220,7 @@ class Engine:
         return EngineState(
             round_num=self.round_num,
             current_team=self.current_team,
-            active_entity=self.active_entity.id if self.active_entity else None,
+            active_entity=self.current_hero.id if self.current_hero else None,
             entities=[e.to_model() for e in self.entities],
         )
 
@@ -240,7 +264,7 @@ class Engine:
             (
                 self.round_num,
                 self.current_team,
-                self.active_entity.id if self.active_entity else None,
+                self.current_hero.id if self.current_hero else None,
                 entity_states,
             )
         )
