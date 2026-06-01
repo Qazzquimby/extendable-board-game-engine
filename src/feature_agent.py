@@ -1,16 +1,9 @@
 import operator
 from typing import List, Dict
 
-from pydantic import BaseModel
-
 from choices import Choice
 from engine import Agent
-
-
-class WeightedFeature(BaseModel):
-    name: str
-    eval_string: str
-    weight: float
+from features import ChoiceFeatureEvaluator, WeightedFeature
 
 
 class FeatureWeightedAgent(Agent):
@@ -19,6 +12,9 @@ class FeatureWeightedAgent(Agent):
         weighted_features: List[WeightedFeature],
     ):
         self.weighted_features = weighted_features
+        self.feature_evaluator = ChoiceFeatureEvaluator(
+            weighted_features=self.weighted_features
+        )
 
     def choose(self, choices: List[Choice]) -> int:
         if not choices:
@@ -50,12 +46,12 @@ def get_example_feature_agent():
     weighted_features = [
         WeightedFeature(
             name="Damage to enemy Ranged",
-            eval_string="sum(damage_dealt(e) for e in get_enemy('RangedHero'))",
+            eval_string="damage_dealt(get_enemy('Ranged Hero'))",
             weight=1.2,
         ),
         WeightedFeature(
-            name="Damage to enemy Melee",
-            eval_string="sum(damage_dealt(e) for e in get_enemy('MeleeHero'))",
+            name="Damage to enemies",
+            eval_string="sum(damage_dealt(e) for e in enemies)",
             weight=1.0,
         ),
         WeightedFeature(

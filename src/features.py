@@ -2,17 +2,25 @@ import random
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
 
+from pydantic import BaseModel
+
 if TYPE_CHECKING:
     from choices import PlausibleMoveAndAction
     from engine import Engine
     from entities import Entity
 
 
+class WeightedFeature(BaseModel):
+    name: str
+    eval_string: str
+    weight: float
+
+
 class ChoiceFeatureEvaluator:
-    def __init__(self, feature_strings: List[str]):
-        self.feature_strings = feature_strings
+    def __init__(self, weighted_features: List["WeightedFeature"]):
+        self.weighted_features = weighted_features
         self.compiled_features = [
-            self._compile_feature(f) for f in self.feature_strings
+            self._compile_feature(f.eval_string) for f in self.weighted_features
         ]
 
     def _compile_feature(self, feature_string: str):
@@ -33,13 +41,14 @@ class ChoiceFeatureEvaluator:
 
         results = {}
         for i, compiled_feature in enumerate(self.compiled_features):
-            feature_string = self.feature_strings[i]
+            weighted_feature = self.weighted_features[i]
             try:
                 # Using a restricted set of builtins for some safety.
                 result = eval(compiled_feature, {"__builtins__": {}}, context)
-                results[feature_string] = result
-            except Exception:
-                results[feature_string] = None
+                results[weighted_feature.name] = result
+            except Exception as e:
+                print(e)
+                results[weighted_feature.name] = None
         return results
 
     def _build_context(
