@@ -3,11 +3,10 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING, TypeVar, Generic
 
-from abilities import Ability
-
 from mod_value import ModInt
 
 if TYPE_CHECKING:
+    from abilities import Ability
     from engine import Engine, Summon, Token, Modifier
     from entities import Entity
 

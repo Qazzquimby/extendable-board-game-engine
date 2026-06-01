@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
+from events import PushEvent, PullEvent, DamageEvent, HealEvent, GiveTokenEvent
 
 if TYPE_CHECKING:
     from engine import (
@@ -11,7 +12,6 @@ if TYPE_CHECKING:
         Token,
         Modifier,
     )
-    from events import PushEvent, PullEvent, DamageEvent, HealEvent, GiveTokenEvent
     from point import Point
 
 

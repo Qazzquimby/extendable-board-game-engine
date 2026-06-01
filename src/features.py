@@ -1,33 +1,118 @@
-import random
-from collections import defaultdict
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from choices import PlausibleMoveAndAction
     from engine import Engine
     from entities import Entity
+    from point import Point
 
 
 class WeightedFeature(BaseModel):
     name: str
-    eval_string: str
+    eval_func: Callable[["FeatureContext"], Any] = Field(..., exclude=True)
     weight: float
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+@dataclass
+class FeatureContext:
+    engine: "Engine"
+    actor: "Entity"
+    choice: "PlausibleMoveAndAction"
+    core_features: Dict[str, Any]
+
+    @property
+    def allies(self) -> List["Entity"]:
+        return [e for e in self.engine.entities if e.team == self.actor.team]
+
+    @property
+    def enemies(self) -> List["Entity"]:
+        return [e for e in self.engine.entities if e.team != self.actor.team]
+
+    def get_entities_by_name(self, name: str) -> List["Entity"]:
+        return [e for e in self.engine.entities if e.name == name]
+
+    def get_entity_by_name(self, name: str) -> Optional["Entity"]:
+        entities = self.get_entities_by_name(name)
+        return entities[0] if entities else None
+
+    def get_enemies_by_name(self, name: str) -> List["Entity"]:
+        return [e for e in self.enemies if e.name == name]
+
+    def get_enemy_by_name(self, name: str) -> Optional["Entity"]:
+        entities = self.get_enemies_by_name(name)
+        return entities[0] if entities else None
+
+    def get_allies_by_name(self, name: str) -> List["Entity"]:
+        return [e for e in self.allies if e.name == name]
+
+    def get_ally_by_name(self, name: str) -> Optional["Entity"]:
+        entities = self.get_allies_by_name(name)
+        return entities[0] if entities else None
+
+    @property
+    def hit_entities(self) -> List["Entity"]:
+        hit_spaces = set(self.choice.aiming_result.target_points) | set(
+            self.choice.aiming_result.included_points
+        )
+        return [
+            entity for entity in self.engine.entities if entity.pos in hit_spaces
+        ]
+
+    @property
+    def hit_allies(self) -> List["Entity"]:
+        return [e for e in self.hit_entities if e.team == self.actor.team]
+
+    @property
+    def hit_enemies(self) -> List["Entity"]:
+        return [e for e in self.hit_entities if e.team != self.actor.team]
+
+    def new_pos(self, entity: "Entity") -> Optional["Point"]:
+        if not entity or not entity.pos:
+            return None
+        pos_key = f"new_location_{entity.name}_{entity.id}"
+        return self.core_features.get(pos_key, entity.pos)
+
+    def new_hp(self, entity: "Entity") -> Optional[int]:
+        if not entity:
+            return None
+
+        damage_key = f"damage_dealt_to_{entity.name}_{entity.id}"
+        damage = self.core_features.get(damage_key, 0)
+
+        heal_key = f"heal_dealt_to_{entity.name}_{entity.id}"
+        heal = self.core_features.get(heal_key, 0)
+
+        return entity.hp - damage + heal
+
+    def damage_dealt(self, entity: "Entity") -> int:
+        if not entity:
+            return 0
+        damage_key = f"damage_dealt_to_{entity.name}_{entity.id}"
+        return self.core_features.get(damage_key, 0)
+
+    def heal_received(self, entity: "Entity") -> int:
+        if not entity:
+            return 0
+        heal_key = f"heal_dealt_to_{entity.name}_{entity.id}"
+        return self.core_features.get(heal_key, 0)
+
+    def new_distance(self, e1: "Entity", e2: "Entity") -> Optional[int]:
+        p1 = self.new_pos(e1)
+        p2 = self.new_pos(e2)
+        if p1 and p2:
+            return self.engine.grid.get_range(p1, p2)
+        return None
 
 
 class ChoiceFeatureEvaluator:
     def __init__(self, weighted_features: List["WeightedFeature"]):
         self.weighted_features = weighted_features
-        self.compiled_features = [
-            self._compile_feature(f.eval_string) for f in self.weighted_features
-        ]
-
-    def _compile_feature(self, feature_string: str):
-        try:
-            return compile(feature_string, feature_string, "eval")
-        except SyntaxError as e:
-            raise ValueError(f"Invalid feature expression: {feature_string}") from e
 
     def evaluate(
         self,
@@ -36,135 +121,19 @@ class ChoiceFeatureEvaluator:
         choice: "PlausibleMoveAndAction",
         core_features: Dict[str, Any],
     ) -> Dict[str, Any]:
-
-        context = self._build_context(engine, actor, choice, core_features)
+        context = FeatureContext(
+            engine=engine,
+            actor=actor,
+            choice=choice,
+            core_features=core_features,
+        )
 
         results = {}
-        for i, compiled_feature in enumerate(self.compiled_features):
-            weighted_feature = self.weighted_features[i]
+        for weighted_feature in self.weighted_features:
             try:
-                # Using a restricted set of builtins for some safety.
-                result = eval(compiled_feature, {"__builtins__": {}}, context)
+                result = weighted_feature.eval_func(context)
                 results[weighted_feature.name] = result
             except Exception as e:
                 print(e)
                 results[weighted_feature.name] = None
         return results
-
-    def _build_context(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        choice: "PlausibleMoveAndAction",
-        core_features: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        entities_by_name = defaultdict(list)
-        for entity in engine.entities:
-            entities_by_name[entity.name].append(entity)
-
-        allies = [e for e in engine.entities if e.team == actor.team]
-        enemies = [e for e in engine.entities if e.team != actor.team]
-
-        def get_entity(name: str) -> Optional["Entity"]:
-            entities = entities_by_name.get(name, [])
-            if entities:
-                return random.choice(entities)
-            else:
-                return None
-
-        def get_enemy(name: str) -> Optional["Entity"]:
-            entities = entities_by_name.get(name, [])
-            entities = [e for e in entities if e.team != actor.team]
-            if entities:
-                return random.choice(entities)
-            else:
-                return None
-
-        def get_ally(name: str) -> Optional["Entity"]:
-            entities = entities_by_name.get(name, [])
-            entities = [e for e in entities if e.team == actor.team]
-            if entities:
-                return random.choice(entities)
-            else:
-                return None
-
-        def get_hit_entities() -> List["Entity"]:
-            hit_spaces = set(choice.aiming_result.target_points) | set(
-                choice.aiming_result.included_points
-            )
-            hit_entities = [
-                entity for entity in engine.entities if entity.pos in hit_spaces
-            ]
-            return hit_entities
-
-        def get_hit_allies() -> List["Entity"]:
-            hit_entities = get_hit_entities()
-            hit_allies = [e for e in hit_entities if e.team == actor.team]
-            return hit_allies
-
-        def get_hit_enemies() -> List["Entity"]:
-            hit_entities = get_hit_entities()
-            hit_enemies = [e for e in hit_entities if e.team != actor.team]
-            return hit_enemies
-
-        def new_pos(entity: "Entity"):
-            if not entity or not entity.pos:
-                return None
-            pos_key = f"new_location_{entity.name}_{entity.id}"
-            return core_features.get(pos_key, entity.pos)
-
-        def new_hp(entity: "Entity") -> Optional[int]:
-            if not entity:
-                return None
-
-            damage_key = f"damage_dealt_to_{entity.name}_{entity.id}"
-            damage = core_features.get(damage_key, 0)
-
-            heal_key = f"heal_dealt_to_{entity.name}_{entity.id}"
-            heal = core_features.get(heal_key, 0)
-
-            return entity.hp - damage + heal
-
-        def damage_dealt(entity: "Entity") -> int:
-            if not entity:
-                return 0
-            damage_key = f"damage_dealt_to_{entity.name}_{entity.id}"
-            return core_features.get(damage_key, 0)
-
-        def heal_received(entity: "Entity") -> int:
-            if not entity:
-                return 0
-            heal_key = f"heal_dealt_to_{entity.name}_{entity.id}"
-            return core_features.get(heal_key, 0)
-
-        def new_distance(e1: "Entity", e2: "Entity") -> Optional[int]:
-            p1 = new_pos(e1)
-            p2 = new_pos(e2)
-            if p1 and p2:
-                return engine.grid.get_range(p1, p2)
-            return None
-
-        context = {
-            "engine": engine,
-            "actor": actor,
-            "choice": choice,
-            "core_features": core_features,
-            "allies": allies,
-            "enemies": enemies,
-            "get_entity": get_entity,
-            "get_ally": get_ally,
-            "get_enemy": get_enemy,
-            "get_hit_entities": get_hit_entities(),
-            "get_hit_enemies": get_hit_enemies(),
-            "get_hit_allies": get_hit_allies(),
-            "new_pos": new_pos,
-            "new_hp": new_hp,
-            "damage_dealt": damage_dealt,
-            "heal_received": heal_received,
-            "new_distance": new_distance,
-            "len": len,
-            "sum": sum,
-            "min": min,
-            "max": max,
-        }
-        return context
