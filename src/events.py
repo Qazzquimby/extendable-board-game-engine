@@ -114,6 +114,15 @@ def query(event_type: Type, only_self: bool = True) -> Callable:
     return decorator
 
 
+class ChangeLocationEvent(Event):
+    def __init__(self, engine: "Engine", subject: "Entity", new_pos: Optional["Point"]):
+        super().__init__(engine=engine, subject=subject)
+        self.new_pos = new_pos
+
+    def _resolve(self) -> None:
+        self.subject.pos = self.new_pos
+
+
 class PushEvent(Event):
     def __init__(
         self,

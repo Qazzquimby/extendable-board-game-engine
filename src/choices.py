@@ -19,7 +19,7 @@ class Choice:
 class PlausibleMoveAndAction(Choice):
     def __init__(
         self,
-        move_pos: Point,
+        move_path: List[Point],
         target: Optional["Entity"],
         ability: "Ability",
         movement_name: str = "",
@@ -30,7 +30,11 @@ class PlausibleMoveAndAction(Choice):
     ):
         # todo right now aoe uses target None.
         #  Probably better to have a list of targets. Ml will need adjusting
-        self.move_pos = move_pos
+        self.move_path = move_path
+        if move_path:
+            self.move_pos = move_path[-1]
+        else:
+            self.move_pos = actor.pos
         self.target = target
         self.ability = ability
         self.movement_name = movement_name
@@ -284,9 +288,15 @@ def get_plausible_uses_of_ability_after_movement(
 
                 key = (move_pos, t_point, ability.get_hash())
                 if key not in plausible_uses_of_ability_after_movement:
+                    if move_pos == actor.pos:
+                        move_path = []
+                    else:
+                        move_path = engine.grid.get_path(
+                            start=actor.pos, target=move_pos
+                        )
                     plausible_uses_of_ability_after_movement[key] = (
                         PlausibleMoveAndAction(
-                            move_pos=move_pos,
+                            move_path=move_path,
                             target=target,
                             ability=ability,
                             movement_name=movement_name,

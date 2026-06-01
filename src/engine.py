@@ -19,6 +19,7 @@ from events import (
     before,
     Router,
     Query,
+    ChangeLocationEvent,
 )
 from grid import Grid
 from point import Point
@@ -29,7 +30,7 @@ from queries import (
     QueryCanMove,
     QuerySpeed,
 )
-from schemas import EngineState, GameLog, LogEntry
+from schemas import EngineState, GameLog, LogEntry, ActionState
 
 ChoiceT = TypeVar("ChoiceT", bound="Choice")
 
@@ -102,6 +103,8 @@ class Engine:
 
         winner_team = None
         self.next_turn()
+        before_state = self.to_model()
+
         while self.round_num <= 6:
             if self.active_entity.hp <= 0:
                 self.next_turn()  # todo doesn't work with summons
@@ -135,15 +138,32 @@ class Engine:
                     winner_team = 0
                 elif len(team_1_living_members) > len(team_0_living_members):
                     winner_team = 1
-            # todo log entry
+
+            action_state = ActionState(
+                actor=self.active_entity.id,
+                target=chosen_action.target.id if chosen_action.target else None,
+                ability=chosen_action.ability.name,
+                move_path=chosen_action.move_path,
+                movement_name=chosen_action.movement_name,
+            )
+            after_state = self.to_model()
+            log_entry = LogEntry(
+                before_state=before_state,
+                action=action_state,
+                after_state=after_state,
+                done=done,
+            )
+            logs.append(log_entry)
+            before_state = after_state
+
             if done:
                 break
 
         return GameLog(winner_team=winner_team, logs=logs)
 
     def step(self, actor: Entity, action: PlausibleMoveAndAction) -> None:
-        # todo move along path
-        actor.pos = action.move_pos
+        for point in action.move_path:
+            ChangeLocationEvent(self, actor, point).resolve()
         action.ability.execute(
             engine=self, source=actor, aiming_result=action.aiming_result
         )

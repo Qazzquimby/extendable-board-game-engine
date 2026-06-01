@@ -25,10 +25,9 @@ class EngineState(BaseModel):
 
 class ActionState(BaseModel):
     actor: int
-    move_pos: Point
     target: Optional[int]
     ability: str
-    path: Optional[List[Point]] = None
+    move_path: Optional[List[Point]] = None
     movement_name: str = ""
 
 
