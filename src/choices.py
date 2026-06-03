@@ -370,7 +370,7 @@ def _get_plausible_uses_of_ability_at_pos(
     )
 
     legal_aimings = engine.ask(
-        QueryLegalAimings(subject=actor, ability=ability, result=raw_aimings)
+        QueryLegalAimings(subject=actor, ability=ability, base_result=raw_aimings)
     )
 
     for aiming_res in legal_aimings:

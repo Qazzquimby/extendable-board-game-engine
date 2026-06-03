@@ -1,68 +1,77 @@
-from typing import List, Optional, TYPE_CHECKING, Type
+from typing import List, Optional, TYPE_CHECKING, Type, TypeVar, Generic
 
 from abilities import Ability
-from events import Query
+from events import EventPhase
 from mod_value import ModInt
 
 if TYPE_CHECKING:
-    from engine import Engine
     from abilities import Ability
     from modifiers import Token
     from entities import Entity
     from aimings import AimingResult
 
 
+QueryResultT = TypeVar("QueryResultT")
+
+
+class Query(Generic[QueryResultT]):
+    def __init__(self, subject: "Entity", base_result: QueryResultT):
+        self.subject = subject
+        self.result: QueryResultT = base_result
+
+    def resolve(self) -> QueryResultT:
+        self.subject.engine.router.publish(self, EventPhase.QUERY)
+        return self.result
+
+
 class QueryIsAlive(Query[bool]):
-    def __init__(self, engine: "Engine", subject: "Entity"):
+    def __init__(self, subject: "Entity"):
         super().__init__(
-            engine=engine,
             subject=subject,
             base_result=subject.pos is not None and subject.hp > 0,
         )
 
 
 class QueryHasArmor(Query[bool]):
-    def __init__(self, engine: "Engine", subject: "Entity"):
-        super().__init__(engine=engine, subject=subject, base_result=False)
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject, base_result=False)
 
 
 class QueryLegalAimings(Query["AimingResult"]):
     def __init__(
         self,
-        engine: "Engine",
         subject: "Entity",
         ability: "Ability",
-        result: List["AimingResult"],
+        base_result: List["AimingResult"],
     ):
-        super().__init__(engine=engine, subject=subject, base_result=result)
+        super().__init__(subject=subject, base_result=base_result)
         self.ability = ability
 
 
 class QueryLegalActions(Query[List[Ability]]):
-    def __init__(self, engine: "Engine", subject: "Entity", result: List[Ability]):
-        super().__init__(engine=engine, subject=subject, base_result=result)
+    def __init__(self, subject: "Entity", base_result: List[Ability]):
+        super().__init__(subject=subject, base_result=base_result)
 
 
 class QueryCanMove(Query[bool]):
-    def __init__(self, engine: "Engine", subject: "Entity"):
-        super().__init__(engine=engine, subject=subject, base_result=True)
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject, base_result=True)
 
 
 class QuerySpeed(Query[ModInt]):
-    def __init__(self, subject: "Entity", result: int):
-        super().__init__(subject=subject, result=result)
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject, base_result=subject.speed)
 
 
 class QueryDefense(Query[ModInt]):
     def __init__(
         self,
-        engine: "Engine",
         subject: "Entity",
         attack_source: Optional["Entity"] = None,
         ability: Optional["Ability"] = None,
         result: int = 0,
     ):
-        super().__init__(engine=engine, subject=subject, base_result=ModInt(result))
+        super().__init__(subject=subject, base_result=ModInt(result))
         self.attack_source = attack_source
         self.ability = ability
 
@@ -70,19 +79,18 @@ class QueryDefense(Query[ModInt]):
 class QueryCrit(Query[ModInt]):
     def __init__(
         self,
-        engine: "Engine",
         subject: "Entity",
         attack_source: Optional["Entity"] = None,
         ability: Optional["Ability"] = None,
         result: int = 0,
     ):
-        super().__init__(engine=engine, subject=subject, base_result=ModInt(result))
+        super().__init__(subject=subject, base_result=ModInt(result))
         self.attack_source = attack_source
         self.ability = ability
 
 
 class GetTokenCountQuery(Query[int]):
-    def __init__(self, engine: "Engine", subject: "Entity", token_class: Type["Token"]):
+    def __init__(self, subject: "Entity", token_class: Type["Token"]):
         self.token_class = token_class
 
         base_result = 0
@@ -92,4 +100,4 @@ class GetTokenCountQuery(Query[int]):
                 base_result = modifier.amount
                 break
 
-        super().__init__(engine=engine, subject=subject, base_result=base_result)
+        super().__init__(subject=subject, base_result=base_result)

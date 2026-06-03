@@ -1,48 +1,33 @@
 import abc
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING, TypeVar, Generic
+from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
 from mod_value import ModInt
 
 if TYPE_CHECKING:
     from abilities import Ability
-    from engine import Engine, Summon
     from modifiers import Modifier, Token
-    from entities import Entity
+    from entities import Entity, Summon
+    from point import Point
 
 
 class Event(abc.ABC):
-    def __init__(self, engine: "Engine", subject: "Entity"):
-        self.engine = engine
+    def __init__(self, subject: "Entity"):
         self.subject = subject
         self.canceled = False
 
     def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
+        self.subject.engine.router.publish(self, EventPhase.BEFORE)
 
         if self.canceled:
             return
         self._resolve()
 
-        self.engine.router.publish(self, EventPhase.AFTER)
+        self.subject.engine.router.publish(self, EventPhase.AFTER)
 
     def _resolve(self) -> None:
         raise NotImplementedError("Events must implement resolve()")
-
-
-QueryResultT = TypeVar("QueryResultT")
-
-
-class Query(Generic[QueryResultT]):
-    def __init__(self, engine: "Engine", subject: "Entity", base_result: QueryResultT):
-        self.engine = engine
-        self.subject = subject
-        self.result: QueryResultT = base_result
-
-    def resolve(self) -> QueryResultT:
-        self.engine.router.publish(self, EventPhase.QUERY)
-        return self.result
 
 
 class EventPhase(Enum):
@@ -121,51 +106,50 @@ def query(event_type: Type, only_self: bool = True) -> Callable:
 
 
 class ChangeLocationEvent(Event):
-    def __init__(self, engine: "Engine", subject: "Entity", new_pos: Optional["Point"]):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: "Entity", new_pos: Optional["Point"]):
+        super().__init__(subject=subject)
         self.new_pos = new_pos
 
     def _resolve(self) -> None:
         self.subject.pos = self.new_pos
 
 
-class PushEvent(Event):
-    def __init__(
-        self,
-        engine: "Engine",
-        subject: "Entity",
-        distance: int,
-        source: Optional["Entity"] = None,
-    ):
-        super().__init__(engine=engine, subject=subject)
-        self.distance = ModInt(distance)
-        self.source = source
-
-    def _resolve(self) -> None:
-        # Pushing is calculated based on pathing away from the source
-        if (
-            getattr(self.subject, "pos", None) is not None
-            and self.source
-            and getattr(self.source, "pos", None) is not None
-        ):
-            dist = max(0, self.distance.value)
-            if dist > 0:
-                path = self.engine.grid.get_push_path(  # todo
-                    start=self.subject.pos, target=None, push_from=self.source.pos
-                )
-                if path and len(path) >= dist:
-                    self.subject.pos = path[dist - 1]
+# class PushEvent(Event):
+#     def __init__(
+#         self,
+#
+#         subject: "Entity",
+#         distance: int,
+#         source: Optional["Entity"] = None,
+#     ):
+#         super().__init__(subject=subject)
+#         self.distance = ModInt(distance)
+#         self.source = source
+#
+#     def _resolve(self) -> None:
+#         # Pushing is calculated based on pathing away from the source
+#         if (
+#             getattr(self.subject, "pos", None) is not None
+#             and self.source
+#             and getattr(self.source, "pos", None) is not None
+#         ):
+#             dist = max(0, self.distance.value)
+#             if dist > 0:
+#                 path = self.subject.engine.grid.get_push_path(  # todo
+#                     start=self.subject.pos, target=None, push_from=self.source.pos
+#                 )
+#                 if path and len(path) >= dist:
+#                     self.subject.pos = path[dist - 1]
 
 
 class PullEvent(Event):
     def __init__(
         self,
-        engine: "Engine",
         subject: "Entity",
         distance: int,
         source: Optional["Entity"] = None,
     ):
-        super().__init__(engine=engine, subject=subject)
+        super().__init__(subject=subject)
         self.distance = ModInt(distance)
         self.source = source
 
@@ -177,7 +161,7 @@ class PullEvent(Event):
         ):
             dist = max(0, self.distance.value)
             if dist > 0:
-                path = self.engine.grid.get_pull_path(
+                path = self.subject.engine.grid.get_pull_path(
                     self.subject.pos, self.source.pos, self.source.pos
                 )
                 if path and len(path) >= dist:
@@ -185,16 +169,16 @@ class PullEvent(Event):
 
 
 class TurnStartEvent(Event):
-    def __init__(self, engine: "Engine", subject: "Entity"):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject)
 
     def _resolve(self) -> None:
-        self.engine.current_hero.start_turn()
+        self.subject.engine.current_hero.start_turn()
 
 
 class TurnEndEvent(Event):
-    def __init__(self, engine: "Engine", subject: "Entity"):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject)
 
     def _resolve(self) -> None:
         for ability in self.subject.abilities:
@@ -205,16 +189,16 @@ class TurnEndEvent(Event):
 
 
 class RoundStartEvent(Event):
-    def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: Optional["Entity"] = None):
+        super().__init__(subject=subject)
 
     def _resolve(self) -> None:
         pass
 
 
 class RoundEndEvent(Event):
-    def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: Optional["Entity"] = None):
+        super().__init__(subject=subject)
 
     def _resolve(self) -> None:
         pass
@@ -223,13 +207,12 @@ class RoundEndEvent(Event):
 class DamageEvent(Event):
     def __init__(
         self,
-        engine: "Engine",
         source: Optional["Entity"],
         subject: "Entity",
         amount: int,
         ability: Optional["Ability"] = None,
     ):
-        super().__init__(engine=engine, subject=subject)
+        super().__init__(subject=subject)
         self.source = source
         self.amount = ModInt(amount)
         self.ability = ability
@@ -243,15 +226,13 @@ class DamageEvent(Event):
         self.subject.hp = new_hp
 
         if self.subject.hp <= 0:
-            DeathEvent(self.engine, subject=self.subject, killer=self.source).resolve()
+            DeathEvent(subject=self.subject, killer=self.source).resolve()
 
 
 class DeathEvent(Event):
     # For on-kill use on-death and filter by killer
-    def __init__(
-        self, engine: "Engine", subject: "Entity", killer: Optional["Entity"] = None
-    ):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: "Entity", killer: Optional["Entity"] = None):
+        super().__init__(subject=subject)
         self.killer = killer
 
     def _resolve(self) -> None:
@@ -259,8 +240,8 @@ class DeathEvent(Event):
 
 
 class SummonEvent(Event):
-    def __init__(self, engine: "Engine", summoner: "Entity", subject: "Summon"):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, summoner: "Entity", subject: "Summon"):
+        super().__init__(subject=subject)
         self.summoner = summoner
 
     def _resolve(self) -> None:
@@ -269,8 +250,8 @@ class SummonEvent(Event):
 
 
 class HealEvent(Event):
-    def __init__(self, engine: "Engine", subject: "Entity", amount: int):
-        super().__init__(engine=engine, subject=subject)
+    def __init__(self, subject: "Entity", amount: int):
+        super().__init__(subject=subject)
         self.amount = ModInt(amount)
 
     def _resolve(self) -> None:
@@ -282,12 +263,11 @@ class HealEvent(Event):
 class AddTokenEvent(Event):
     def __init__(
         self,
-        engine: "Engine",
         subject: "Entity",
         token_class: Type["Token"],
         amount: int,
     ):
-        super().__init__(engine=engine, subject=subject)
+        super().__init__(subject=subject)
         self.token_class = token_class
         self.amount = amount
 
@@ -303,12 +283,11 @@ class AddTokenEvent(Event):
 class RemoveTokenEvent(Event):
     def __init__(
         self,
-        engine: "Engine",
         subject: "Entity",
         token_class: Type["Token"],
         amount: int,
     ):
-        super().__init__(engine=engine, subject=subject)
+        super().__init__(subject=subject)
         self.token_class = token_class
         self.amount = amount
 

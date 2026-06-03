@@ -14,7 +14,8 @@ from queries import (
     QueryCanMove,
     QueryLegalActions,
     QueryDefense,
-    QueryCrit, GetTokenCountQuery,
+    QueryCrit,
+    GetTokenCountQuery,
 )
 from schemas import EntityState
 
@@ -130,7 +131,7 @@ class Entity:
                 continue
             legal.append(ability)
 
-        q = QueryLegalActions(self, result=legal)
+        q = QueryLegalActions(self, base_result=legal)
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
@@ -170,21 +171,16 @@ class Entity:
 
     def add_token(self, token_class: Type["Token"], amount: int = 1) -> None:
         AddTokenEvent(
-            engine=self.engine,
             subject=self,
             token_class=token_class,
             amount=amount,
         ).resolve()
 
     def remove_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        RemoveTokenEvent(
-            engine=self.engine, subject=self, token_class=token_class, amount=amount
-        )
+        RemoveTokenEvent(subject=self, token_class=token_class, amount=amount).resolve()
 
     def get_token_count(self, token_class: Type["Token"]) -> int:
-        return GetTokenCountQuery(
-            subject=self, token_class=token_class
-        ).
+        return GetTokenCountQuery(subject=self, token_class=token_class).resolve()
 
 
 class Hero(Entity):
@@ -211,7 +207,7 @@ class Summon(Entity):
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
         )
         self.summoner = summoner
-        SummonEvent(self.engine, summoner=self.summoner, subject=self).resolve()
+        SummonEvent(summoner=self.summoner, subject=self).resolve()
 
 
 class Object(Summon):
