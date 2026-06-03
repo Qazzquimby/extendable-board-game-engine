@@ -76,12 +76,16 @@ class Engine:
         ]
         self.num_hero_rows = max([len(team) for team in self.team_heroes])
 
-    def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
+    def get_choice_index(self, team: int, choices: List[ChoiceT]) -> int:
         if not choices:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
-            return choices[0]
+            return 0
         index = self.agents[team].choose(choices)
+        return index
+
+    def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
+        index = self.get_choice_index(team=team, choices=choices)
         return choices[index]
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:

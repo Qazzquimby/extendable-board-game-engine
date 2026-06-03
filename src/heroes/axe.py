@@ -1,25 +1,29 @@
 from dataclasses import dataclass
 from typing import Optional, TYPE_CHECKING
 
-from aimings import TargetEntity, TargetSelf, MultipleAiming, IncludeArea
+from aimings import (
+    TargetEntity,
+    TargetSelf,
+    MultipleAiming,
+    IncludeArea,
+    is_enemy_aim_condition,
+)
 from areas import Burst
 from engine import (
     Engine,
     Hero,
-    before,
-    InnateArmor,
 )
-from modifiers import Modifier, Token, ArmorToken, StunnedToken
-from events import TurnEndEvent, DamageEvent, after, query, DeathEvent
+from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor
+from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
 from abilities import (
     Ability,
     DamageInstruction,
     GiveTokenInstruction,
-    ApplyModifierInstruction,
     RefreshAbilityInstruction,
     ActionCost,
     Instruction,
     ActionContext,
+    UseAnAbilityInstruction,
 )
 from mod_value import div
 from point import Point
@@ -67,7 +71,7 @@ class CullingBladeInstruction(Instruction):
             if ctx.ability and ctx.ability.charges is not None:
                 ctx.ability.charges += 1
             if isinstance(ctx.target, Hero):
-                ctx.source.add_modifier(InnateArmor())
+                ctx.source.add_modifier(Armor())
 
 
 class AxeCleaveOnTakeDamage(Modifier):
@@ -120,27 +124,24 @@ class Axe(Hero):
             )
         )
 
-        # TODO
-        #     - name: Berserker's Call
-        #       text: |-
-        #         1/Game, Free Action
-        #         You have Armor until the beginning of your next turn.
-        #         All enemies in range 1 target you with a default ability, and are stunned.Until the beginning of your next turn,
-
         self.abilities.append(
             Ability(
                 name="Berserker's Call",
                 aiming=MultipleAiming(
                     {
                         "self": TargetSelf(),
-                        "nearby_enemies": IncludeArea(area=Burst(radius=1)),
+                        "nearby_enemies": IncludeArea(
+                            area=Burst(radius=1), condition=is_enemy_aim_condition
+                        ),
                     }
                 ),
                 instructions=[
                     GiveTokenInstruction(
                         aiming_name="self_target", token_class=ArmorToken
                     ),
-                    UseAbilityInstruction(...),
+                    UseAnAbilityInstruction(
+                        aiming_name="nearby_enemies", default_only=True
+                    ),
                     GiveTokenInstruction(
                         aiming_name="nearby_enemies", token_class=StunnedToken
                     ),

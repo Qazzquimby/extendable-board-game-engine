@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
+from choices import Choice
 from events import PushEvent, PullEvent, DamageEvent, HealEvent, AddTokenEvent
 
 if TYPE_CHECKING:
@@ -307,6 +308,52 @@ class PullInstruction(Instruction):
 
 
 # todo should really have an 'only affects entities' default flag to avoid the repeated filter logic.
+
+
+# Which ability, who chooses, what constraints. on whom, who chooses, what constraints
+
+
+@dataclass
+class UseAnAbilityInstruction(Instruction):
+    default_only: bool = False
+    required_target: Optional["Point"] = None
+    subject_chooses: bool = True
+
+    def execute(self, ctx: ActionContext) -> None:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if not subject or not hasattr(subject, "abilities"):
+            return
+
+        valid_abilities = subject.abilities
+        if self.default_only:
+            valid_abilities = [
+                ability for ability in valid_abilities if ability.is_default
+            ]
+
+        choices = [
+            Choice(
+                features={f"{ctx.source.name}_forced_use_ability_is_{ability.name}": 1}
+            )
+            for ability in valid_abilities
+        ]
+        if self.subject_chooses:
+            choosing_team = subject.team
+        else:
+            choosing_team = ctx.source.team
+        chosen_ability_index = ctx.engine.get_choice_index(
+            team=choosing_team, choices=choices
+        )
+        chosen_ability = valid_abilities[chosen_ability_index]
+        possible_aimings = chosen_ability.aiming.get_all_aimings(
+            engine=ctx.engine, actor=subject, require_los=True
+        )
+        aiming = possible_aimings[0]
+
+        chosen_ability.execute(
+            engine=ctx.engine,
+            source=subject,
+            aiming_result=aiming,
+        )
 
 
 @dataclass
