@@ -1,5 +1,5 @@
 from aimings import TargetSelf, TargetEntity
-from engine import Token
+from modifiers import Token
 from queries import QueryLegalActions
 from events import TurnEndEvent, DamageEvent
 from engine import before, query

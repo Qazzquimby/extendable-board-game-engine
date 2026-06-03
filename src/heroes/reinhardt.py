@@ -15,11 +15,11 @@ from engine import (
     Engine,
     Hero,
     before,
-    Modifier,
     ImmobileToken,
     ActionContext,
     Instruction,
 )
+from modifiers import Modifier
 from events import PushEvent, PullEvent, DamageEvent
 from grid import Grid
 from point import Point

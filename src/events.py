@@ -7,7 +7,8 @@ from mod_value import ModInt
 
 if TYPE_CHECKING:
     from abilities import Ability
-    from engine import Engine, Summon, Token, Modifier
+    from engine import Engine, Summon
+    from modifiers import Modifier, Token
     from entities import Entity
 
 

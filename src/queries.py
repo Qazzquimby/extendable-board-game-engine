@@ -6,7 +6,7 @@ from mod_value import ModInt
 
 if TYPE_CHECKING:
     from abilities import Ability
-    from engine import Token
+    from modifiers import Token
     from entities import Entity
     from aimings import AimingResult
 

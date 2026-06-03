@@ -1,11 +1,11 @@
 from engine import (
     Engine,
-    Modifier,
     query,
     before,
     Taunted,
     InnateArmor,
 )
+from modifiers import Modifier
 from entities import Entity
 from queries import QueryHasArmor
 from events import DamageEvent, HealEvent

@@ -4,13 +4,13 @@ from aimings import TargetEntity
 from engine import (
     Engine,
     Hero,
-    Modifier,
     after,
     HealEvent,
     query,
     ActionContext,
     Instruction,
 )
+from modifiers import Modifier
 from queries import QueryDefense
 from events import DeathEvent
 from abilities import (

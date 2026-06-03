@@ -20,7 +20,8 @@ from queries import (
 from schemas import EntityState
 
 if TYPE_CHECKING:
-    from engine import Engine, Modifier, Token
+    from engine import Engine
+    from modifiers import Modifier, Token
 
 
 class Entity:

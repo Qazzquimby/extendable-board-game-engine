@@ -8,19 +8,17 @@ from abilities import (
 )
 from aimings import TargetEntity, MultipleAiming, TargetPoint
 from engine import (
-    Token,
     Entity,
-    Modifier,
     after,
     Object,
     Engine,
-    SummonModifier,
     SlowToken,
     Hero,
     GiveTokenEvent,
     ActionContext,
     Instruction,
 )
+from modifiers import Modifier, SummonModifier, Token
 from events import TurnStartEvent, TurnEndEvent, DamageEvent, SummonEvent
 from point import Point
 

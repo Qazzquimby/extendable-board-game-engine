@@ -6,10 +6,9 @@ from engine import (
     Engine,
     Hero,
     before,
-    Token,
-    Modifier,
     InnateArmor,
 )
+from modifiers import Modifier, Token
 from events import TurnEndEvent, DamageEvent, after, query, DeathEvent
 from abilities import (
     Ability,
@@ -120,7 +119,6 @@ class Axe(Hero):
             )
         )
 
-
         # TODO
         #     - name: Berserker's Call
         #       text: |-
@@ -137,11 +135,10 @@ class Axe(Hero):
                 aiming=TargetSelf(),
                 instructions=[
                     GiveTokenInstruction(token_class=ArmorToken),
-                    GiveTokenInstruction(token_class=BerserkersCallToken)
+                    GiveTokenInstruction(token_class=BerserkersCallToken),
                 ],
                 owner=self,
-                action_cost=ActionCost.FREE
-
+                action_cost=ActionCost.FREE,
             )
         )
 

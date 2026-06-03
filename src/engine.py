@@ -1,7 +1,6 @@
 import abc
 import random
 import copy
-from dataclasses import dataclass, field
 from typing import (
     List,
     Optional,
@@ -10,13 +9,12 @@ from typing import (
 )
 
 from choices import get_plausible_move_and_actions, Choice, PlausibleMoveAndAction
-from entities import Entity, Summon, Marker, Hero
+from entities import Entity, Marker, Hero
 from events import (
     TurnStartEvent,
     TurnEndEvent,
     EventPhase,
     query,
-    before,
     Router,
     Query,
     ChangeLocationEvent,
@@ -27,10 +25,6 @@ from grid import Grid
 from point import Point
 from queries import (
     QueryIsAlive,
-    QueryHasArmor,
-    QueryLegalActions,
-    QueryCanMove,
-    QuerySpeed,
 )
 from schemas import EngineState, GameLog, LogEntry, ActionState
 
@@ -268,109 +262,3 @@ class Engine:
                 entity_states,
             )
         )
-
-
-class Modifier:
-    owner: Entity = field(init=False)
-
-
-class SummonModifier(Modifier):
-    owner: Summon = field(init=False)
-
-
-class Token(Modifier):
-    def __init__(self, amount: int = 1):
-        self.amount = amount
-
-    def add(self, amount: int) -> None:
-        self.amount += amount
-
-    def remove(self, amount: int) -> None:
-        self.amount -= amount
-        if self.amount <= 0:
-            self.owner.remove_modifier(self)
-
-
-class Immobile(Modifier):
-    @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
-        q.result = False
-
-
-class ImmobileToken(Immobile, Token):
-    @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
-
-
-class Stunned(Modifier):
-    @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
-        q.result = False
-
-    @query(QueryLegalActions)
-    def prevent_actions(self, q: QueryLegalActions) -> None:
-        q.result = []
-
-    @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        # todo, we'd rather modify the modifier somehow
-        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
-        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
-        #  eg Nearby enemies are immobile
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
-
-
-class Slow(Modifier):
-    def __init__(self, amount: int):
-        self.amount = amount
-
-    @query(QuerySpeed)
-    def reduce_speed(self, q: QuerySpeed) -> None:
-        q.result.add(-self.amount)
-
-
-class SlowToken(Slow, Token):
-    @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        # todo, we'd rather modify the modifier somehow
-        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
-        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
-        #  eg Nearby enemies are immobile
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
-
-
-@dataclass
-class Taunted(Modifier):
-    taunter: Entity
-
-    @query(QueryLegalActions)
-    def force_attack(self, q: QueryLegalActions) -> None:
-        forced_actions = []
-        # for ability in self.owner.abilities:
-        for (
-            ability
-        ) in (
-            q.result
-        ):  # It should start initialized to all legal actions including move.
-            if ability.is_default:
-                import copy
-
-                action = copy.deepcopy(ability)
-                action.subject = self.taunter
-                forced_actions.append(action)
-        q.result = forced_actions
-        self.owner.remove_modifier(self)
-
-    @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
-        q.result = False
-
-
-class InnateArmor(Modifier):
-    @query(QueryHasArmor)
-    def grant_armor(self, q: QueryHasArmor) -> None:
-        q.result = True

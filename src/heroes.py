@@ -1,5 +1,6 @@
 from aimings import TargetEntity, TargetSelf
-from engine import Engine, Token
+from engine import Engine
+from modifiers import Token
 from abilities import Ability, DamageInstruction
 from entities import Hero
 from point import Point

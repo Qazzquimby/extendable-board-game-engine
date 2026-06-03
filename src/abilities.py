@@ -9,9 +9,8 @@ if TYPE_CHECKING:
     from engine import (
         Engine,
         Entity,
-        Token,
-        Modifier,
     )
+    from modifiers import Modifier, Token
     from point import Point
 
 
