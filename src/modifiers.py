@@ -26,23 +26,21 @@ class Token(Modifier):
             self.owner.remove_modifier(self)
 
 
-class Immobile(Modifier):
-    @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
-        q.result = False
-
-
-class Immobile(Modifier):
-    @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
-        q.result = False
-
-
-class ImmobileToken(Immobile, Token):
+class ClearAtEndOfTurnMixin:
     @before(TurnEndEvent)
     def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
         if self in self.owner.modifiers:
             self.owner.remove_modifier(self)
+
+
+class Immobile(Modifier):
+    @query(QueryCanMove)
+    def prevent_move(self, q: QueryCanMove) -> None:
+        q.result = False
+
+
+class ImmobileToken(Immobile, Token, ClearAtEndOfTurnMixin):
+    pass
 
 
 class Stunned(Modifier):
@@ -54,14 +52,9 @@ class Stunned(Modifier):
     def prevent_actions(self, q: QueryLegalActions) -> None:
         q.result = []
 
-    @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        # todo, we'd rather modify the modifier somehow
-        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
-        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
-        #  eg Nearby enemies are immobile
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
+
+class StunnedToken(Stunned, Token, ClearAtEndOfTurnMixin):
+    pass
 
 
 class Slow(Modifier):
@@ -73,42 +66,8 @@ class Slow(Modifier):
         q.result.add(-self.amount)
 
 
-class SlowToken(Slow, Token):
-    @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        # todo, we'd rather modify the modifier somehow
-        #  Immobile().until(TurnEndEvent, target=self.owner) or something.
-        #  Immobile doesn't inherently last one turn. Everything can have any duration or condition
-        #  eg Nearby enemies are immobile
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
-
-
-@dataclass
-class Taunted(Modifier):
-    taunter: Entity
-
-    @query(QueryLegalActions)
-    def force_attack(self, q: QueryLegalActions) -> None:
-        forced_actions = []
-        # for ability in self.owner.abilities:
-        for (
-            ability
-        ) in (
-            q.result
-        ):  # It should start initialized to all legal actions including move.
-            if ability.is_default:
-                import copy
-
-                action = copy.deepcopy(ability)
-                action.subject = self.taunter
-                forced_actions.append(action)
-        q.result = forced_actions
-        self.owner.remove_modifier(self)
-
-    @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
-        q.result = False
+class SlowToken(Slow, Token, ClearAtEndOfTurnMixin):
+    pass
 
 
 class Armor(Modifier):
@@ -117,12 +76,32 @@ class Armor(Modifier):
         q.result = True
 
 
-class ArmorToken(Token):
-    @query(QueryHasArmor)
-    def grant_armor(self, q: QueryHasArmor) -> None:
-        q.result = True
+class ArmorToken(Armor, Token, ClearAtEndOfTurnMixin):
+    pass
 
-    @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
+
+# @dataclass
+# class Taunted(Modifier):
+#     taunter: Entity
+#
+#     @query(QueryLegalActions)
+#     def force_attack(self, q: QueryLegalActions) -> None:
+#         forced_actions = []
+#         # for ability in self.owner.abilities:
+#         for (
+#             ability
+#         ) in (
+#             q.result
+#         ):  # It should start initialized to all legal actions including move.
+#             if ability.is_default:
+#                 import copy
+#
+#                 action = copy.deepcopy(ability)
+#                 action.subject = self.taunter
+#                 forced_actions.append(action)
+#         q.result = forced_actions
+#         self.owner.remove_modifier(self)
+#
+#     @query(QueryCanMove)
+#     def prevent_move(self, q: QueryCanMove) -> None:
+#         q.result = False

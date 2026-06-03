@@ -23,7 +23,7 @@ class Burst(Area):
         in_range: int = 0,
     ):
         super().__init__(in_range=in_range)
-        self.radius = radius
+        self.radius = radius  # radius n is all points in range n.
         self.range_limit = in_range
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:

@@ -1,14 +1,15 @@
 from dataclasses import dataclass
 from typing import Optional, TYPE_CHECKING
 
-from aimings import TargetEntity, TargetSelf
+from aimings import TargetEntity, TargetSelf, MultipleAiming, IncludeArea
+from areas import Burst
 from engine import (
     Engine,
     Hero,
     before,
     InnateArmor,
 )
-from modifiers import Modifier, Token
+from modifiers import Modifier, Token, ArmorToken, StunnedToken
 from events import TurnEndEvent, DamageEvent, after, query, DeathEvent
 from abilities import (
     Ability,
@@ -123,19 +124,26 @@ class Axe(Hero):
         #     - name: Berserker's Call
         #       text: |-
         #         1/Game, Free Action
-        #         Until the beginning of your next turn,
-        #           You have Armor
-        #           When an enemy starts their turn in range 1 of you,
-        #             they cannot move, and they must use a default attack targeting you, if possible, spending actions as normal.
-        #       hints:
-        #         - REFERENCE_ArmorHint
+        #         You have Armor until the beginning of your next turn.
+        #         All enemies in range 1 target you with a default ability, and are stunned.Until the beginning of your next turn,
+
         self.abilities.append(
             Ability(
                 name="Berserker's Call",
-                aiming=TargetSelf(),
+                aiming=MultipleAiming(
+                    {
+                        "self": TargetSelf(),
+                        "nearby_enemies": IncludeArea(area=Burst(radius=1)),
+                    }
+                ),
                 instructions=[
-                    GiveTokenInstruction(token_class=ArmorToken),
-                    GiveTokenInstruction(token_class=BerserkersCallToken),
+                    GiveTokenInstruction(
+                        aiming_name="self_target", token_class=ArmorToken
+                    ),
+                    UseAbilityInstruction(...),
+                    GiveTokenInstruction(
+                        aiming_name="nearby_enemies", token_class=StunnedToken
+                    ),
                 ],
                 owner=self,
                 action_cost=ActionCost.FREE,
