@@ -35,9 +35,14 @@ QueryResultT = TypeVar("QueryResultT")
 
 
 class Query(Generic[QueryResultT]):
-    def __init__(self, subject: "Entity", result: QueryResultT):
+    def __init__(self, engine: "Engine", subject: "Entity", base_result: QueryResultT):
+        self.engine = engine
         self.subject = subject
-        self.result = result
+        self.result: QueryResultT = base_result
+
+    def resolve(self) -> QueryResultT:
+        self.engine.router.publish(self, EventPhase.QUERY)
+        return self.result
 
 
 class EventPhase(Enum):

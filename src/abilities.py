@@ -3,7 +3,6 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from choices import Choice
 from events import PushEvent, PullEvent, DamageEvent, HealEvent, AddTokenEvent
 
 if TYPE_CHECKING:
@@ -320,6 +319,8 @@ class UseAnAbilityInstruction(Instruction):
     subject_chooses: bool = True
 
     def execute(self, ctx: ActionContext) -> None:
+        from choices import Choice
+
         subject = ctx.engine.entity_at(ctx.subject_point)
         if not subject or not hasattr(subject, "abilities"):
             return

@@ -7,7 +7,6 @@ from events import (
     SummonEvent,
     AddTokenEvent,
     RemoveTokenEvent,
-    GetTokenCountQuery,
 )
 from point import Point
 from queries import (
@@ -15,7 +14,7 @@ from queries import (
     QueryCanMove,
     QueryLegalActions,
     QueryDefense,
-    QueryCrit,
+    QueryCrit, GetTokenCountQuery,
 )
 from schemas import EntityState
 
@@ -107,9 +106,7 @@ class Entity:
 
     # --- Engine Query Helpers ---
     def has_armor(self) -> bool:
-        q = QueryHasArmor(self)
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
+        return QueryHasArmor(subject=self).resolve()
 
     def can_move(self) -> bool:
         q = QueryCanMove(self)
@@ -186,8 +183,8 @@ class Entity:
 
     def get_token_count(self, token_class: Type["Token"]) -> int:
         return GetTokenCountQuery(
-            engine=self.engine, subject=self, token_class=token_class
-        ).resolve()
+            subject=self, token_class=token_class
+        ).
 
 
 class Hero(Entity):
