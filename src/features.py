@@ -4,7 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
-    from choices import PlausibleMoveAndAction
+    from choices import PlausibleActionOrMoveAndAction
     from engine import Engine
     from entities import Entity
     from point import Point
@@ -23,7 +23,7 @@ class WeightedFeature(BaseModel):
 class FeatureContext:
     engine: "Engine"
     actor: "Entity"
-    choice: "PlausibleMoveAndAction"
+    choice: "PlausibleActionOrMoveAndAction"
     core_features: Dict[str, Any]
 
     @property
@@ -60,9 +60,7 @@ class FeatureContext:
         hit_spaces = set(self.choice.aiming_result.target_points) | set(
             self.choice.aiming_result.included_points
         )
-        return [
-            entity for entity in self.engine.entities if entity.pos in hit_spaces
-        ]
+        return [entity for entity in self.engine.entities if entity.pos in hit_spaces]
 
     @property
     def hit_allies(self) -> List["Entity"]:
@@ -118,7 +116,7 @@ class ChoiceFeatureEvaluator:
         self,
         engine: "Engine",
         actor: "Entity",
-        choice: "PlausibleMoveAndAction",
+        choice: "PlausibleActionOrMoveAndAction",
         core_features: Dict[str, Any],
     ) -> Dict[str, Any]:
         context = FeatureContext(

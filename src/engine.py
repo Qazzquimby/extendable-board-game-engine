@@ -2,13 +2,20 @@ import abc
 import random
 import copy
 from typing import (
+    Dict,
     List,
     Optional,
-    Dict,
     TypeVar,
+    Union,
 )
 
-from choices import get_plausible_move_and_actions, Choice, PlausibleMoveAndAction
+from choices import (
+    Choice,
+    PlausibleFreeAction,
+    PlausibleMoveAndAction,
+    get_plausible_free_actions,
+    get_plausible_move_and_actions,
+)
 from entities import Entity, Marker, Hero
 from events import (
     TurnStartEvent,
@@ -134,17 +141,41 @@ class Engine:
 
             agent = self.agents[self.current_hero.team]
             feature_evaluator = getattr(agent, "feature_evaluator", None)
-            plausible_actions: List[PlausibleMoveAndAction] = (
-                get_plausible_move_and_actions(
+
+            chosen_action: PlausibleMoveAndAction = None
+            turn_over = False
+            while not turn_over:
+                plausible_move_actions = get_plausible_move_and_actions(
                     actor=self.current_hero,
                     engine=self,
                     feature_evaluator=feature_evaluator,
                 )
-            )
-            chosen_action: PlausibleMoveAndAction = self.get_choice(
-                team=self.current_hero.team, choices=plausible_actions
-            )
-            self.step(actor=self.current_hero, action=chosen_action)
+                plausible_free_actions = get_plausible_free_actions(
+                    actor=self.current_hero,
+                    engine=self,
+                    feature_evaluator=feature_evaluator,
+                )
+
+                all_choices: List[Choice] = (
+                    plausible_move_actions + plausible_free_actions
+                )
+                if not all_choices:
+                    turn_over = True
+                    continue
+
+                action_choice = self.get_choice(
+                    team=self.current_hero.team, choices=all_choices
+                )
+
+                if isinstance(action_choice, PlausibleMoveAndAction):
+                    self.step(actor=self.current_hero, action=action_choice)
+                    chosen_action = action_choice
+                    turn_over = True
+                elif isinstance(action_choice, PlausibleFreeAction):
+                    self.step(actor=self.current_hero, action=action_choice)
+
+            if not chosen_action:
+                continue
 
             # Check win condition
             time_up = self.round_num >= 6
@@ -182,9 +213,12 @@ class Engine:
 
         return GameLog(winner_team=winner_team, logs=logs)
 
-    def step(self, actor: Entity, action: PlausibleMoveAndAction) -> None:
-        for point in action.move_path:
-            ChangeLocationEvent(self, actor, point).resolve()
+    def step(
+        self, actor: Entity, action: Union[PlausibleMoveAndAction, PlausibleFreeAction]
+    ) -> None:
+        if isinstance(action, PlausibleMoveAndAction):
+            for point in action.move_path:
+                ChangeLocationEvent(self, actor, point).resolve()
         action.ability.execute(
             engine=self, source=actor, aiming_result=action.aiming_result
         )
