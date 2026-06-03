@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from events import PushEvent, PullEvent, DamageEvent, HealEvent, GiveTokenEvent
+from events import PushEvent, PullEvent, DamageEvent, HealEvent, AddTokenEvent
 
 if TYPE_CHECKING:
     from engine import (
@@ -253,7 +253,7 @@ class GiveTokenInstruction(Instruction):
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
-            GiveTokenEvent(
+            AddTokenEvent(
                 engine=ctx.engine,
                 subject=subject,
                 token_class=self.token_class,

@@ -2,7 +2,13 @@ from typing import Optional, List, Type, TYPE_CHECKING
 
 from abilities import Ability
 
-from events import EventPhase, SummonEvent
+from events import (
+    EventPhase,
+    SummonEvent,
+    AddTokenEvent,
+    RemoveTokenEvent,
+    GetTokenCountQuery,
+)
 from point import Point
 from queries import (
     QueryHasArmor,
@@ -165,24 +171,22 @@ class Entity:
             self.engine.router.unsubscribe(modifier)
 
     def add_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        for mod in self.modifiers:
-            if isinstance(mod, token_class):
-                mod.add(amount)
-                return
-        new_token = token_class(amount)
-        self.add_modifier(new_token)
+        AddTokenEvent(
+            engine=self.engine,
+            subject=self,
+            token_class=token_class,
+            amount=amount,
+        ).resolve()
 
     def remove_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        for mod in self.modifiers:
-            if isinstance(mod, token_class):
-                mod.remove(amount)
-                return
+        RemoveTokenEvent(
+            engine=self.engine, subject=self, token_class=token_class, amount=amount
+        )
 
     def get_token_count(self, token_class: Type["Token"]) -> int:
-        for mod in self.modifiers:
-            if isinstance(mod, token_class):
-                return mod.amount
-        return 0
+        return GetTokenCountQuery(
+            engine=self.engine, subject=self, token_class=token_class
+        ).resolve()
 
 
 class Hero(Entity):

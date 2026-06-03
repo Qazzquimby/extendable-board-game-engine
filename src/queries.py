@@ -1,10 +1,12 @@
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Type
 
 from abilities import Ability
 from events import Query
 from mod_value import ModInt
 
 if TYPE_CHECKING:
+    from abilities import Ability
+    from engine import Token
     from entities import Entity
     from aimings import AimingResult
 
@@ -68,3 +70,16 @@ class QueryCrit(Query[ModInt]):
         super().__init__(subject=subject, result=ModInt(result))
         self.attack_source = attack_source
         self.ability = ability
+
+
+class GetTokenCountQuery(Query[int]):
+    def __init__(self, subject: "Entity", token_class: Type["Token"]):
+        super().__init__(subject=subject, result=0)
+        self.token_class = token_class
+
+    def _resolve(self):
+        for modifier in self.subject.modifiers:
+            if isinstance(modifier, self.token_class):
+                modifier: "Token"
+                return modifier.amount
+        return 0

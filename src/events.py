@@ -272,7 +272,8 @@ class HealEvent(Event):
         self.subject.hp += final_heal
 
 
-class GiveTokenEvent(Event):
+### TOKENS
+class AddTokenEvent(Event):
     def __init__(
         self,
         engine: "Engine",
@@ -285,4 +286,28 @@ class GiveTokenEvent(Event):
         self.amount = amount
 
     def _resolve(self):
-        self.subject.add_token(self.token_class, amount=self.amount)
+        for modifier in self.subject.modifiers:
+            if isinstance(modifier, self.token_class):
+                modifier.add(self.amount)
+                return
+        new_token = self.token_class(self.amount)
+        self.subject.add_modifier(new_token)
+
+
+class RemoveTokenEvent(Event):
+    def __init__(
+        self,
+        engine: "Engine",
+        subject: "Entity",
+        token_class: Type["Token"],
+        amount: int,
+    ):
+        super().__init__(engine=engine, subject=subject)
+        self.token_class = token_class
+        self.amount = amount
+
+    def _resolve(self):
+        for modifiers in self.subject.modifiers:
+            if isinstance(modifiers, self.token_class):
+                modifiers.remove(self.amount)
+                return
