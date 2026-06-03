@@ -23,7 +23,6 @@ from events import (
     EventPhase,
     query,
     Router,
-    Query,
     ChangeLocationEvent,
     RoundEndEvent,
     RoundStartEvent,
@@ -126,7 +125,7 @@ class Engine:
 
         after_state = None
 
-        RoundStartEvent(engine=self).resolve()
+        RoundStartEvent(engine=engine).resolve()
 
         while self.round_num <= 6:
             self.next_turn()

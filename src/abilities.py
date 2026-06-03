@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from events import PushEvent, PullEvent, DamageEvent, HealEvent, AddTokenEvent
+from events import PullEvent, DamageEvent, HealEvent, AddTokenEvent
 
 if TYPE_CHECKING:
     from engine import (
@@ -272,21 +272,21 @@ class RemoveTokenInstruction(Instruction):
             ctx.target.remove_token(self.token_class, amount=amount)
 
 
-@dataclass
-class PushInstruction(Instruction):
-    distance: DynamicInt
-
-    # todo probably want direction param and update resolution
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
-        if subject:
-            dist = resolve_int(self.distance, ctx)
-            PushEvent(
-                engine=ctx.engine,
-                subject=ctx.target,
-                distance=dist,
-                source=ctx.source,
-            ).resolve()
+# @dataclass
+# class PushInstruction(Instruction):
+#     distance: DynamicInt
+#
+#     # todo probably want direction param and update resolution
+#     def execute(self, ctx: ActionContext) -> None:
+#         subject = ctx.engine.entity_at(ctx.subject_point)
+#         if subject:
+#             dist = resolve_int(self.distance, ctx)
+#             PushEvent(
+#                 engine=ctx.engine,
+#                 subject=ctx.target,
+#                 distance=dist,
+#                 source=ctx.source,
+#             ).resolve()
 
 
 @dataclass

@@ -6,6 +6,7 @@ from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 from mod_value import ModInt
 
 if TYPE_CHECKING:
+    from engine import Engine
     from abilities import Ability
     from modifiers import Modifier, Token
     from entities import Entity, Summon
@@ -13,18 +14,19 @@ if TYPE_CHECKING:
 
 
 class Event(abc.ABC):
-    def __init__(self, subject: "Entity"):
+    def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
+        self.engine = engine
         self.subject = subject
         self.canceled = False
 
     def resolve(self) -> None:
-        self.subject.engine.router.publish(self, EventPhase.BEFORE)
+        self.engine.router.publish(self, EventPhase.BEFORE)
 
         if self.canceled:
             return
         self._resolve()
 
-        self.subject.engine.router.publish(self, EventPhase.AFTER)
+        self.engine.router.publish(self, EventPhase.AFTER)
 
     def _resolve(self) -> None:
         raise NotImplementedError("Events must implement resolve()")
@@ -107,7 +109,7 @@ def query(event_type: Type, only_self: bool = True) -> Callable:
 
 class ChangeLocationEvent(Event):
     def __init__(self, subject: "Entity", new_pos: Optional["Point"]):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.new_pos = new_pos
 
     def _resolve(self) -> None:
@@ -149,7 +151,7 @@ class PullEvent(Event):
         distance: int,
         source: Optional["Entity"] = None,
     ):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.distance = ModInt(distance)
         self.source = source
 
@@ -170,7 +172,7 @@ class PullEvent(Event):
 
 class TurnStartEvent(Event):
     def __init__(self, subject: "Entity"):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
 
     def _resolve(self) -> None:
         self.subject.engine.current_hero.start_turn()
@@ -178,7 +180,7 @@ class TurnStartEvent(Event):
 
 class TurnEndEvent(Event):
     def __init__(self, subject: "Entity"):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
 
     def _resolve(self) -> None:
         for ability in self.subject.abilities:
@@ -189,16 +191,16 @@ class TurnEndEvent(Event):
 
 
 class RoundStartEvent(Event):
-    def __init__(self, subject: Optional["Entity"] = None):
-        super().__init__(subject=subject)
+    def __init__(self, engine: "Engine"):
+        super().__init__(engine=engine)
 
     def _resolve(self) -> None:
         pass
 
 
 class RoundEndEvent(Event):
-    def __init__(self, subject: Optional["Entity"] = None):
-        super().__init__(subject=subject)
+    def __init__(self, engine: "Engine"):
+        super().__init__(engine=engine)
 
     def _resolve(self) -> None:
         pass
@@ -212,7 +214,7 @@ class DamageEvent(Event):
         amount: int,
         ability: Optional["Ability"] = None,
     ):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.source = source
         self.amount = ModInt(amount)
         self.ability = ability
@@ -232,7 +234,7 @@ class DamageEvent(Event):
 class DeathEvent(Event):
     # For on-kill use on-death and filter by killer
     def __init__(self, subject: "Entity", killer: Optional["Entity"] = None):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.killer = killer
 
     def _resolve(self) -> None:
@@ -241,7 +243,7 @@ class DeathEvent(Event):
 
 class SummonEvent(Event):
     def __init__(self, summoner: "Entity", subject: "Summon"):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.summoner = summoner
 
     def _resolve(self) -> None:
@@ -251,7 +253,7 @@ class SummonEvent(Event):
 
 class HealEvent(Event):
     def __init__(self, subject: "Entity", amount: int):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.amount = ModInt(amount)
 
     def _resolve(self) -> None:
@@ -267,7 +269,7 @@ class AddTokenEvent(Event):
         token_class: Type["Token"],
         amount: int,
     ):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.token_class = token_class
         self.amount = amount
 
@@ -287,7 +289,7 @@ class RemoveTokenEvent(Event):
         token_class: Type["Token"],
         amount: int,
     ):
-        super().__init__(subject=subject)
+        super().__init__(engine=subject.engine, subject=subject)
         self.token_class = token_class
         self.amount = amount
 
