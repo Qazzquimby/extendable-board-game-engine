@@ -1,3 +1,4 @@
+import abc
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, TYPE_CHECKING, Callable
 
@@ -55,12 +56,13 @@ class AimingResult:
 MultipleAimingResults = Dict[str, AimingResult]
 
 
-class Aiming:
+class Aiming(abc.ABC):
     """Base class for how an ability finds its subjects."""
 
     def __init__(self, condition: Optional[AimingCondition] = None):
         self.condition = condition
 
+    @abc.abstractmethod
     def get_all_aimings(
         self,
         engine: "Engine",

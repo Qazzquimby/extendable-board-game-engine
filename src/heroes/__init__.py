@@ -1,6 +1,5 @@
 from aimings import TargetEntity, TargetSelf
 from engine import Engine
-from modifiers import Token
 from abilities import Ability, DamageInstruction
 from entities import Hero
 from point import Point
@@ -42,7 +41,3 @@ class RangedHero(Hero):
         self.abilities.append(
             Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
         )
-
-
-class KillCounter(Token):
-    pass

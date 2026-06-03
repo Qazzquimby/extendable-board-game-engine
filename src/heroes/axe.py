@@ -35,9 +35,7 @@ if TYPE_CHECKING:
 class DamageOverTimeToken(Token):
     @before(TurnEndEvent)
     def take_damage(self, event: TurnEndEvent) -> None:
-        DamageEvent(
-            engine=event.engine, source=None, subject=self.owner, amount=self.amount
-        ).resolve()
+        DamageEvent(source=None, subject=self.owner, amount=self.amount).resolve()
 
 
 class BattleHungerToken(Token):
@@ -58,7 +56,6 @@ class CullingBladeInstruction(Instruction):
         if not hasattr(ctx.target, "hp"):
             return
         event = DamageEvent(
-            engine=ctx.engine,
             source=ctx.source,
             subject=ctx.target,
             amount=3,
@@ -86,9 +83,7 @@ class AxeCleaveOnTakeDamage(Modifier):
             )
             for entity in self.owner.engine.living_entities:
                 if entity.team != self.owner.team and entity.pos in points_in_range:
-                    DamageEvent(
-                        self.owner.engine, source=self.owner, subject=entity, amount=1
-                    ).resolve()
+                    DamageEvent(source=self.owner, subject=entity, amount=1).resolve()
 
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
@@ -100,7 +95,6 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
             reflect_amt = div(event.amount.value, 2)
             if reflect_amt > 0:
                 DamageEvent(
-                    self.owner.engine,
                     source=self.owner,
                     subject=event.source,
                     amount=reflect_amt,

@@ -29,9 +29,7 @@ from events import (
 )
 from grid import Grid
 from point import Point
-from queries import (
-    QueryIsAlive,
-)
+from queries import QueryIsAlive, Query
 from schemas import EngineState, GameLog, LogEntry, ActionState
 
 ChoiceT = TypeVar("ChoiceT", bound="Choice")
@@ -125,7 +123,7 @@ class Engine:
 
         after_state = None
 
-        RoundStartEvent(engine=engine).resolve()
+        RoundStartEvent(engine=self).resolve()
 
         while self.round_num <= 6:
             self.next_turn()
@@ -217,7 +215,7 @@ class Engine:
     ) -> None:
         if isinstance(action, PlausibleMoveAndAction):
             for point in action.move_path:
-                ChangeLocationEvent(self, actor, point).resolve()
+                ChangeLocationEvent(actor, point).resolve()
         action.ability.execute(
             engine=self, source=actor, aiming_result=action.aiming_result
         )
@@ -226,7 +224,7 @@ class Engine:
         will_be_first_turn = self.current_hero is None
 
         if not will_be_first_turn:
-            TurnEndEvent(self, self.current_hero).resolve()
+            TurnEndEvent(self.current_hero).resolve()
 
             self.current_team = (self.current_team + 1) % NUM_TEAMS
             if self.current_team == 0:  # just wrapped, get new hero index
@@ -238,7 +236,7 @@ class Engine:
                     RoundStartEvent(self).resolve()
 
         self.current_hero = self._get_current_hero()
-        TurnStartEvent(self, self.current_hero).resolve()
+        TurnStartEvent(self.current_hero).resolve()
 
     def _get_current_hero(self):
         return self.team_heroes[self.current_team][self.current_hero_row_index]
