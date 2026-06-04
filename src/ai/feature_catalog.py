@@ -57,3 +57,11 @@ def get_feature_catalog(engine: "Engine") -> List[str]:
             features.add(f"distance_{e1.name}_to_{e2.name}")
 
     return sorted(list(features))
+
+
+if __name__ == "__main__":
+    from self_play import setup_game
+
+    engine = setup_game()
+    feature_catalog = get_feature_catalog(engine)
+    print("\n".join(feature_catalog))

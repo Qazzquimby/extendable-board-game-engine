@@ -1,5 +1,8 @@
+import json
 import random
+from pathlib import Path
 from typing import List, Dict, Callable
+
 import numpy as np
 
 
@@ -8,11 +11,14 @@ class PlayerPopulation:
         self,
         population_size: int,
         feature_catalog: List[str],
-        initial_weights: Dict[str, float],
+        initial_weights: Dict[str, float] = None,
     ):
         self.population_size = population_size
         self.feature_catalog = feature_catalog
-        self.population = self._initialize_population(initial_weights)
+        if initial_weights:
+            self.population = self._initialize_population(initial_weights)
+        else:
+            self.population = []
 
     def _initialize_population(
         self, initial_weights: Dict[str, float]
@@ -27,6 +33,18 @@ class PlayerPopulation:
             population.append(weights)
         return population
 
+    def save(self, path: Path):
+        with open(path, "w") as f:
+            json.dump(self.population, f, indent=2)
+
+    @classmethod
+    def load(cls, path: Path, feature_catalog: List[str]):
+        with open(path, "r") as f:
+            population_data = json.load(f)
+        instance = cls(len(population_data), feature_catalog)
+        instance.population = population_data
+        return instance
+
     def run_tournament(
         self, engine_setup_fn: Callable, run_game_fn: Callable, agent_class: type
     ):
@@ -39,7 +57,7 @@ class PlayerPopulation:
 
                 # Game 1
                 engine1 = engine_setup_fn()
-                winner1 = run_game_fn(engine1, {0: agent1, 1: agent2})
+                winner1 = run_game_fn(engine1, {0: agent1, 1: agent2}, (i, j))
                 if winner1 == 0:
                     scores[i] += 1
                 elif winner1 == 1:
@@ -49,7 +67,9 @@ class PlayerPopulation:
                 agent1_swapped = agent_class(weights=self.population[i])
                 agent2_swapped = agent_class(weights=self.population[j])
                 engine2 = engine_setup_fn()
-                winner2 = run_game_fn(engine2, {0: agent2_swapped, 1: agent1_swapped})
+                winner2 = run_game_fn(
+                    engine2, {0: agent2_swapped, 1: agent1_swapped}, (j, i)
+                )
                 if winner2 == 0:
                     scores[j] += 1
                 elif winner2 == 1:
@@ -105,32 +125,3 @@ class PlayerPopulation:
                 weights[key] += np.random.normal(0, strength)
 
 
-# todo unused, unsaved
-def tune_weights(
-    engine_setup_fn: Callable,
-    run_game_fn: Callable,
-    agent_class: type,
-    initial_weights: Dict[str, float],
-    feature_catalog: List[str],
-    generations: int = 10,
-    population_size: int = 20,
-    mutation_rate: float = 0.05,
-    mutation_strength: float = 0.1,
-    crossover_prob: float = 0.7,
-):
-    population = PlayerPopulation(population_size, feature_catalog, initial_weights)
-
-    for gen in range(generations):
-        print(f"Generation {gen+1}/{generations}")
-        scores = population.run_tournament(engine_setup_fn, run_game_fn, agent_class)
-        population.evolve(scores, mutation_rate, mutation_strength, crossover_prob)
-
-        best_player_idx = max(scores, key=scores.get, default=0)
-        print(
-            f"Best player of generation {gen+1} had score {scores.get(best_player_idx, 0)}"
-        )
-
-    # Return the weights of the best player from the final generation
-    final_scores = population.run_tournament(engine_setup_fn, run_game_fn, agent_class)
-    best_player_idx = max(final_scores, key=final_scores.get, default=0)
-    return population.population[best_player_idx]

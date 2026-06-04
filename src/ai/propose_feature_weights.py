@@ -15,7 +15,6 @@ class FeatureWeights(BaseModel):
     weights: List[FeatureWeight]
 
 
-# todo is not used or saved anywhere.
 def propose_feature_weights(
     feature_catalog: List[str], strategy: str
 ) -> Dict[str, float]:

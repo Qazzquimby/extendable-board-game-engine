@@ -1,16 +1,14 @@
 import json
-import random
 from pathlib import Path
-from typing import List, Type, Union
 
 from tqdm import tqdm
 
+from ai.feature_agent import get_example_feature_agent
 from engine import Engine
 from grid import Grid
 from heroes import MeleeHero, RangedHero
 from heroes.axe import Axe
 from point import Point
-from feature_agent import get_example_feature_agent
 
 # POSSIBLE_HEROES = [MeleeHero, RangedHero]
 POSSIBLE_HEROES = [
