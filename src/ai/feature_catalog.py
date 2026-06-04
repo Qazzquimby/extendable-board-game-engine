@@ -2,10 +2,9 @@ from typing import List, TYPE_CHECKING
 
 from abilities import (
     Ability,
-    UseAnAbilityInstruction,
-    Instruction,
 )
 from aimings import MultipleAiming
+from ai.feature_definitions import NEW_LOCATION
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -26,8 +25,7 @@ def get_feature_catalog(engine: "Engine") -> List[str]:
             all_abilities.extend(entity.abilities)
 
     # Features from PlausibleMoveAndAction
-    for name in entity_names:
-        features.add(f"new_location_{name}")
+    features.update(NEW_LOCATION.get_all_variants(engine, None, None))
 
     # Features from _compute_ability_features
     for ability in all_abilities:
@@ -42,30 +40,13 @@ def get_feature_catalog(engine: "Engine") -> List[str]:
     # Features from instructions
     for ability in all_abilities:
         for instruction in ability.instructions:
-            templates = instruction.get_feature_templates()
+            feature_templates = instruction.get_feature_templates()
 
-            for template in templates:
-                if isinstance(instruction, UseAnAbilityInstruction):
-                    source_entity = ability.owner
-                    if not source_entity:
-                        continue
-                    for subject_entity in entities:
-                        if hasattr(subject_entity, "abilities"):
-                            valid_abilities = subject_entity.abilities
-                            if instruction.default_only:
-                                valid_abilities = [
-                                    a for a in valid_abilities if a.is_default
-                                ]
-                            for forced_ability in valid_abilities:
-                                features.add(
-                                    template.format(
-                                        source_name=source_entity.name,
-                                        ability_name=forced_ability.name,
-                                    )
-                                )
-                elif "{name}" in template:
-                    for name in entity_names:
-                        features.add(template.format(name=name))
+            for feature_template in feature_templates:
+                variants = feature_template.get_all_variants(
+                    engine, ability, instruction
+                )
+                features.update(variants)
 
     # Distance features
     entity_list = sorted(engine.entities, key=lambda e: e.id)

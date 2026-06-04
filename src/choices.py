@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Union
 
 from abilities import Ability, ActionContext, ActionCost
+from ai.feature_definitions import NEW_LOCATION
 from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
 from entities import Entity
 from point import Point
@@ -53,7 +54,7 @@ class PlausibleMoveAndAction(Choice):
         engine: "Engine",
         feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
     ) -> Dict[str, Any]:
-        base_features = {f"new_location_{actor.name}": self.move_pos}
+        base_features = {NEW_LOCATION(name=actor.name): self.move_pos}
         return _compute_ability_features(
             actor=actor,
             engine=engine,

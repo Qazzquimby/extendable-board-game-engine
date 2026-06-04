@@ -4,6 +4,14 @@ from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Calla
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
 from events import PullEvent, DamageEvent, HealEvent, AddTokenEvent
+from ai.feature_definitions import (
+    DAMAGE_DEALT,
+    FORCED_USE_ABILITY,
+    HEAL_DEALT,
+    KILLS,
+    NEW_LOCATION,
+    Feature,
+)
 
 if TYPE_CHECKING:
     from engine import (
@@ -70,7 +78,7 @@ class Instruction:
     def get_features(self, ctx: "ActionContext") -> dict:
         return {}
 
-    def get_feature_templates(self) -> List[str]:
+    def get_feature_templates(self) -> List["Feature"]:
         return []
 
 
@@ -201,9 +209,9 @@ class DamageInstruction(Instruction):
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject and ctx.is_hit:
             amount = resolve_int(self.amount, ctx)
-            features[f"damage_dealt_to_{subject.name}"] = amount
+            features[DAMAGE_DEALT(name=subject.name)] = amount
             if subject.hp > 0 and subject.hp - amount <= 0:
-                features[f"kills_{subject.name}"] = True
+                features[KILLS(name=subject.name)] = True
         return features
 
     def execute(self, ctx: ActionContext) -> None:
@@ -221,8 +229,8 @@ class DamageInstruction(Instruction):
                 ability=ctx.ability,
             ).resolve()
 
-    def get_feature_templates(self) -> List[str]:
-        return ["damage_dealt_to_{name}", "kills_{name}"]
+    def get_feature_templates(self) -> List["Feature"]:
+        return [DAMAGE_DEALT, KILLS]
 
 
 @dataclass
@@ -237,7 +245,7 @@ class HealInstruction(Instruction):
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
-            key = f"heal_dealt_to_{subject.name}"
+            key = HEAL_DEALT(name=subject.name)
             features[key] = amount
         return features
 
@@ -245,10 +253,10 @@ class HealInstruction(Instruction):
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
-            HealEvent(engine=ctx.engine, subject=subject, amount=amount).resolve()
+            HealEvent(subject=subject, amount=amount).resolve()
 
-    def get_feature_templates(self) -> List[str]:
-        return ["heal_dealt_to_{name}"]
+    def get_feature_templates(self) -> List["Feature"]:
+        return [HEAL_DEALT]
 
 
 @dataclass
@@ -322,17 +330,10 @@ class PullInstruction(Instruction):
         if subject:
             dist = resolve_int(self.distance, ctx)
             PullEvent(
-                engine=ctx.engine,
                 subject=ctx.target,
                 distance=dist,
                 source=ctx.source,
             ).resolve()
-
-
-# todo should really have an 'only affects entities' default flag to avoid the repeated filter logic.
-
-
-# Which ability, who chooses, what constraints. on whom, who chooses, what constraints
 
 
 @dataclass
@@ -345,8 +346,8 @@ class UseAnAbilityInstruction(Instruction):
         self.plausibly_positive = True
         self.plausibly_negative = True
 
-    def get_feature_templates(self) -> List[str]:
-        return ["{source_name}_forced_use_ability_is_{ability_name}"]
+    def get_feature_templates(self) -> List["Feature"]:
+        return [FORCED_USE_ABILITY]
 
     def execute(self, ctx: ActionContext) -> None:
         from choices import Choice
@@ -418,7 +419,7 @@ class TeleportInstruction(Instruction):
                 if callable(self.destination)
                 else self.destination
             )
-            features[f"new_location_{subject.name}"] = dest
+            features[NEW_LOCATION(name=subject.name)] = dest
         return features
 
     def execute(self, ctx: ActionContext) -> None:
@@ -431,8 +432,8 @@ class TeleportInstruction(Instruction):
             )
             subject.pos = dest  # todo should be event
 
-    def get_feature_templates(self) -> List[str]:
-        return ["new_location_{name}"]
+    def get_feature_templates(self) -> List["Feature"]:
+        return [NEW_LOCATION]
 
 
 @dataclass
