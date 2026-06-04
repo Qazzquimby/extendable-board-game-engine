@@ -1,4 +1,5 @@
 import abc
+import itertools
 from dataclasses import dataclass, field
 from typing import Optional, Union, List, Dict, TYPE_CHECKING, Callable
 
@@ -51,6 +52,7 @@ def has_any_entity_aim_condition(
 class AimingResult:
     target_points: List[Point] = field(default_factory=list)
     included_points: List[Point] = field(default_factory=list)
+    sub_aimings: Optional[Dict[str, "AimingResult"]] = None
 
 
 MultipleAimingResults = Dict[str, AimingResult]
@@ -81,6 +83,48 @@ class MultipleAiming(Aiming):
         if isinstance(aimings, list):
             aimings = {f"{i}": t for i, t in enumerate(aimings)}
         self.aimings = aimings
+
+    def get_all_aimings(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        start_pos: Point = None,
+        require_los: bool = True,
+    ) -> List[AimingResult]:
+        if not start_pos:
+            start_pos = actor.pos
+
+        # Get all possible aimings for each sub-aiming
+        all_sub_aimings = {}
+        for name, aiming in self.aimings.items():
+            sub_aims = aiming.get_all_aimings(engine, actor, start_pos, require_los)
+            if not sub_aims:
+                # If any sub-aiming has no valid targets, then no combinations are possible.
+                return []
+            all_sub_aimings[name] = sub_aims
+
+        # Generate combinations of aimings
+        aiming_names = list(all_sub_aimings.keys())
+        aiming_lists = list(all_sub_aimings.values())
+
+        res = []
+        for combination in itertools.product(*aiming_lists):
+            sub_aimings_dict = dict(zip(aiming_names, combination))
+
+            combined_target_points = []
+            combined_included_points = []
+            for sub_aiming_result in combination:
+                combined_target_points.extend(sub_aiming_result.target_points)
+                combined_included_points.extend(sub_aiming_result.included_points)
+
+            res.append(
+                AimingResult(
+                    target_points=list(set(combined_target_points)),
+                    included_points=list(set(combined_included_points)),
+                    sub_aimings=sub_aimings_dict,
+                )
+            )
+        return res
 
 
 class TargetSelf(Aiming):

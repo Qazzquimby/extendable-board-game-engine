@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Union
 
 from abilities import Ability, ActionContext, ActionCost
-from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult
+from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
 from entities import Entity
 from point import Point
 from queries import QueryLegalAimings
@@ -201,6 +201,39 @@ def _compute_ability_features(
     choice: "PlausibleActionOrMoveAndAction",
 ) -> Dict[str, Any]:
     features = base_features.copy()
+
+    feature_name_parts = [f"use {ability.name}"]
+    if aiming_result.sub_aimings:
+        # MultipleAiming case
+        sub_aiming_descs = []
+        for name, sub_aiming_result in aiming_result.sub_aimings.items():
+            targets = set()
+            all_sub_points = set(sub_aiming_result.target_points) | set(
+                sub_aiming_result.included_points
+            )
+            for p in all_sub_points:
+                entity = engine.entity_at(p)
+                if entity:
+                    targets.add(entity.name)
+            if targets:
+                sub_aiming_descs.append(f"{name} on {', '.join(sorted(list(targets)))}")
+        if sub_aiming_descs:
+            feature_name_parts.append("with " + " and ".join(sub_aiming_descs))
+    else:
+        # Single aiming case
+        targets = set()
+        all_points = set(aiming_result.target_points) | set(
+            aiming_result.included_points
+        )
+        for p in all_points:
+            entity = engine.entity_at(p)
+            if entity:
+                targets.add(entity.name)
+        if targets:
+            feature_name_parts.append(f"on {', '.join(sorted(list(targets)))}")
+
+    features[" ".join(feature_name_parts)] = 1
+
     all_points = set(aiming_result.target_points) | set(aiming_result.included_points)
 
     for instruction in ability.instructions:
@@ -374,7 +407,23 @@ def _get_plausible_uses_of_ability_at_pos(
     )
 
     for aiming_res in legal_aimings:
-        if isinstance(ability.aiming, TargetEntity) or isinstance(
+        if isinstance(ability.aiming, MultipleAiming):
+            all_points = set(aiming_res.target_points) | set(aiming_res.included_points)
+            if not all_points:
+                continue
+
+            key = (pos, frozenset(all_points), ability.get_hash())
+            if key not in plausible_uses:
+                plausible_uses[key] = choice_class(
+                    target=None,
+                    ability=ability,
+                    engine=engine,
+                    actor=actor,
+                    aiming_result=aiming_res,
+                    feature_evaluator=feature_evaluator,
+                    **choice_kwargs,
+                )
+        elif isinstance(ability.aiming, TargetEntity) or isinstance(
             ability.aiming, TargetSelf
         ):
             for t_point in aiming_res.target_points:
