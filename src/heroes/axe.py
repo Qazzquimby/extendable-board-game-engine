@@ -52,6 +52,9 @@ class BattleHungerToken(Token):
 
 @dataclass
 class CullingBladeInstruction(Instruction):
+    def __post_init__(self):
+        self.plausibly_negative = True
+
     def execute(self, ctx: ActionContext) -> None:
         if not hasattr(ctx.target, "hp"):
             return
@@ -72,6 +75,10 @@ class CullingBladeInstruction(Instruction):
 
 
 class AxeCleaveOnTakeDamage(Modifier):
+
+    def __post_init__(self):
+        self.plausibly_positive = True
+
     # - name: Receive damage
     #   text: |-
     #     Enemies in burst 1, 1dmg
@@ -87,6 +94,9 @@ class AxeCleaveOnTakeDamage(Modifier):
 
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
+    def __post_init__(self):
+        self.plausibly_positive = True
+
     #       name: Receive damage from a Default Ability
     #       text: The attacker takes 1/2 the damage received, before Armor.
     @before(DamageEvent)

@@ -195,15 +195,7 @@ class RoundStartEvent(Event):
         super().__init__(engine=engine)
 
     def _resolve(self) -> None:
-        pass
-
-
-class RoundEndEvent(Event):
-    def __init__(self, engine: "Engine"):
-        super().__init__(engine=engine)
-
-    def _resolve(self) -> None:
-        pass
+        self.engine.round_num += 1
 
 
 class DamageEvent(Event):

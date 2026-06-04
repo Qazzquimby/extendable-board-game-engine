@@ -248,12 +248,15 @@ class GiveTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
 
+    def __post_init__(self):
+        self.plausibly_positive = True
+        self.plausibly_negative = True
+
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
             AddTokenEvent(
-                engine=ctx.engine,
                 subject=subject,
                 token_class=self.token_class,
                 amount=amount,
@@ -264,6 +267,10 @@ class GiveTokenInstruction(Instruction):
 class RemoveTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
+
+    def __post_init__(self):
+        self.plausibly_positive = True
+        self.plausibly_negative = True
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -276,6 +283,10 @@ class RemoveTokenInstruction(Instruction):
 # class PushInstruction(Instruction):
 #     distance: DynamicInt
 #
+# def __post_init__(self):
+#     self.plausibly_positive = True
+#     self.plausibly_negative = True
+
 #     # todo probably want direction param and update resolution
 #     def execute(self, ctx: ActionContext) -> None:
 #         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -292,6 +303,10 @@ class RemoveTokenInstruction(Instruction):
 @dataclass
 class PullInstruction(Instruction):
     distance: DynamicInt
+
+    def __post_init__(self):
+        self.plausibly_positive = True
+        self.plausibly_negative = True
 
     # todo probably want direction param and update resolution
     def execute(self, ctx: ActionContext) -> None:
@@ -317,6 +332,10 @@ class UseAnAbilityInstruction(Instruction):
     default_only: bool = False
     required_target: Optional["Point"] = None
     subject_chooses: bool = True
+
+    def __post_init__(self):
+        self.plausibly_positive = True
+        self.plausibly_negative = True
 
     def execute(self, ctx: ActionContext) -> None:
         from choices import Choice
@@ -359,6 +378,9 @@ class UseAnAbilityInstruction(Instruction):
 
 @dataclass
 class RefreshAbilityInstruction(Instruction):
+    def __post_init__(self):
+        self.plausibly_positive = True
+
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
@@ -371,6 +393,10 @@ class RefreshAbilityInstruction(Instruction):
 @dataclass
 class TeleportInstruction(Instruction):
     destination: DynamicPoint
+
+    def __post_init__(self):
+        self.plausibly_positive = True
+        self.plausibly_negative = True
 
     def get_features(self, ctx: ActionContext) -> dict:
         features = {}

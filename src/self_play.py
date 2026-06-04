@@ -19,23 +19,21 @@ POSSIBLE_HEROES = [
     Axe,
 ]
 
-grid_size = 6
+grid_size = 5
 
 
 def setup_game():
     engine = Engine(grid=Grid(grid_size, grid_size), agents={0: agent, 1: agent})
-    team_0_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
-        random.choice(POSSIBLE_HEROES) for _ in range(2)
-    ]
-    team_1_classes: List[Type[Union[MeleeHero, RangedHero]]] = [
-        random.choice(POSSIBLE_HEROES) for _ in range(2)
-    ]
+    team_0_classes = [Axe]
+    team_1_classes = [MeleeHero, RangedHero]
 
-    team_0_classes[0](engine=engine, pos=Point(0, 0), team=0)
-    team_0_classes[1](engine=engine, pos=Point(0, 1), team=0)
+    for i, entity in enumerate(team_0_classes):
+        team_0_classes[i](engine=engine, pos=Point(0, i), team=0)
 
-    team_1_classes[0](engine=engine, pos=Point(grid_size - 1, grid_size - 1), team=1)
-    team_1_classes[1](engine=engine, pos=Point(grid_size - 1, grid_size - 2), team=1)
+    for i, entity in enumerate(team_1_classes):
+        team_1_classes[i](
+            engine=engine, pos=Point(grid_size - 1, grid_size - (i + 1)), team=1
+        )
     engine.finalize_setup()
     return engine
 

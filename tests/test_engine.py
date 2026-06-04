@@ -218,7 +218,7 @@ def test_engine_serialization():
     e1_state = state.entities[0]
     assert e1_state.name == "Hero1"
     assert e1_state.hp == 10
-    assert e1_state.pos == (0, 0)
+    assert e1_state.pos == Point(0, 0)
     assert e1_state.move_actions == 1
 
 

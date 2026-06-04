@@ -59,3 +59,27 @@ class ModInt:
             value = cap(int(value)) if callable(cap) else min(value, float(cap))
 
         return int(value)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ModInt):
+            return self.value == other.value
+        elif isinstance(other, int):
+            return self.value == other
+        else:
+            return NotImplemented
+
+    def __gt__(self, other):
+        if isinstance(other, ModInt):
+            return self.value > other.value
+        elif isinstance(other, int):
+            return self.value > other
+        else:
+            return NotImplemented
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, ModInt):
+            return self.value < other.value
+        elif isinstance(other, int):
+            return self.value < other
+        else:
+            return NotImplemented

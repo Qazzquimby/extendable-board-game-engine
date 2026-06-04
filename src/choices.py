@@ -188,6 +188,7 @@ def get_plausible_actions_after_movement(
         plausible_actions_after_movement.update(
             plausible_uses_of_ability_after_movement
         )
+    assert plausible_actions_after_movement  # including pass turn
     return plausible_actions_after_movement
 
 

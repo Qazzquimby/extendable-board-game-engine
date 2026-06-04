@@ -24,7 +24,6 @@ from events import (
     query,
     Router,
     ChangeLocationEvent,
-    RoundEndEvent,
     RoundStartEvent,
 )
 from grid import Grid
@@ -60,7 +59,7 @@ class Engine:
         self.entities: List["Entity"] = []
         self.markers: List["Marker"] = []
         self.rng = random.Random(seed)
-        self.round_num: int = 1
+        self.round_num: int = 0
 
         self.team_heroes: List[List[Hero]] = None  # run finalize
         self.num_hero_rows: int = None  # run finalize
@@ -142,7 +141,7 @@ class Engine:
             chosen_action: PlausibleMoveAndAction = None
             turn_over = False
             while not turn_over:
-                plausible_move_actions = get_plausible_move_and_actions(
+                plausible_move_and_actions = get_plausible_move_and_actions(
                     actor=self.current_hero,
                     engine=self,
                     feature_evaluator=feature_evaluator,
@@ -154,7 +153,7 @@ class Engine:
                 )
 
                 all_choices: List[Choice] = (
-                    plausible_move_actions + plausible_free_actions
+                    plausible_move_and_actions + plausible_free_actions
                 )
                 if not all_choices:
                     turn_over = True
@@ -232,7 +231,6 @@ class Engine:
                     self.current_hero_row_index + 1
                 ) % self.num_hero_rows
                 if self.current_hero_row_index == 0:  # New round
-                    RoundEndEvent(self).resolve()
                     RoundStartEvent(self).resolve()
 
         self.current_hero = self._get_current_hero()
