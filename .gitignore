@@ -1,5 +1,6 @@
 .aider*
 .venv
+*_key.txt
 __py_cache__
 node_modules
 
