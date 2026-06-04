@@ -70,6 +70,9 @@ class Instruction:
     def get_features(self, ctx: "ActionContext") -> dict:
         return {}
 
+    def get_feature_templates(self) -> List[str]:
+        return []
+
 
 @dataclass
 class Ability:
@@ -198,9 +201,9 @@ class DamageInstruction(Instruction):
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject and ctx.is_hit:
             amount = resolve_int(self.amount, ctx)
-            features[f"damage_dealt_to_{subject.name}_{subject.id}"] = amount
+            features[f"damage_dealt_to_{subject.name}"] = amount
             if subject.hp > 0 and subject.hp - amount <= 0:
-                features[f"kills_{subject.name}_{subject.id}"] = True
+                features[f"kills_{subject.name}"] = True
         return features
 
     def execute(self, ctx: ActionContext) -> None:
@@ -212,12 +215,14 @@ class DamageInstruction(Instruction):
             # todo crit handling will likely need to be more extensible later
 
             DamageEvent(
-                engine=ctx.engine,
                 source=ctx.source,
                 subject=subject,
                 amount=amount,
                 ability=ctx.ability,
             ).resolve()
+
+    def get_feature_templates(self) -> List[str]:
+        return ["damage_dealt_to_{name}", "kills_{name}"]
 
 
 @dataclass
@@ -232,7 +237,7 @@ class HealInstruction(Instruction):
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
-            key = f"heal_dealt_to_{subject.name}_{subject.id}"
+            key = f"heal_dealt_to_{subject.name}"
             features[key] = amount
         return features
 
@@ -241,6 +246,9 @@ class HealInstruction(Instruction):
         if subject:
             amount = resolve_int(self.amount, ctx)
             HealEvent(engine=ctx.engine, subject=subject, amount=amount).resolve()
+
+    def get_feature_templates(self) -> List[str]:
+        return ["heal_dealt_to_{name}"]
 
 
 @dataclass
@@ -337,6 +345,9 @@ class UseAnAbilityInstruction(Instruction):
         self.plausibly_positive = True
         self.plausibly_negative = True
 
+    def get_feature_templates(self) -> List[str]:
+        return ["{source_name}_forced_use_ability_is_{ability_name}"]
+
     def execute(self, ctx: ActionContext) -> None:
         from choices import Choice
 
@@ -407,7 +418,7 @@ class TeleportInstruction(Instruction):
                 if callable(self.destination)
                 else self.destination
             )
-            features[f"new_location_{subject.name}_{subject.id}"] = dest
+            features[f"new_location_{subject.name}"] = dest
         return features
 
     def execute(self, ctx: ActionContext) -> None:
@@ -419,6 +430,9 @@ class TeleportInstruction(Instruction):
                 else self.destination
             )
             subject.pos = dest  # todo should be event
+
+    def get_feature_templates(self) -> List[str]:
+        return ["new_location_{name}"]
 
 
 @dataclass
