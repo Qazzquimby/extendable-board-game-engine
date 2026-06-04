@@ -1,6 +1,7 @@
 from typing import Optional, List, Type, TYPE_CHECKING
 
 from abilities import Ability
+from aimings import TargetSelf
 
 from events import (
     EventPhase,
@@ -189,6 +190,9 @@ class Hero(Entity):
     ):
         super().__init__(
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
+        )
+        self.abilities.append(
+            Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
         )
 
 

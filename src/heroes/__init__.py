@@ -19,9 +19,6 @@ class MeleeHero(Hero):
                 owner=self,
             )
         )
-        self.abilities.append(
-            Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
-        )
 
 
 class RangedHero(Hero):
@@ -37,7 +34,4 @@ class RangedHero(Hero):
                 is_default=True,
                 owner=self,
             )
-        )
-        self.abilities.append(
-            Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
         )

@@ -130,7 +130,7 @@ def get_plausible_movements(
                 if isinstance(ability.aiming, TargetEntity):
                     attack_range = ability.aiming.in_range
                 elif isinstance(ability.aiming, IncludeArea):
-                    attack_range = ability.aiming.area.in_range
+                    attack_range = ability.aiming.area.in_range  # todo plus radius
 
                 if attack_range > 0:
                     best_at_range = min(
@@ -391,12 +391,17 @@ def _get_plausible_uses_of_ability_at_pos(
     **choice_kwargs,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_uses = {}
-    plausibly_positive = any(
-        instruction.plausibly_positive for instruction in ability.instructions
-    )
-    plausibly_negative = any(
-        instruction.plausibly_negative for instruction in ability.instructions
-    )
+    if ability.instructions:
+        plausibly_positive = any(
+            instruction.plausibly_positive for instruction in ability.instructions
+        )
+        plausibly_negative = any(
+            instruction.plausibly_negative for instruction in ability.instructions
+        )
+        assert plausibly_positive or plausibly_negative
+    else:  # passing
+        plausibly_positive = True
+        plausibly_negative = True
 
     raw_aimings = ability.aiming.get_all_aimings(
         engine=engine, actor=actor, start_pos=pos, require_los=True
