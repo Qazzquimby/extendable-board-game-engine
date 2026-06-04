@@ -53,10 +53,7 @@ class PlausibleMoveAndAction(Choice):
         engine: "Engine",
         feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
     ) -> Dict[str, Any]:
-        base_features = {f"new_location_{actor.name}_{actor.id}": self.move_pos}
-        if self.move_pos != actor.pos:
-            base_features[f"moved_{actor.name}_{actor.id}"] = True
-
+        base_features = {f"new_location_{actor.name}": self.move_pos}
         return _compute_ability_features(
             actor=actor,
             engine=engine,
@@ -206,34 +203,30 @@ def _compute_ability_features(
     feature_name_parts = [f"use {ability.name}"]
     if aiming_result.sub_aimings:
         # MultipleAiming case
-        sub_aiming_descs = []
-        for name, sub_aiming_result in aiming_result.sub_aimings.items():
-            targets = set()
+        for aiming_name, sub_aiming_result in aiming_result.sub_aimings.items():
+            target_names = set()
             all_sub_points = set(sub_aiming_result.target_points) | set(
                 sub_aiming_result.included_points
             )
             for p in all_sub_points:
                 entity = engine.entity_at(p)
                 if entity:
-                    targets.add(entity.name)
-            if targets:
-                sub_aiming_descs.append(f"{name} on {', '.join(sorted(list(targets)))}")
-        if sub_aiming_descs:
-            feature_name_parts.append("with " + " and ".join(sub_aiming_descs))
+                    target_names.add(entity.name)
+
+            for target_name in target_names:
+                features[f"{ability.name} {aiming_name} on {target_name}"] = 1
     else:
         # Single aiming case
-        targets = set()
+        target_names = set()
         all_points = set(aiming_result.target_points) | set(
             aiming_result.included_points
         )
         for p in all_points:
             entity = engine.entity_at(p)
             if entity:
-                targets.add(entity.name)
-        if targets:
-            feature_name_parts.append(f"on {', '.join(sorted(list(targets)))}")
-
-    features[" ".join(feature_name_parts)] = 1
+                target_names.add(entity.name)
+        for target_name in target_names:
+            features[f"{ability.name} on {target_name}"] = 1
 
     all_points = set(aiming_result.target_points) | set(aiming_result.included_points)
 
@@ -262,7 +255,7 @@ def _compute_ability_features(
 
     # Derived features
     for entity in engine.entities:
-        new_pos_key = f"new_location_{entity.name}_{entity.id}"
+        new_pos_key = f"new_location_{entity.name}"
         entity_pos = features.get(new_pos_key, entity.pos)
         if not entity_pos:
             continue
@@ -271,13 +264,13 @@ def _compute_ability_features(
             if entity.id >= other_entity.id:
                 continue
 
-            other_pos_key = f"new_location_{other_entity.name}_{other_entity.id}"
+            other_pos_key = f"new_location_{other_entity.name}"
             other_pos = features.get(other_pos_key, other_entity.pos)
             if not other_pos:
                 continue
 
             dist = engine.grid.get_range(entity_pos, other_pos)
-            key = f"distance_{entity.name}_{entity.id}_to_{other_entity.name}_{other_entity.id}"
+            key = f"distance_{entity.name}_to_{other_entity.name}"
             features[key] = dist
 
     if feature_evaluator:

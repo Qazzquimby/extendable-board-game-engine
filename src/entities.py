@@ -47,7 +47,7 @@ class Entity:
         self.standard_actions: int = 0
         self.free_actions: int = 0
         self.engine.add_entity(self)
-        self.pos = pos # runs setter
+        self.pos = pos  # runs setter
 
     @property
     def pos(self) -> Optional[Point]:
@@ -244,7 +244,7 @@ class Marker:
         self.team = team
         self.modifiers: List["Modifier"] = []
         self.engine.markers.append(self)
-        self.pos = pos # runs setter
+        self.pos = pos  # runs setter
 
     @property
     def pos(self) -> Optional[Point]:
