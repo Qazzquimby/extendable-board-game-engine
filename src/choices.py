@@ -388,6 +388,39 @@ def get_plausible_uses_of_ability_after_movement(
     )
 
 
+class _ActorMovedView:
+    """A view of the engine that also acts as a context manager
+    to temporarily move an actor to a new position."""
+
+    def __init__(self, engine: "Engine", actor: "Entity", new_pos: Point):
+        self._engine = engine
+        self._actor = actor
+        self._new_pos = new_pos
+        self._original_pos = actor.pos
+
+    def __enter__(self):
+        if self._new_pos != self._original_pos:
+            self._actor.pos = self._new_pos
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._new_pos != self._original_pos:
+            self._actor.pos = self._original_pos
+
+    def entity_at(self, pos: Point) -> Optional["Entity"]:
+        if self._new_pos == self._original_pos:
+            return self._engine.entity_at(pos)
+
+        if pos == self._new_pos:
+            return self._actor
+        if pos == self._original_pos:
+            return None
+        return self._engine.entity_at(pos)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._engine, name)
+
+
 def _get_plausible_uses_of_ability_at_pos(
     actor: Entity,
     engine: "Engine",
@@ -398,93 +431,98 @@ def _get_plausible_uses_of_ability_at_pos(
     **choice_kwargs,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_uses = {}
-    if ability.instructions:
-        plausibly_positive = any(
-            instruction.plausibly_positive for instruction in ability.instructions
-        )
-        plausibly_negative = any(
-            instruction.plausibly_negative for instruction in ability.instructions
-        )
-        assert plausibly_positive or plausibly_negative
-    else:  # passing
-        plausibly_positive = True
-        plausibly_negative = True
-
-    raw_aimings = ability.aiming.get_all_aimings(
-        engine=engine, actor=actor, start_pos=pos, require_los=True
-    )
-
-    legal_aimings = engine.ask(
-        QueryLegalAimings(subject=actor, ability=ability, base_result=raw_aimings)
-    )
-
-    for aiming_res in legal_aimings:
-        if isinstance(ability.aiming, MultipleAiming):
-            all_points = set(aiming_res.target_points) | set(aiming_res.included_points)
-            if not all_points:
-                continue
-
-            key = (pos, frozenset(all_points), ability.get_hash())
-            if key not in plausible_uses:
-                plausible_uses[key] = choice_class(
-                    target=None,
-                    ability=ability,
-                    engine=engine,
-                    actor=actor,
-                    aiming_result=aiming_res,
-                    feature_evaluator=feature_evaluator,
-                    **choice_kwargs,
-                )
-        elif isinstance(ability.aiming, TargetEntity) or isinstance(
-            ability.aiming, TargetSelf
-        ):
-            # target self just targets self. Ignore aiming_res.
-            key = (pos, actor.pos, ability.get_hash())
-            if key not in plausible_uses:
-                plausible_uses[key] = choice_class(
-                    target=actor,
-                    ability=ability,
-                    engine=engine,
-                    actor=actor,
-                    aiming_result=aiming_res,
-                    feature_evaluator=feature_evaluator,
-                    **choice_kwargs,
-                )
-        elif isinstance(ability.aiming, IncludeArea):
-            affected_entities = {
-                e for e in engine.entities if e.pos in aiming_res.included_points
-            }
-            if not affected_entities:
-                continue
-
-            key = (
-                pos,
-                frozenset(e.pos for e in affected_entities),
-                ability.get_hash(),
+    with _ActorMovedView(engine, actor, pos) as sim_engine:
+        if ability.instructions:
+            plausibly_positive = any(
+                instruction.plausibly_positive for instruction in ability.instructions
             )
-            if key not in plausible_uses:
-                if plausibly_positive:
-                    valid_targets = [
-                        e for e in affected_entities if e.team == actor.team
-                    ]
-                elif plausibly_negative:
-                    valid_targets = [
-                        e for e in affected_entities if e.team != actor.team
-                    ]
-                else:
-                    valid_targets = list(affected_entities)
+            plausibly_negative = any(
+                instruction.plausibly_negative for instruction in ability.instructions
+            )
+            assert plausibly_positive or plausibly_negative
+        else:  # passing
+            plausibly_positive = True
+            plausibly_negative = True
 
-                if not valid_targets:
+        raw_aimings = ability.aiming.get_all_aimings(
+            engine=sim_engine, actor=actor, start_pos=pos, require_los=True
+        )
+
+        legal_aimings = sim_engine.ask(
+            QueryLegalAimings(subject=actor, ability=ability, base_result=raw_aimings)
+        )
+
+        for aiming_res in legal_aimings:
+            if isinstance(ability.aiming, MultipleAiming):
+                all_points = set(aiming_res.target_points) | set(
+                    aiming_res.included_points
+                )
+                if not all_points:
                     continue
 
-                plausible_uses[key] = choice_class(
-                    target=None,
-                    ability=ability,
-                    engine=engine,
-                    actor=actor,
-                    aiming_result=aiming_res,
-                    feature_evaluator=feature_evaluator,
-                    **choice_kwargs,
+                key = (pos, frozenset(all_points), ability.get_hash())
+                if key not in plausible_uses:
+                    plausible_uses[key] = choice_class(
+                        target=None,
+                        ability=ability,
+                        engine=sim_engine,
+                        actor=actor,
+                        aiming_result=aiming_res,
+                        feature_evaluator=feature_evaluator,
+                        **choice_kwargs,
+                    )
+            elif isinstance(ability.aiming, TargetEntity) or isinstance(
+                ability.aiming, TargetSelf
+            ):
+                # target self just targets self. Ignore aiming_res.
+                key = (pos, actor.pos, ability.get_hash())
+                if key not in plausible_uses:
+                    plausible_uses[key] = choice_class(
+                        target=actor,
+                        ability=ability,
+                        engine=sim_engine,
+                        actor=actor,
+                        aiming_result=aiming_res,
+                        feature_evaluator=feature_evaluator,
+                        **choice_kwargs,
+                    )
+            elif isinstance(ability.aiming, IncludeArea):
+                affected_entities = {
+                    e
+                    for e in sim_engine.entities
+                    if e.pos in aiming_res.included_points
+                }
+                if not affected_entities:
+                    continue
+
+                key = (
+                    pos,
+                    frozenset(e.pos for e in affected_entities),
+                    ability.get_hash(),
                 )
+                if key not in plausible_uses:
+                    if plausibly_positive:
+                        valid_targets = [
+                            e for e in affected_entities if e.team == actor.team
+                        ]
+                    elif plausibly_negative:
+                        valid_targets = [
+                            e for e in affected_entities if e.team != actor.team
+                        ]
+                    else:
+                        valid_targets = list(affected_entities)
+
+                    if not valid_targets:
+                        continue
+
+                    plausible_uses[key] = choice_class(
+                        target=None,
+                        ability=ability,
+                        engine=sim_engine,
+                        actor=actor,
+                        aiming_result=aiming_res,
+                        feature_evaluator=feature_evaluator,
+                        **choice_kwargs,
+                    )
 
     return plausible_uses
