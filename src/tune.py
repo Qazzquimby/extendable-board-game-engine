@@ -42,7 +42,7 @@ def _get_or_create_initial_weight_stats(
     return feature_stats
 
 
-def tune_strategy(
+def tune_weights(
     game_setup: GameSetup,
     generations: int = 10,
     population_size: int = 20,
@@ -100,9 +100,7 @@ def tune_strategy(
                 pop = PlayerPopulation.load(population_file, feature_catalog)
             elif gen == 0:
                 print(f"Initializing population for team {i} gen 0.")
-                pop = PlayerPopulation(
-                    population_size, feature_catalog, initial_stats
-                )
+                pop = PlayerPopulation(population_size, feature_catalog, initial_stats)
                 pop.save(population_file)
             else:
                 print(f"Evolving population for team {i} gen {gen}.")
@@ -191,4 +189,4 @@ if __name__ == "__main__":
         team0_classes=[Axe],
         team1_classes=[MeleeHero, RangedHero],
     )
-    tune_strategy(game_setup, generations=2, population_size=4)
+    tune_weights(game_setup, generations=2, population_size=4)

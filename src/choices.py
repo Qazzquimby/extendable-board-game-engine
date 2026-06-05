@@ -186,7 +186,19 @@ def get_plausible_actions_after_movement(
         plausible_actions_after_movement.update(
             plausible_uses_of_ability_after_movement
         )
-    assert plausible_actions_after_movement  # including pass turn
+    # assert plausible_actions_after_movement
+    if not plausible_actions_after_movement:
+        print("Impossible")
+        get_plausible_uses_of_ability_after_movement(
+            actor=actor,
+            engine=engine,
+            move_pos=move_pos,
+            movement_name=movement_name,
+            ability=actor.abilities[0],
+            feature_evaluator=feature_evaluator,
+        )
+
+    # including pass turn
     return plausible_actions_after_movement
 
 
@@ -426,36 +438,18 @@ def _get_plausible_uses_of_ability_at_pos(
         elif isinstance(ability.aiming, TargetEntity) or isinstance(
             ability.aiming, TargetSelf
         ):
-            for t_point in aiming_res.target_points:
-                target = engine.entity_at(t_point)
-                if not target:
-                    continue
-                if isinstance(ability.aiming, TargetEntity) and target == actor:
-                    continue
-                if (
-                    not plausibly_positive
-                    and target.team == actor.team
-                    and isinstance(ability.aiming, TargetEntity)
-                ):
-                    continue
-                if (
-                    not plausibly_negative
-                    and target.team != actor.team
-                    and isinstance(ability.aiming, TargetEntity)
-                ):
-                    continue
-
-                key = (pos, t_point, ability.get_hash())
-                if key not in plausible_uses:
-                    plausible_uses[key] = choice_class(
-                        target=target,
-                        ability=ability,
-                        engine=engine,
-                        actor=actor,
-                        aiming_result=aiming_res,
-                        feature_evaluator=feature_evaluator,
-                        **choice_kwargs,
-                    )
+            # target self just targets self. Ignore aiming_res.
+            key = (pos, actor.pos, ability.get_hash())
+            if key not in plausible_uses:
+                plausible_uses[key] = choice_class(
+                    target=actor,
+                    ability=ability,
+                    engine=engine,
+                    actor=actor,
+                    aiming_result=aiming_res,
+                    feature_evaluator=feature_evaluator,
+                    **choice_kwargs,
+                )
         elif isinstance(ability.aiming, IncludeArea):
             affected_entities = {
                 e for e in engine.entities if e.pos in aiming_res.included_points

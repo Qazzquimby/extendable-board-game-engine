@@ -219,22 +219,29 @@ class Engine:
             engine=self, source=actor, aiming_result=action.aiming_result
         )
 
+    def _advance_hero_indices(self):
+        self.current_team = (self.current_team + 1) % NUM_TEAMS
+        if self.current_team == 0:  # just wrapped, get new hero index
+            self.current_hero_row_index = (
+                self.current_hero_row_index + 1
+            ) % self.num_hero_rows
+            if self.current_hero_row_index == 0:  # New round
+                RoundStartEvent(self).resolve()
+
     def next_turn(self) -> None:
         will_be_first_turn = self.current_hero is None
 
         if not will_be_first_turn:
             TurnEndEvent(self.current_hero).resolve()
+            self._advance_hero_indices()
 
-            self.current_team = (self.current_team + 1) % NUM_TEAMS
-            if self.current_team == 0:  # just wrapped, get new hero index
-                self.current_hero_row_index = (
-                    self.current_hero_row_index + 1
-                ) % self.num_hero_rows
-                if self.current_hero_row_index == 0:  # New round
-                    RoundStartEvent(self).resolve()
-
-        self.current_hero = self._get_current_hero()
-        TurnStartEvent(self.current_hero).resolve()
+        for i in range(99):
+            try:
+                self.current_hero = self._get_current_hero()
+                TurnStartEvent(self.current_hero).resolve()
+                return
+            except IndexError:
+                self._advance_hero_indices()
 
     def _get_current_hero(self):
         return self.team_heroes[self.current_team][self.current_hero_row_index]

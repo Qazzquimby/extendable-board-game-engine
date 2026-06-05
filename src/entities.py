@@ -55,6 +55,7 @@ class Entity:
 
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
+        assert isinstance(value, Point) or value is None
         if self._pos is not None:
             if self.engine.entity_at(self._pos) == self:
                 del self.engine._entity_by_pos[self._pos]

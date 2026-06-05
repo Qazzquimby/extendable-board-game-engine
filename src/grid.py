@@ -167,7 +167,7 @@ class Grid:
 
             x, y = curr
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
-                n = (nx, ny)
+                n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
                     if n not in visited and not self.is_movement_blocked(curr, n):
                         if valid_step is None or valid_step(curr, n):
