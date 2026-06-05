@@ -133,7 +133,7 @@ class Axe(Hero):
                 name="Berserker's Call",
                 aiming=MultipleAiming(
                     {
-                        "self": TargetSelf(),
+                        "self_target": TargetSelf(),
                         "nearby_enemies": IncludeArea(
                             area=Burst(radius=1), condition=is_enemy_aim_condition
                         ),

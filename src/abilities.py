@@ -125,8 +125,9 @@ class Ability:
 
         for instruction in self.instructions:
             if instruction.aiming_name:
-                assert isinstance(aiming_result, MultipleAimingResults)
-                instruction_aiming_result = aiming_result[instruction.aiming_name]
+                instruction_aiming_result = aiming_result.sub_aimings[
+                    instruction.aiming_name
+                ]
             else:
                 instruction_aiming_result = aiming_result
 
