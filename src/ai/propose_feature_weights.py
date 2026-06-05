@@ -18,9 +18,6 @@ class FeatureWeights(BaseModel):
 def propose_feature_weights(
     feature_catalog: List[str], strategy: str
 ) -> Dict[str, float]:
-    """
-    Uses an LLM to propose starting weights for a list of features based on a strategy.
-    """
     conv = Conversation()
     conv.add_message(
         "system",

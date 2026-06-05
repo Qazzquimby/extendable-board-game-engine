@@ -11,24 +11,25 @@ class PlayerPopulation:
         self,
         population_size: int,
         feature_catalog: List[str],
-        initial_weights: Dict[str, float] = None,
+        initial_weight_stats: Dict[str, tuple[float, float]] = None,
     ):
         self.population_size = population_size
         self.feature_catalog = feature_catalog
-        if initial_weights:
-            self.population = self._initialize_population(initial_weights)
+        if initial_weight_stats:
+            self.population = self._initialize_population(initial_weight_stats)
         else:
             self.population = []
 
     def _initialize_population(
-        self, initial_weights: Dict[str, float]
+        self, initial_weight_stats: Dict[str, tuple[float, float]]
     ) -> List[Dict[str, float]]:
         population = []
         for _ in range(self.population_size):
             weights = {}
             for feature in self.feature_catalog:
-                mean = initial_weights.get(feature, 0.0)
-                std_dev = 0.1  # Standard deviation for initial population spread
+                mean, std_dev = initial_weight_stats.get(feature, (0.0, 0.1))
+                if std_dev == 0.0:
+                    std_dev = 0.1
                 weights[feature] = np.random.normal(mean, std_dev)
             population.append(weights)
         return population
@@ -45,36 +46,6 @@ class PlayerPopulation:
         instance.population = population_data
         return instance
 
-    def run_tournament(
-        self, engine_setup_fn: Callable, run_game_fn: Callable, agent_class: type
-    ):
-        scores = {i: 0 for i in range(self.population_size)}
-
-        for i in range(self.population_size):
-            for j in range(i + 1, self.population_size):
-                agent1 = agent_class(weights=self.population[i])
-                agent2 = agent_class(weights=self.population[j])
-
-                # Game 1
-                engine1 = engine_setup_fn()
-                winner1 = run_game_fn(engine1, {0: agent1, 1: agent2}, (i, j))
-                if winner1 == 0:
-                    scores[i] += 1
-                elif winner1 == 1:
-                    scores[j] += 1
-
-                # Game 2 (swapped teams)
-                agent1_swapped = agent_class(weights=self.population[i])
-                agent2_swapped = agent_class(weights=self.population[j])
-                engine2 = engine_setup_fn()
-                winner2 = run_game_fn(
-                    engine2, {0: agent2_swapped, 1: agent1_swapped}, (j, i)
-                )
-                if winner2 == 0:
-                    scores[j] += 1
-                elif winner2 == 1:
-                    scores[i] += 1
-        return scores
 
     def evolve(
         self,
@@ -123,5 +94,31 @@ class PlayerPopulation:
         for key in weights:
             if random.random() < rate:
                 weights[key] += np.random.normal(0, strength)
+
+
+def run_tournament(
+    population0: PlayerPopulation,
+    population1: PlayerPopulation,
+    engine_setup_fn: Callable,
+    run_game_fn: Callable,
+    agent_class: type,
+    num_games_per_matchup: int = 2,
+):
+    scores0 = {i: 0 for i in range(population0.population_size)}
+    scores1 = {i: 0 for i in range(population1.population_size)}
+
+    for i in range(population0.population_size):
+        for j in range(population1.population_size):
+            agent0 = agent_class(weights=population0.population[i])
+            agent1 = agent_class(weights=population1.population[j])
+
+            for _ in range(num_games_per_matchup):
+                engine = engine_setup_fn()
+                winner = run_game_fn(engine, {0: agent0, 1: agent1}, (i, j))
+                if winner == 0:
+                    scores0[i] += 1
+                elif winner == 1:
+                    scores1[j] += 1
+    return scores0, scores1
 
 
