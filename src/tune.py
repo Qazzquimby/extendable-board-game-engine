@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import numpy as np
 
@@ -12,9 +12,15 @@ from game_setup import GameSetup
 from heroes import MeleeHero, RangedHero
 from heroes.axe import Axe
 
+if TYPE_CHECKING:
+    from engine import Engine
+
 
 def _get_or_create_initial_weight_stats(
-    tuning_dir: Path, feature_catalog: List[str], strategies: List[str]
+    engine: "Engine",
+    tuning_dir: Path,
+    feature_catalog: List[str],
+    strategies: List[str],
 ) -> Dict[str, Tuple[float, float]]:
     initial_stats_file = tuning_dir / "initial_weight_stats.json"
     if initial_stats_file.exists():
@@ -42,6 +48,7 @@ def _get_or_create_initial_weight_stats(
 
 
 def tune_weights(
+    engine: "Engine",
     game_setup: GameSetup,
     generations: int = 10,
     population_size: int = 20,
@@ -52,6 +59,8 @@ def tune_weights(
     base_tuning_dir = Path(f"../tuning_results/{game_setup.get_id()}")
     base_tuning_dir.mkdir(parents=True, exist_ok=True)
 
+    dummy_engine = game_setup.create_engine()
+
     feature_catalog_file = base_tuning_dir / "feature_catalog.json"
     if feature_catalog_file.exists():
         print("Loading feature catalog from cache.")
@@ -59,7 +68,6 @@ def tune_weights(
             feature_catalog = json.load(f)
     else:
         print("Generating feature catalog.")
-        dummy_engine = game_setup.create_engine()
         feature_catalog = get_feature_catalog(dummy_engine)
         with open(feature_catalog_file, "w") as f:
             json.dump(feature_catalog, f, indent=2)
@@ -71,10 +79,16 @@ def tune_weights(
 
     strategies = ["aggressive", "defensive", "balanced", "opportunistic"]
     initial_stats0 = _get_or_create_initial_weight_stats(
-        team0_tuning_dir, feature_catalog, strategies
+        engine=dummy_engine,
+        tuning_dir=team0_tuning_dir,
+        feature_catalog=feature_catalog,
+        strategies=strategies,
     )
     initial_stats1 = _get_or_create_initial_weight_stats(
-        team1_tuning_dir, feature_catalog, strategies
+        engine=dummy_engine,
+        tuning_dir=team1_tuning_dir,
+        feature_catalog=feature_catalog,
+        strategies=strategies,
     )
 
     population0, population1 = None, None
