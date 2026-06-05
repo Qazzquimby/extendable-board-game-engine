@@ -1,10 +1,12 @@
 import inspect
 import json
+import re
 from pathlib import Path
 from typing import Dict, List, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+from ai.feature_catalog import get_feature_catalog
 from ai.llm import Conversation, STRONG_LLM, prompt
 from features import FeatureContext
 
@@ -55,11 +57,18 @@ def get_entity_rules(engine: "Engine") -> str:
     return entity_rules
 
 
-def propose_new_feature(
-    entity_rules: str, feature_catalog: List[str], strategy: str
-) -> List[str]:
-    output_dir = Path("feature_packs")
-    output_dir.mkdir(exist_ok=True)
+def propose_new_features_for_strategy(
+    entity_rules: str, strategy: str, game_setup_id: str
+):
+    output_dir = Path("feature_packs") / game_setup_id
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    sanitized_strategy = "".join(
+        c for c in strategy if c.isalnum() or c in "_-"
+    ).lower()
+    output_file = output_dir / f"generated_{sanitized_strategy}.py"
+    if output_file.exists():
+        return
 
     feature_gen_conv = Conversation()
     feature_context_code = inspect.getsource(FeatureContext)
@@ -92,11 +101,6 @@ def propose_new_feature(
     )
 
     if new_features_response:
-        sanitized_strategy = "".join(
-            c for c in strategy if c.isalnum() or c in "_-"
-        ).lower()  # todo separate feature packs per game setup
-        output_file = output_dir / f"generated_{sanitized_strategy}.py"
-
         with open(output_file, "w") as f:
             f.write("from features import FeatureContext\n")
             f.write("from typing import Any, List, Optional, TYPE_CHECKING, Union\n\n")
@@ -110,11 +114,6 @@ def propose_new_feature(
                 f.write(f"# Feature: {feature.name}\n")
                 f.write(feature.code)
                 f.write("\n\n")
-
-        new_feature_names = [f.name for f in new_features_response.features]
-        feature_catalog.extend(new_feature_names)
-        feature_catalog = sorted(list(set(feature_catalog)))
-    return feature_catalog
 
 
 def propose_weights(
@@ -147,16 +146,23 @@ def propose_weights(
 
 
 def get_proposed_features_and_weights(
-    engine: "Engine", feature_catalog: List[str], strategies: list[str]
-) -> Dict[str, float]:
+    engine: "Engine", strategies: list[str], game_setup_id: str
+) -> List[Dict[str, float]]:
     entity_rules = get_entity_rules(engine)
+
+    # Propose features
     for strategy in strategies:
-        # todo, if already generated, use existing instead
-        feature_catalog = propose_new_feature(
-            entity_rules=entity_rules,
-            feature_catalog=feature_catalog,
-            strategy=strategy,
-        )
+        propose_new_features_for_strategy(entity_rules, strategy, game_setup_id)
+
+    # Build feature catalog
+    feature_catalog = get_feature_catalog(engine)
+    feature_pack_dir = Path("feature_packs") / game_setup_id
+    if feature_pack_dir.exists():
+        for f in feature_pack_dir.glob("generated_*.py"):
+            content = f.read_text()
+            found_features = re.findall(r"# Feature: (.*)", content)
+            feature_catalog.extend(found_features)
+    feature_catalog = sorted(list(set(feature_catalog)))
 
     all_weights = []
     for strategy in strategies:
@@ -166,4 +172,4 @@ def get_proposed_features_and_weights(
             strategy=strategy,
         )
         all_weights.append(weights)
-    return all_weights  # merge here?
+    return all_weights
