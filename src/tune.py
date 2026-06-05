@@ -48,7 +48,6 @@ def _get_or_create_initial_weight_stats(
 
 
 def tune_weights(
-    engine: "Engine",
     game_setup: GameSetup,
     generations: int = 10,
     population_size: int = 20,
@@ -77,7 +76,7 @@ def tune_weights(
     team0_tuning_dir.mkdir(exist_ok=True)
     team1_tuning_dir.mkdir(exist_ok=True)
 
-    strategies = ["aggressive", "defensive", "balanced", "opportunistic"]
+    strategies = ["aggressive"]  # , "defensive", "balanced", "opportunistic"]
     initial_stats0 = _get_or_create_initial_weight_stats(
         engine=dummy_engine,
         tuning_dir=team0_tuning_dir,

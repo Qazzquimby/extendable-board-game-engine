@@ -58,6 +58,9 @@ def get_entity_rules(engine: "Engine") -> str:
 def propose_new_feature(
     entity_rules: str, feature_catalog: List[str], strategy: str
 ) -> List[str]:
+    output_dir = Path("feature_packs")
+    output_dir.mkdir(exist_ok=True)
+
     feature_gen_conv = Conversation()
     feature_context_code = inspect.getsource(FeatureContext)
 
@@ -89,11 +92,9 @@ def propose_new_feature(
     )
 
     if new_features_response:
-        output_dir = Path("src/feature_packs")
-        output_dir.mkdir(exist_ok=True)
         sanitized_strategy = "".join(
             c for c in strategy if c.isalnum() or c in "_-"
-        ).lower()
+        ).lower()  # todo separate feature packs per game setup
         output_file = output_dir / f"generated_{sanitized_strategy}.py"
 
         with open(output_file, "w") as f:
@@ -150,6 +151,7 @@ def get_proposed_features_and_weights(
 ) -> Dict[str, float]:
     entity_rules = get_entity_rules(engine)
     for strategy in strategies:
+        # todo, if already generated, use existing instead
         feature_catalog = propose_new_feature(
             entity_rules=entity_rules,
             feature_catalog=feature_catalog,
@@ -164,4 +166,4 @@ def get_proposed_features_and_weights(
             strategy=strategy,
         )
         all_weights.append(weights)
-    return feature_catalog, all_weights  # merge here?
+    return all_weights  # merge here?
