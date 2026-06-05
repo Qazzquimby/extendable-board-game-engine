@@ -1,9 +1,15 @@
+import inspect
 import json
-from typing import Dict, List
+from pathlib import Path
+from typing import Dict, List, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 from ai.llm import Conversation, STRONG_LLM, prompt
+from features import FeatureContext
+
+if TYPE_CHECKING:
+    from engine import Engine
 
 
 class FeatureWeight(BaseModel):
@@ -15,17 +21,107 @@ class FeatureWeights(BaseModel):
     weights: List[FeatureWeight]
 
 
-def propose_feature_weights(
-    feature_catalog: List[str], strategy: str
-) -> Dict[str, float]:
+class NewFeature(BaseModel):
+    name: str = Field(..., description="A descriptive name for the feature.")
+    code: str = Field(
+        ...,
+        description="The Python code for the feature evaluation function. It must be a single function that takes a 'FeatureContext' as its only argument.",
+    )
+
+
+class NewFeatures(BaseModel):
+    features: List[NewFeature]
+
+
+def get_entity_rules(engine: "Engine") -> str:
+    entity_rules_parts = []
+    unique_entities = {e.name: e for e in engine.entities}.values()
+
+    for entity in unique_entities:
+        rules = f"Entity: {entity.name}\n"
+        if hasattr(entity, "abilities"):
+            for ability in entity.abilities:
+                if hasattr(ability, "text") and ability.text:
+                    rules += f"  Ability: {ability.name}\n"
+                    rules += f"    {ability.text}\n"
+        if hasattr(entity, "modifiers"):
+            for modifier in entity.modifiers:
+                if hasattr(modifier, "text") and modifier.text:
+                    rules += f"  Modifier: {modifier.__class__.__name__}\n"
+                    rules += f"    {modifier.text}\n"
+        entity_rules_parts.append(rules)
+
+    entity_rules = "\n\n".join(entity_rules_parts)
+    return entity_rules
+
+
+def propose_new_feature(
+    entity_rules: str, feature_catalog: List[str], strategy: str
+) -> List[str]:
+    feature_gen_conv = Conversation()
+    feature_context_code = inspect.getsource(FeatureContext)
+
+    feature_gen_prompt = (
+        "Propose choice-features for an AI in a turn-based strategy game.\n"
+        "A feature is a python function that evaluates a game state after a potential action and returns a numeric or boolean value.\n"
+        "The function signature must be `def my_feature_func(ctx: FeatureContext) -> int | float | bool | None:`\n"
+        f"Here are the rules for the entities in the game:\n{entity_rules}\n\n"
+        f"Here is the definition of the `FeatureContext` class, which is passed to your function:\n"
+        f"```python\n{feature_context_code}\n```\n"
+        "Here are some example features:\n"
+        "```python\n"
+        "def damage_to_enemies(ctx: FeatureContext) -> int:\n"
+        "    return sum(ctx.damage_dealt(e) for e in ctx.enemies)\n\n"
+        "def enemies_killed(ctx: FeatureContext) -> int:\n"
+        "    return sum(1 for e in ctx.enemies if ctx.new_hp(e) is not None and ctx.new_hp(e) <= 0)\n\n"
+        "def self_hp(ctx: FeatureContext) -> int | None:\n"
+        "    return ctx.new_hp(ctx.actor)\n"
+        "```\n\n"
+        f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
+        "Provide a descriptive name and the python code for each feature."
+    )
+    feature_gen_conv.add_message(feature_gen_prompt)
+
+    new_features_response = prompt(
+        model=STRONG_LLM,
+        messages=feature_gen_conv.messages,
+        return_type=NewFeatures,
+    )
+
+    if new_features_response:
+        output_dir = Path("src/feature_packs")
+        output_dir.mkdir(exist_ok=True)
+        sanitized_strategy = "".join(
+            c for c in strategy if c.isalnum() or c in "_-"
+        ).lower()
+        output_file = output_dir / f"generated_{sanitized_strategy}.py"
+
+        with open(output_file, "w") as f:
+            f.write("from features import FeatureContext\n")
+            f.write("from typing import Any, List, Optional, TYPE_CHECKING, Union\n\n")
+            f.write("if TYPE_CHECKING:\n")
+            f.write("    from choices import PlausibleActionOrMoveAndAction\n")
+            f.write("    from engine import Engine\n")
+            f.write("    from entities import Entity\n")
+            f.write("    from point import Point\n\n")
+
+            for feature in new_features_response.features:
+                f.write(f"# Feature: {feature.name}\n")
+                f.write(feature.code)
+                f.write("\n\n")
+
+        new_feature_names = [f.name for f in new_features_response.features]
+        feature_catalog.extend(new_feature_names)
+        feature_catalog = sorted(list(set(feature_catalog)))
+    return feature_catalog
+
+
+def propose_weights(
+    entity_rules: str, feature_catalog: List[str], strategy: str
+) -> dict[str, float]:
     conv = Conversation()
-
-    # TODO needs to see rules for all entities. See axe definition for text on modifiers and abilities
-    # TODO first have each 'strategy' llm create new features, (maybe dedup somehow?)
-    #  These need to create files that go in the feature packs folder. They'll need sufficient context to write the code for those files.
-    #  then the the below weight proposals on the set of all features.
-
-    conv.add_message(
+    weight_prompt = (
+        f"Here are the rules for the entities in the game:\n{entity_rules}\n\n"
         "Provide weights on how often an AI agent should favor actions with certain features in a turn based strategy game. "
         "Only weight features relevant to your strategy. "
         "Positive weights mean the AI should favor actions with that feature, and negative weights avoid. "
@@ -33,8 +129,9 @@ def propose_feature_weights(
         f"Here is the list of all possible features:\n"
         f"{json.dumps(feature_catalog, indent=2)}\n\n"
         f"For your strategy, focus on being *{strategy}*.\n"
-        "For each relevant feature, provide the feature name and a weight.",
+        "For each relevant feature, provide the feature name and a weight."
     )
+    conv.add_message(weight_prompt)
 
     response = prompt(
         model=STRONG_LLM,
@@ -46,3 +143,25 @@ def propose_feature_weights(
         raise ValueError("LLM failed to propose weights.")
 
     return {fw.feature: fw.weight for fw in response.weights}
+
+
+def get_proposed_features_and_weights(
+    engine: "Engine", feature_catalog: List[str], strategies: list[str]
+) -> Dict[str, float]:
+    entity_rules = get_entity_rules(engine)
+    for strategy in strategies:
+        feature_catalog = propose_new_feature(
+            entity_rules=entity_rules,
+            feature_catalog=feature_catalog,
+            strategy=strategy,
+        )
+
+    all_weights = []
+    for strategy in strategies:
+        weights = propose_weights(
+            entity_rules=entity_rules,
+            feature_catalog=feature_catalog,
+            strategy=strategy,
+        )
+        all_weights.append(weights)
+    return feature_catalog, all_weights  # merge here?

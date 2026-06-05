@@ -6,7 +6,7 @@ import numpy as np
 
 from ai.feature_agent import FeatureWeightedAgent
 from ai.feature_catalog import get_feature_catalog
-from ai.propose_feature_weights import propose_feature_weights
+from ai.propose_feature_weights import get_proposed_features_and_weights
 from ai.tune_feature_weights import PlayerPopulation, run_tournament
 from game_setup import GameSetup
 from heroes import MeleeHero, RangedHero
@@ -23,10 +23,9 @@ def _get_or_create_initial_weight_stats(
             return json.load(f)
 
     print("Proposing initial weights with LLM using strategies:", strategies)
-    all_proposed_weights = []
-    for strategy in strategies:
-        weights = propose_feature_weights(feature_catalog, strategy)
-        all_proposed_weights.append(weights)
+    all_proposed_weights = get_proposed_features_and_weights(
+        engine=engine, feature_catalog=feature_catalog, strategies=strategies
+    )
 
     feature_stats: Dict[str, Tuple[float, float]] = {}
     for feature in feature_catalog:
