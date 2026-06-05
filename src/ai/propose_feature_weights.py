@@ -19,15 +19,17 @@ def propose_feature_weights(
     feature_catalog: List[str], strategy: str
 ) -> Dict[str, float]:
     conv = Conversation()
+
+    # TODO needs to see rules for all entities. See axe definition for text on modifiers and abilities
+    # TODO first have each 'strategy' llm create new features, (maybe dedup somehow?)
+    #  These need to create files that go in the feature packs folder. They'll need sufficient context to write the code for those files.
+    #  then the the below weight proposals on the set of all features.
+
     conv.add_message(
-        "system",
         "Provide weights on how often an AI agent should favor actions with certain features in a turn based strategy game. "
         "Only weight features relevant to your strategy. "
         "Positive weights mean the AI should favor actions with that feature, and negative weights avoid. "
-        "Absolute top priorities can have weights up to +- 20, while more common priorities should be at or below +- 5. ",
-    )
-    conv.add_message(
-        "user",
+        "Absolute top priorities can have weights up to +- 20, while more common priorities should be at or below +- 5. "
         f"Here is the list of all possible features:\n"
         f"{json.dumps(feature_catalog, indent=2)}\n\n"
         f"For your strategy, focus on being *{strategy}*.\n"

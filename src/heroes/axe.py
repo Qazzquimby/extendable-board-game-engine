@@ -75,6 +75,7 @@ class CullingBladeInstruction(Instruction):
 
 
 class AxeCleaveOnTakeDamage(Modifier):
+    text = "When you take damage: Enemies in burst 1, 1dmg."
 
     def __post_init__(self):
         self.plausibly_positive = True
@@ -94,6 +95,8 @@ class AxeCleaveOnTakeDamage(Modifier):
 
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
+    text = "When you receive damage from a Default Ability: The attacker takes 1/2 the damage received, before Armor."
+
     def __post_init__(self):
         self.plausibly_positive = True
 
@@ -120,7 +123,8 @@ class Axe(Hero):
 
         self.abilities.append(
             Ability(
-                name="Axe",
+                name="Axe Swing",
+                text="Range 1, 2dmg",
                 aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
@@ -131,6 +135,11 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Berserker's Call",
+                text="""\
+        1/Game, Free Action
+        Until the beginning of your next turn,
+          You have Armor
+        All enemies in range 1 of you use a default ability targeting you, if possible, and are stunned.""",
                 aiming=MultipleAiming(
                     {
                         "self_target": TargetSelf(),
@@ -158,6 +167,11 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Battle Hunger",
+                text="""\
+                1/Game:
+        Range 3, give the 2 DoT and a Battle Hunger token:
+          When they kill a unit, they lose the token and clear all DoT.
+                """,
                 aiming=TargetEntity(in_range=3),
                 instructions=[
                     GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
@@ -170,6 +184,14 @@ class Axe(Hero):
         self.abilities.append(
             Ability(
                 name="Culling Blade",
+                text="""\
+                1/Game
+        Range 1, 3dmg irreducible
+        On kill:
+          The target does not trigger any on-death reactions.
+          Refresh this.
+          If the kill was a hero, for the rest of the game you have Armor.
+                """,
                 aiming=TargetEntity(in_range=1),
                 instructions=[CullingBladeInstruction()],
                 is_ultimate=True,

@@ -336,8 +336,7 @@
         1/Game, Free Action
         Until the beginning of your next turn,
           You have Armor
-          When an enemy starts their turn in range 1 of you,
-            they cannot move, and they must use a default attack targeting you, if possible, spending actions as normal.
+        All enemies in range 1 of you use a default ability targeting you, if possible, and are stunned.
       hints:
         - REFERENCE_ArmorHint
     - name: Battle Hunger

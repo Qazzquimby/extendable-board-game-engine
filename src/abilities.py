@@ -86,6 +86,7 @@ class Instruction:
 class Ability:
     name: str
     aiming: Aiming
+    text: str = ""
     instructions: List[Instruction] = field(default_factory=list)
     owner: Optional["Entity"] = None
     is_default: bool = False

@@ -7,6 +7,7 @@ from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 
 class Modifier:
     owner: Entity = field(init=False)
+    text: str = ""
 
 
 class SummonModifier(Modifier):
