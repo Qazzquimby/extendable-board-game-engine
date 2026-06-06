@@ -1,3 +1,4 @@
+import importlib
 import inspect
 import json
 import re
@@ -62,6 +63,8 @@ def propose_new_features_for_strategy(
 ):
     output_dir = Path("feature_packs") / game_setup_id
     output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.parent.joinpath("__init__.py").touch(exist_ok=True)
+    output_dir.joinpath("__init__.py").touch(exist_ok=True)
 
     sanitized_strategy = "".join(
         c for c in strategy if c.isalnum() or c in "_-"
@@ -102,7 +105,7 @@ def propose_new_features_for_strategy(
 
     if new_features_response:
         with open(output_file, "w") as f:
-            f.write("from features import FeatureContext\n")
+            f.write("from features import FeatureContext, WeightedFeature\n")
             f.write("from typing import Any, List, Optional, TYPE_CHECKING, Union\n\n")
             f.write("if TYPE_CHECKING:\n")
             f.write("    from choices import PlausibleActionOrMoveAndAction\n")
@@ -110,10 +113,25 @@ def propose_new_features_for_strategy(
             f.write("    from entities import Entity\n")
             f.write("    from point import Point\n\n")
 
+            func_names_map = {}
             for feature in new_features_response.features:
+                match = re.search(r"def\s+([a-zA-Z_]\w*)\s*\(", feature.code)
+                if not match:
+                    continue
+                func_name = match.group(1)
+                func_names_map[feature.name] = func_name
+
                 f.write(f"# Feature: {feature.name}\n")
                 f.write(feature.code)
                 f.write("\n\n")
+
+            f.write("FEATURES = [\n")
+            for feature in new_features_response.features:
+                if feature.name in func_names_map:
+                    f.write(
+                        f"    WeightedFeature(name='{feature.name}', eval_func={func_names_map[feature.name]}, weight=0.0),\n"
+                    )
+            f.write("]\n")
 
 
 def propose_weights(
@@ -159,9 +177,14 @@ def get_proposed_features_and_weights(
     feature_pack_dir = Path("feature_packs") / game_setup_id
     if feature_pack_dir.exists():
         for f in feature_pack_dir.glob("generated_*.py"):
-            content = f.read_text()
-            found_features = re.findall(r"# Feature: (.*)", content)
-            feature_catalog.extend(found_features)
+            module_name = f"feature_packs.{game_setup_id}.{f.stem}"
+            try:
+                module = importlib.import_module(module_name)
+                importlib.reload(module)
+                if hasattr(module, "FEATURES"):
+                    feature_catalog.extend([wf.name for wf in module.FEATURES])
+            except ImportError as e:
+                print(f"Could not import {module_name}: {e}")
     feature_catalog = sorted(list(set(feature_catalog)))
 
     all_weights = []
