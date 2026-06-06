@@ -6,7 +6,7 @@ from typing import Dict, List, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from ai.feature_catalog import get_feature_catalog
+from ai.feature_catalog import create_new_feature_catalog
 from ai.llm import Conversation, STRONG_LLM, prompt
 from features import FeatureContext
 
@@ -155,7 +155,7 @@ def get_proposed_features_and_weights(
         propose_new_features_for_strategy(entity_rules, strategy, game_setup_id)
 
     # Build feature catalog
-    feature_catalog = get_feature_catalog(engine)
+    feature_catalog = create_new_feature_catalog(engine)
     feature_pack_dir = Path("feature_packs") / game_setup_id
     if feature_pack_dir.exists():
         for f in feature_pack_dir.glob("generated_*.py"):

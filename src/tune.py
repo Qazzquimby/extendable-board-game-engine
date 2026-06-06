@@ -1,11 +1,12 @@
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import numpy as np
 
 from ai.feature_agent import FeatureWeightedAgent
-from ai.feature_catalog import get_feature_catalog
+from ai.feature_catalog import create_new_feature_catalog, get_feature_catalog
 from ai.propose_feature_weights import get_proposed_features_and_weights
 from ai.tune_feature_weights import PlayerPopulation, run_tournament
 from game_setup import GameSetup
@@ -14,6 +15,10 @@ from heroes.axe import Axe
 
 if TYPE_CHECKING:
     from engine import Engine
+
+TEAM_0_DIR_NAME = "team0"
+TEAM_1_DIR_NAME = "team1"
+TEAM_DIR_NAMES = [TEAM_0_DIR_NAME, TEAM_1_DIR_NAME]
 
 
 def _get_or_create_initial_weight_stats(
@@ -47,6 +52,126 @@ def _get_or_create_initial_weight_stats(
     return feature_stats
 
 
+@dataclass
+class TuningGenerationInputs:
+    population: PlayerPopulation
+    initial_stats: Dict[str, Tuple[float, float]]
+    gen_dir: Path
+    team_tuning_dir: Path
+
+
+def update_population(
+    gen_dir: Path,
+    tuning_dir: Path,
+    gen: int,
+    i: int,
+    feature_catalog: List[str],
+    population_size: int,
+    mutation_rate: float,
+    mutation_strength: float,
+    crossover_prob: float,
+    initial_stats: Dict[str, Tuple[float, float]],
+):
+    population_file = gen_dir / "population.json"
+    if population_file.exists():
+        print(f"Loading population for team {i} gen {gen} from cache.")
+        pop = PlayerPopulation.load(population_file, feature_catalog)
+    elif gen == 0:
+        print(f"Initializing population for team {i} gen 0.")
+        pop = PlayerPopulation(population_size, feature_catalog, initial_stats)
+        pop.save(population_file)
+    else:
+        print(f"Evolving population for team {i} gen {gen}.")
+        prev_gen_dir = tuning_dir / f"gen_{gen - 1}"
+        prev_pop_file = prev_gen_dir / "population.json"
+        prev_scores_file = prev_gen_dir / "scores.json"
+
+        if not prev_pop_file.exists() or not prev_scores_file.exists():
+            raise FileNotFoundError(f"Missing data for evolution for team {i}")
+
+        pop = PlayerPopulation.load(prev_pop_file, feature_catalog)
+        with open(prev_scores_file, "r") as f:
+            scores = {int(k): v for k, v in json.load(f).items()}
+        pop.evolve(scores, mutation_rate, mutation_strength, crossover_prob)
+        pop.save(population_file)
+
+    return pop
+
+
+def tuning_generation(
+    gen: int,
+    base_tuning_dir: Path,
+    feature_catalog: List[str],
+    population_size: int = 20,
+    mutation_rate: float = 0.05,
+    mutation_strength: float = 0.1,
+    crossover_prob: float = 0.7,
+):
+    gen_dirs = [
+        base_tuning_dir / team_dir_name / f"gen_{gen}"
+        for team_dir_name in TEAM_DIR_NAMES
+    ]
+    for gen_dir in gen_dirs:
+        gen_dir.mkdir(exist_ok=True)
+
+    population0 = update_population(
+        gen_dir=gen_dirs[0],
+        initial_stats=initial_stats0,
+        tuning_dir=team0_tuning_dir,
+        gen=gen,
+        i=0,
+        feature_catalog=feature_catalog,
+        population_size=population_size,
+        mutation_rate=mutation_rate,
+        mutation_strength=mutation_strength,
+        crossover_prob=crossover_prob,
+    )
+
+    scores_file0 = gen_dir0 / "scores.json"
+    scores_file1 = gen_dir1 / "scores.json"
+    if scores_file0.exists() and scores_file1.exists():
+        print(f"Loading scores for gen {gen} from cache.")
+        with open(scores_file0, "r") as f:
+            scores0 = json.load(f)
+        with open(scores_file1, "r") as f:
+            scores1 = json.load(f)
+    else:
+        print(f"Running tournament for gen {gen}.")
+        game_logs_dir = base_tuning_dir / f"gen_{gen}_game_logs"
+        game_logs_dir.mkdir(exist_ok=True)
+
+        def run_game_fn(engine, agents, player_indices):
+            engine.agents = agents
+            game_log = engine.run_game()
+            p0_idx, p1_idx = player_indices
+            log_path = game_logs_dir / f"p0_{p0_idx}_vs_p1_{p1_idx}.json"
+            with open(log_path, "w") as f:
+                json.dump(game_log.model_dump(mode="json"), f, indent=2)
+            return game_log.winner_team
+
+        scores0, scores1 = run_tournament(
+            population0,
+            population1,
+            engine_setup_fn=game_setup.create_engine,
+            run_game_fn=run_game_fn,
+            agent_class=FeatureWeightedAgent,
+        )
+        with open(scores_file0, "w") as f:
+            json.dump(scores0, f, indent=2)
+        with open(scores_file1, "w") as f:
+            json.dump(scores1, f, indent=2)
+
+    best_player0_idx = max(scores0, key=scores0.get, default=0)
+    best_player1_idx = max(scores1, key=scores1.get, default=0)
+    print(
+        f"Best player of gen {gen + 1} for team 0: score {scores0.get(best_player0_idx, 0)}"
+    )
+    print(
+        f"Best player of gen {gen + 1} for team 1: score {scores1.get(best_player1_idx, 0)}"
+    )
+    return scores0, scores1
+
+
 def tune_weights(
     game_setup: GameSetup,
     generations: int = 10,
@@ -60,22 +185,15 @@ def tune_weights(
 
     dummy_engine = game_setup.create_engine()
 
-    feature_catalog_file = base_tuning_dir / "feature_catalog.json"
-    if feature_catalog_file.exists():
-        print("Loading feature catalog from cache.")
-        with open(feature_catalog_file, "r") as f:
-            feature_catalog = json.load(f)
-    else:
-        print("Generating feature catalog.")
-        feature_catalog = get_feature_catalog(dummy_engine)
-        with open(feature_catalog_file, "w") as f:
-            json.dump(feature_catalog, f, indent=2)
+    feature_catalog_file_path = base_tuning_dir / "feature_catalog.json"
+    feature_catalog = get_feature_catalog(
+        engine=dummy_engine, feature_catalog_file_path=feature_catalog_file_path
+    )
 
     team0_tuning_dir = base_tuning_dir / "team0"
     team1_tuning_dir = base_tuning_dir / "team1"
     team0_tuning_dir.mkdir(exist_ok=True)
     team1_tuning_dir.mkdir(exist_ok=True)
-
     strategies = ["aggressive"]  # , "defensive", "balanced", "opportunistic"]
     initial_stats0 = _get_or_create_initial_weight_stats(
         engine=dummy_engine,
@@ -90,91 +208,19 @@ def tune_weights(
         strategies=strategies,
     )
 
-    population0, population1 = None, None
+    population0 = None
+    population1 = None
 
     for gen in range(generations):
         print(f"Generation {gen + 1}/{generations}")
-        gen_dir0 = team0_tuning_dir / f"gen_{gen}"
-        gen_dir1 = team1_tuning_dir / f"gen_{gen}"
-        gen_dir0.mkdir(exist_ok=True)
-        gen_dir1.mkdir(exist_ok=True)
-
-        # Load or create populations
-        for i, (pop, initial_stats, gen_dir, tuning_dir) in enumerate(
-            [
-                (population0, initial_stats0, gen_dir0, team0_tuning_dir),
-                (population1, initial_stats1, gen_dir1, team1_tuning_dir),
-            ]
-        ):
-            population_file = gen_dir / "population.json"
-            if population_file.exists():
-                print(f"Loading population for team {i} gen {gen} from cache.")
-                pop = PlayerPopulation.load(population_file, feature_catalog)
-            elif gen == 0:
-                print(f"Initializing population for team {i} gen 0.")
-                pop = PlayerPopulation(population_size, feature_catalog, initial_stats)
-                pop.save(population_file)
-            else:
-                print(f"Evolving population for team {i} gen {gen}.")
-                prev_gen_dir = tuning_dir / f"gen_{gen - 1}"
-                prev_pop_file = prev_gen_dir / "population.json"
-                prev_scores_file = prev_gen_dir / "scores.json"
-
-                if not prev_pop_file.exists() or not prev_scores_file.exists():
-                    raise FileNotFoundError(f"Missing data for evolution for team {i}")
-
-                pop = PlayerPopulation.load(prev_pop_file, feature_catalog)
-                with open(prev_scores_file, "r") as f:
-                    scores = {int(k): v for k, v in json.load(f).items()}
-                pop.evolve(scores, mutation_rate, mutation_strength, crossover_prob)
-                pop.save(population_file)
-
-            if i == 0:
-                population0 = pop
-            else:
-                population1 = pop
-
-        scores_file0 = gen_dir0 / "scores.json"
-        scores_file1 = gen_dir1 / "scores.json"
-        if scores_file0.exists() and scores_file1.exists():
-            print(f"Loading scores for gen {gen} from cache.")
-            with open(scores_file0, "r") as f:
-                scores0 = json.load(f)
-            with open(scores_file1, "r") as f:
-                scores1 = json.load(f)
-        else:
-            print(f"Running tournament for gen {gen}.")
-            game_logs_dir = base_tuning_dir / f"gen_{gen}_game_logs"
-            game_logs_dir.mkdir(exist_ok=True)
-
-            def run_game_fn(engine, agents, player_indices):
-                engine.agents = agents
-                game_log = engine.run_game()
-                p0_idx, p1_idx = player_indices
-                log_path = game_logs_dir / f"p0_{p0_idx}_vs_p1_{p1_idx}.json"
-                with open(log_path, "w") as f:
-                    json.dump(game_log.model_dump(mode="json"), f, indent=2)
-                return game_log.winner_team
-
-            scores0, scores1 = run_tournament(
-                population0,
-                population1,
-                engine_setup_fn=game_setup.create_engine,
-                run_game_fn=run_game_fn,
-                agent_class=FeatureWeightedAgent,
-            )
-            with open(scores_file0, "w") as f:
-                json.dump(scores0, f, indent=2)
-            with open(scores_file1, "w") as f:
-                json.dump(scores1, f, indent=2)
-
-        best_player0_idx = max(scores0, key=scores0.get, default=0)
-        best_player1_idx = max(scores1, key=scores1.get, default=0)
-        print(
-            f"Best player of gen {gen + 1} for team 0: score {scores0.get(best_player0_idx, 0)}"
-        )
-        print(
-            f"Best player of gen {gen + 1} for team 1: score {scores1.get(best_player1_idx, 0)}"
+        scores0, scores1 = tuning_generation(
+            gen=gen,
+            base_tuning_dir=base_tuning_dir,
+            feature_catalog=feature_catalog,
+            population_size=population_size,
+            mutation_rate=mutation_rate,
+            mutation_strength=mutation_strength,
+            crossover_prob=crossover_prob,
         )
 
     # Save best weights

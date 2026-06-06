@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import List, TYPE_CHECKING
 
 from abilities import (
@@ -11,7 +13,20 @@ if TYPE_CHECKING:
     from entities import Entity
 
 
-def get_feature_catalog(engine: "Engine") -> List[str]:
+def get_feature_catalog(engine: "Engine", feature_catalog_file_path: Path) -> List[str]:
+    if feature_catalog_file_path.exists():
+        print("Loading feature catalog from cache.")
+        with open(feature_catalog_file_path, "r") as f:
+            feature_catalog = json.load(f)
+    else:
+        print("Generating feature catalog.")
+        feature_catalog = create_new_feature_catalog(engine)
+        with open(feature_catalog_file_path, "w") as f:
+            json.dump(feature_catalog, f, indent=2)
+    return feature_catalog
+
+
+def create_new_feature_catalog(engine: "Engine") -> List[str]:
     """
     Generates a list of all possible feature names for a given game setup.
     """
@@ -63,5 +78,5 @@ if __name__ == "__main__":
     from self_play import setup_game
 
     engine = setup_game()
-    feature_catalog = get_feature_catalog(engine)
+    feature_catalog = create_new_feature_catalog(engine)
     print("\n".join(feature_catalog))
