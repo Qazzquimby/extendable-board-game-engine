@@ -5,6 +5,10 @@ from typing import List, Dict, Callable
 
 import numpy as np
 
+from ai.feature_agent import FeatureWeightedAgent
+from feature_packs.default import FEATURES
+from features import WeightedFeature
+
 
 class PlayerPopulation:
     def __init__(
@@ -45,7 +49,6 @@ class PlayerPopulation:
         instance = cls(len(population_data), feature_catalog)
         instance.population = population_data
         return instance
-
 
     def evolve(
         self,
@@ -101,7 +104,6 @@ def run_tournament(
     population1: PlayerPopulation,
     engine_setup_fn: Callable,
     run_game_fn: Callable,
-    agent_class: type,
     num_games_per_matchup: int = 2,
 ):
     scores0 = {i: 0 for i in range(population0.population_size)}
@@ -109,8 +111,27 @@ def run_tournament(
 
     for i in range(population0.population_size):
         for j in range(population1.population_size):
-            agent0 = agent_class(weights=population0.population[i])
-            agent1 = agent_class(weights=population1.population[j])
+            weights0 = population0.population[i]
+            features0 = [
+                WeightedFeature(
+                    name=f.name,
+                    eval_func=f.eval_func,
+                    weight=weights0.get(f.name, 0.0)
+                )
+                for f in FEATURES
+            ]
+            agent0 = FeatureWeightedAgent(weighted_features=features0)
+
+            weights1 = population1.population[j]
+            features1 = [
+                WeightedFeature(
+                    name=f.name,
+                    eval_func=f.eval_func,
+                    weight=weights1.get(f.name, 0.0)
+                )
+                for f in FEATURES
+            ]
+            agent1 = FeatureWeightedAgent(weighted_features=features1)
 
             for _ in range(num_games_per_matchup):
                 engine = engine_setup_fn()
@@ -120,5 +141,3 @@ def run_tournament(
                 elif winner == 1:
                     scores1[j] += 1
     return scores0, scores1
-
-

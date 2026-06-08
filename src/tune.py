@@ -5,7 +5,6 @@ from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import numpy as np
 
-from ai.feature_agent import FeatureWeightedAgent
 from ai.propose_feature_weights import (
     ensure_features_proposed,
     get_proposed_weights_for_strategies,
@@ -176,7 +175,6 @@ class Tuner:
             self.populations[1],
             engine_setup_fn=self.config.game_setup.create_engine,
             run_game_fn=run_game_fn,
-            agent_class=FeatureWeightedAgent,
         )
         scores_list = [scores0, scores1]
         for i, scores in enumerate(scores_list):

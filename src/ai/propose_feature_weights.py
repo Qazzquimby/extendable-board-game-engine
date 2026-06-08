@@ -96,6 +96,7 @@ def propose_new_features_for_strategy(
         "Provide a descriptive name and the python code for each feature."
     )
     feature_gen_conv.add_message(feature_gen_prompt)
+    # todo improve prompting, no stub functions, name should literally describe behavior
 
     new_features_response = prompt(
         model=STRONG_LLM,
@@ -163,7 +164,9 @@ def propose_weights(
     return {fw.feature: fw.weight for fw in response.weights}
 
 
-def ensure_features_proposed(engine: "Engine", strategies: List[str], game_setup_id: str):
+def ensure_features_proposed(
+    engine: "Engine", strategies: List[str], game_setup_id: str
+):
     entity_rules = get_entity_rules(engine)
     for strategy in strategies:
         propose_new_features_for_strategy(entity_rules, strategy, game_setup_id)
@@ -186,18 +189,23 @@ def load_extended_feature_catalog(engine: "Engine", game_setup_id: str) -> List[
 
 
 def get_proposed_weights_for_strategies(
-    engine: "Engine", feature_catalog: List[str], strategies: List[str], game_setup_id: str
+    engine: "Engine",
+    feature_catalog: List[str],
+    strategies: List[str],
+    game_setup_id: str,
 ) -> List[Dict[str, float]]:
     entity_rules = get_entity_rules(engine)
     all_weights = []
-    
+
     weights_dir = Path("feature_packs") / game_setup_id / "weights"
     weights_dir.mkdir(parents=True, exist_ok=True)
-    
+
     for strategy in strategies:
-        sanitized_strategy = "".join(c for c in strategy if c.isalnum() or c in "_-").lower()
+        sanitized_strategy = "".join(
+            c for c in strategy if c.isalnum() or c in "_-"
+        ).lower()
         weights_file = weights_dir / f"{sanitized_strategy}_weights.json"
-        
+
         if weights_file.exists():
             with open(weights_file, "r") as f:
                 weights = json.load(f)
@@ -205,7 +213,7 @@ def get_proposed_weights_for_strategies(
             weights = propose_weights(entity_rules, feature_catalog, strategy)
             with open(weights_file, "w") as f:
                 json.dump(weights, f, indent=2)
-                
+
         all_weights.append(weights)
-        
+
     return all_weights
