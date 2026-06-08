@@ -163,16 +163,13 @@ def propose_weights(
     return {fw.feature: fw.weight for fw in response.weights}
 
 
-def get_proposed_features_and_weights(
-    engine: "Engine", strategies: list[str], game_setup_id: str
-) -> List[Dict[str, float]]:
+def ensure_features_proposed(engine: "Engine", strategies: List[str], game_setup_id: str):
     entity_rules = get_entity_rules(engine)
-
-    # Propose features
     for strategy in strategies:
         propose_new_features_for_strategy(entity_rules, strategy, game_setup_id)
 
-    # Build feature catalog
+
+def load_extended_feature_catalog(engine: "Engine", game_setup_id: str) -> List[str]:
     feature_catalog = create_new_feature_catalog(engine)
     feature_pack_dir = Path("feature_packs") / game_setup_id
     if feature_pack_dir.exists():
@@ -185,14 +182,30 @@ def get_proposed_features_and_weights(
                     feature_catalog.extend([wf.name for wf in module.FEATURES])
             except ImportError as e:
                 print(f"Could not import {module_name}: {e}")
-    feature_catalog = sorted(list(set(feature_catalog)))
+    return sorted(list(set(feature_catalog)))
 
+
+def get_proposed_weights_for_strategies(
+    engine: "Engine", feature_catalog: List[str], strategies: List[str], game_setup_id: str
+) -> List[Dict[str, float]]:
+    entity_rules = get_entity_rules(engine)
     all_weights = []
+    
+    weights_dir = Path("feature_packs") / game_setup_id / "weights"
+    weights_dir.mkdir(parents=True, exist_ok=True)
+    
     for strategy in strategies:
-        weights = propose_weights(
-            entity_rules=entity_rules,
-            feature_catalog=feature_catalog,
-            strategy=strategy,
-        )
+        sanitized_strategy = "".join(c for c in strategy if c.isalnum() or c in "_-").lower()
+        weights_file = weights_dir / f"{sanitized_strategy}_weights.json"
+        
+        if weights_file.exists():
+            with open(weights_file, "r") as f:
+                weights = json.load(f)
+        else:
+            weights = propose_weights(entity_rules, feature_catalog, strategy)
+            with open(weights_file, "w") as f:
+                json.dump(weights, f, indent=2)
+                
         all_weights.append(weights)
+        
     return all_weights
