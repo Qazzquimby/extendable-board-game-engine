@@ -24,7 +24,7 @@ class MeleeHero(Hero):
 class RangedHero(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
-            engine=engine, name="Ranged Hero", hp=6, speed=3, pos=pos, team=team
+            engine=engine, name="Ranged Hero", hp=4, speed=3, pos=pos, team=team
         )
         self.abilities.append(
             Ability(

@@ -26,12 +26,12 @@ TEAM_DIR_NAMES = [TEAM_0_DIR_NAME, TEAM_1_DIR_NAME]
 @dataclass
 class TuningConfig:
     game_setup: GameSetup
+    strategies: List[str]
     generations: int = 10
     population_size: int = 20
     mutation_rate: float = 0.05
     mutation_strength: float = 0.1
     crossover_prob: float = 0.7
-    strategies: List[str] = field(default_factory=lambda: ["aggressive"])
 
 
 def _get_or_create_initial_weight_stats(
@@ -250,7 +250,10 @@ if __name__ == "__main__":
     )
     config = TuningConfig(
         game_setup=game_setup,
-        generations=2,
+        generations=10,
         population_size=4,
+        strategies=["aggressive", "careful"],
     )
+    # optimal, clever, combo-oriented, balanced
+
     tune_weights(config)
