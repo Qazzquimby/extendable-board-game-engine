@@ -10,13 +10,13 @@ from features import ChoiceFeatureEvaluator, WeightedFeature
 
 def get_all_features(game_setup_id: str) -> List[WeightedFeature]:
     all_features = []
-    top_level_module_infos: List[pkgutil.ModuleInfo] = list(
-        pkgutil.iter_modules(feature_packs.__path__)
-    )
-    for _, name, _ in top_level_module_infos:
-        module = importlib.import_module(f"feature_packs.{name}")
-        if hasattr(module, "FEATURES"):
-            all_features.extend(module.FEATURES)
+    # top_level_module_infos: List[pkgutil.ModuleInfo] = list(
+    #     pkgutil.iter_modules(feature_packs.__path__)
+    # )
+    # for _, name, _ in top_level_module_infos:
+    #     module = importlib.import_module(f"feature_packs.{name}")
+    #     if hasattr(module, "FEATURES"):
+    #         all_features.extend(module.FEATURES)
 
     tuning_dir_module_infos: List[pkgutil.ModuleInfo] = list(
         pkgutil.iter_modules([feature_packs.__path__[0] + f"/{game_setup_id}"])
