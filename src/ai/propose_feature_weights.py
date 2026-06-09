@@ -39,21 +39,29 @@ class NewFeatures(BaseModel):
 
 def get_entity_rules(engine: "Engine") -> str:
     entity_rules_parts = []
-    unique_entities = {e.name: e for e in engine.entities}.values()
-
-    for entity in unique_entities:
-        rules = f"Entity: {entity.name}\n"
-        if hasattr(entity, "abilities"):
-            for ability in entity.abilities:
-                if hasattr(ability, "text") and ability.text:
-                    rules += f"  Ability: {ability.name}\n"
-                    rules += f"    {ability.text}\n"
-        if hasattr(entity, "modifiers"):
-            for modifier in entity.modifiers:
-                if hasattr(modifier, "text") and modifier.text:
-                    rules += f"  Modifier: {modifier.__class__.__name__}\n"
-                    rules += f"    {modifier.text}\n"
-        entity_rules_parts.append(rules)
+    
+    teams = {}
+    for entity in engine.entities:
+        if entity.team not in teams:
+            teams[entity.team] = []
+        teams[entity.team].append(entity)
+        
+    for team, entities in sorted(teams.items()):
+        entity_rules_parts.append(f"Team {team}:")
+        unique_entities = {e.name: e for e in entities}.values()
+        for entity in unique_entities:
+            rules = f"  Entity: {entity.name} (HP: {entity.max_hp}, Speed: {entity.speed})"
+            if hasattr(entity, "abilities"):
+                for ability in entity.abilities:
+                    if hasattr(ability, "text") and ability.text:
+                        rules += f"\n    Ability: {ability.name}"
+                        rules += f"\n      {ability.text}"
+            if hasattr(entity, "modifiers"):
+                for modifier in entity.modifiers:
+                    if hasattr(modifier, "text") and modifier.text:
+                        rules += f"\n    Modifier: {modifier.__class__.__name__}"
+                        rules += f"\n      {modifier.text}"
+            entity_rules_parts.append(rules)
 
     entity_rules = "\n\n".join(entity_rules_parts)
     return entity_rules
