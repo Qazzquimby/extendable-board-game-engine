@@ -34,6 +34,7 @@ class Entity:
         self.set = "development"
         self.name = name
 
+        self.max_hp = hp  # todo prevent healing over max
         self.hp = hp
         self.speed = speed
 
