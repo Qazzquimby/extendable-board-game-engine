@@ -1,16 +1,18 @@
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Tuple, TYPE_CHECKING
 
 import numpy as np
 
+from ai.feature_agent import get_all_features
 from ai.propose_feature_weights import (
     ensure_features_proposed,
     get_proposed_weights_for_strategies,
     load_extended_feature_catalog,
 )
 from ai.tune_feature_weights import PlayerPopulation, run_tournament
+from features import WeightedFeature
 from game_setup import GameSetup
 from heroes import MeleeHero, RangedHero
 from heroes.axe import Axe
@@ -38,7 +40,7 @@ def _get_or_create_initial_weight_stats(
     engine: "Engine",
     game_setup_id: str,
     tuning_dir: Path,
-    feature_catalog: List[str],
+    feature_catalog_names: List[str],
     strategies: List[str],
 ) -> Dict[str, Tuple[float, float]]:
     initial_stats_file = tuning_dir / "initial_weight_stats.json"
@@ -50,13 +52,13 @@ def _get_or_create_initial_weight_stats(
     print("Proposing initial weights with LLM using strategies:", strategies)
     all_proposed_weights = get_proposed_weights_for_strategies(
         engine=engine,
-        feature_catalog=feature_catalog,
+        feature_catalog=feature_catalog_names,
         strategies=strategies,
         game_setup_id=game_setup_id,
     )
 
     feature_stats: Dict[str, Tuple[float, float]] = {}
-    for feature in feature_catalog:
+    for feature in feature_catalog_names:
         weights_for_feature = [w.get(feature, 0.0) for w in all_proposed_weights]
         if weights_for_feature:
             mean = float(np.mean(weights_for_feature))
@@ -74,7 +76,7 @@ class Tuner:
         self,
         config: TuningConfig,
         base_tuning_dir: Path,
-        feature_catalog: List[str],
+        feature_catalog: List[WeightedFeature],
         initial_stats_list: List[Dict[str, Tuple[float, float]]],
         team_tuning_dirs: List[Path],
     ):
@@ -211,11 +213,15 @@ def tune_weights(config: TuningConfig):
     feature_catalog_file_path = base_tuning_dir / "feature_catalog.json"
     if feature_catalog_file_path.exists():
         with open(feature_catalog_file_path, "r") as f:
-            feature_catalog = json.load(f)
+            feature_catalog_names = json.load(f)
     else:
-        feature_catalog = load_extended_feature_catalog(dummy_engine, game_setup_id)
+        feature_catalog_names = load_extended_feature_catalog(
+            dummy_engine, game_setup_id
+        )
         with open(feature_catalog_file_path, "w") as f:
-            json.dump(feature_catalog, f, indent=2)
+            json.dump(feature_catalog_names, f, indent=2)
+
+    feature_catalog = get_all_features(game_setup_id=game_setup_id)
 
     team_tuning_dirs = [
         base_tuning_dir / team_dir_name for team_dir_name in TEAM_DIR_NAMES
@@ -227,7 +233,7 @@ def tune_weights(config: TuningConfig):
             engine=dummy_engine,
             game_setup_id=game_setup_id,
             tuning_dir=team_tuning_dir,
-            feature_catalog=feature_catalog,
+            feature_catalog_names=feature_catalog_names,
             strategies=config.strategies,
         )
         initial_stats_list.append(initial_stats)

@@ -6,7 +6,6 @@ from typing import List, Dict, Callable
 import numpy as np
 
 from ai.feature_agent import FeatureWeightedAgent
-from feature_packs.default import FEATURES
 from features import WeightedFeature
 
 
@@ -14,7 +13,7 @@ class PlayerPopulation:
     def __init__(
         self,
         population_size: int,
-        feature_catalog: List[str],
+        feature_catalog: List[WeightedFeature],
         initial_weight_stats: Dict[str, tuple[float, float]] = None,
     ):
         self.population_size = population_size
@@ -31,10 +30,10 @@ class PlayerPopulation:
         for _ in range(self.population_size):
             weights = {}
             for feature in self.feature_catalog:
-                mean, std_dev = initial_weight_stats.get(feature, (0.0, 0.1))
+                mean, std_dev = initial_weight_stats.get(feature.name, (0.0, 0.1))
                 if std_dev == 0.0:
                     std_dev = 0.1
-                weights[feature] = np.random.normal(mean, std_dev)
+                weights[feature.name] = np.random.normal(mean, std_dev)
             population.append(weights)
         return population
 
@@ -43,7 +42,7 @@ class PlayerPopulation:
             json.dump(self.population, f, indent=2)
 
     @classmethod
-    def load(cls, path: Path, feature_catalog: List[str]):
+    def load(cls, path: Path, feature_catalog: List[WeightedFeature]):
         with open(path, "r") as f:
             population_data = json.load(f)
         instance = cls(len(population_data), feature_catalog)
@@ -85,7 +84,7 @@ class PlayerPopulation:
     def _crossover(self, p1: Dict, p2: Dict, probability: float) -> (Dict, Dict):
         child1, child2 = p1.copy(), p2.copy()
         if random.random() < probability:
-            keys = list(self.feature_catalog)
+            keys = [f.name for f in self.feature_catalog]
             random.shuffle(keys)
             crossover_point = random.randint(1, len(keys) - 1)
             for i in range(crossover_point):
@@ -114,22 +113,18 @@ def run_tournament(
             weights0 = population0.population[i]
             features0 = [
                 WeightedFeature(
-                    name=f.name,
-                    eval_func=f.eval_func,
-                    weight=weights0.get(f.name, 0.0)
+                    name=f.name, eval_func=f.eval_func, weight=weights0.get(f.name, 0.0)
                 )
-                for f in FEATURES
+                for f in population0.feature_catalog
             ]
             agent0 = FeatureWeightedAgent(weighted_features=features0)
 
             weights1 = population1.population[j]
             features1 = [
                 WeightedFeature(
-                    name=f.name,
-                    eval_func=f.eval_func,
-                    weight=weights1.get(f.name, 0.0)
+                    name=f.name, eval_func=f.eval_func, weight=weights1.get(f.name, 0.0)
                 )
-                for f in FEATURES
+                for f in population1.feature_catalog
             ]
             agent1 = FeatureWeightedAgent(weighted_features=features1)
 

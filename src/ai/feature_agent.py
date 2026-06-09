@@ -1,10 +1,32 @@
-import operator
+import pkgutil
+import importlib
 from typing import List
 
 from choices import Choice
 from engine import Agent
-from feature_packs.default import FEATURES
+import feature_packs
 from features import ChoiceFeatureEvaluator, WeightedFeature
+
+
+def get_all_features(game_setup_id: str) -> List[WeightedFeature]:
+    all_features = []
+    top_level_module_infos: List[pkgutil.ModuleInfo] = list(
+        pkgutil.iter_modules(feature_packs.__path__)
+    )
+    for _, name, _ in top_level_module_infos:
+        module = importlib.import_module(f"feature_packs.{name}")
+        if hasattr(module, "FEATURES"):
+            all_features.extend(module.FEATURES)
+
+    tuning_dir_module_infos: List[pkgutil.ModuleInfo] = list(
+        pkgutil.iter_modules([feature_packs.__path__[0] + f"/{game_setup_id}"])
+    )
+    for _, name, _ in tuning_dir_module_infos:
+        module = importlib.import_module(f"feature_packs.{game_setup_id}.{name}")
+        if hasattr(module, "FEATURES"):
+            all_features.extend(module.FEATURES)
+
+    return all_features
 
 
 class FeatureWeightedAgent(Agent):
@@ -47,5 +69,5 @@ class FeatureWeightedAgent(Agent):
 
 
 def get_example_feature_agent():
-    agent = FeatureWeightedAgent(weighted_features=FEATURES)
+    agent = FeatureWeightedAgent(weighted_features=get_all_features())
     return agent
