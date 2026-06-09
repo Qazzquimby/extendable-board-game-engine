@@ -13,6 +13,7 @@ class MeleeHero(Hero):
         self.abilities.append(
             Ability(
                 name="Melee Attack",
+                text="Target in range 1: 2 damage",
                 aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
@@ -29,6 +30,7 @@ class RangedHero(Hero):
         self.abilities.append(
             Ability(
                 name="Ranged Attack",
+                text="Target in range 3: 2 damage",
                 aiming=TargetEntity(in_range=3),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,

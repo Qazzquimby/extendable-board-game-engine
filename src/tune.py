@@ -169,7 +169,7 @@ class Tuner:
             p0_idx, p1_idx = player_indices
             log_path = game_logs_dir / f"p0_{p0_idx}_vs_p1_{p1_idx}.json"
             with open(log_path, "w") as f:
-                json.dump(game_log.model_dump(mode="json"), f, indent=2)
+                json.dump([game_log.model_dump(mode="json")], f, indent=2)
             return game_log.winner_team
 
         scores0, scores1 = run_tournament(

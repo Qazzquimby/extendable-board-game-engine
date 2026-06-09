@@ -1,3 +1,4 @@
+import ast
 import importlib
 import inspect
 import json
@@ -9,10 +10,10 @@ from pydantic import BaseModel, Field
 
 from ai.feature_catalog import create_new_feature_catalog
 from ai.llm import Conversation, STRONG_LLM, prompt
+from choices import PlausibleMoveAndAction
+from entities import Entity
 from features import FeatureContext
-
-if TYPE_CHECKING:
-    from engine import Engine
+from engine import Engine
 
 
 class FeatureWeight(BaseModel):
@@ -58,6 +59,39 @@ def get_entity_rules(engine: "Engine") -> str:
     return entity_rules
 
 
+def get_definitions(obj):
+    source = inspect.getsource(obj)
+    tree = ast.parse(source)
+
+    defs = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            args = ast.unparse(node.args)
+            prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+
+            try:
+                return_type = f" -> {ast.unparse(node.returns)}" if node.returns else ""
+            except AttributeError:
+                return_type = ""
+
+            defs.append(f"\t{prefix} {node.name}({args}){return_type}")
+        elif isinstance(node, ast.ClassDef):
+            bases = ", ".join(ast.unparse(b) for b in node.bases)
+            defs.append(
+                f"class {node.name}({bases})" if bases else f"class {node.name}"
+            )
+
+    return defs
+
+
+def get_general_rules_prompt():
+    return """\
+Teams start far away from each other.
+The game ends after round 6.
+"""
+
+
 def propose_new_features_for_strategy(
     entity_rules: str, strategy: str, game_setup_id: str
 ):
@@ -74,15 +108,20 @@ def propose_new_features_for_strategy(
         return
 
     feature_gen_conv = Conversation()
-    feature_context_code = inspect.getsource(FeatureContext)  # todo add more context
+    feature_context_code = get_definitions(FeatureContext)
+    entity_context = get_definitions(Entity)
+    engine_context = get_definitions(Engine)
+    choice_context = get_definitions(PlausibleMoveAndAction)
+
     # todo make sure plausbiblemoveandaction move_pos is included
     feature_gen_prompt = (
         "Propose choice-features for an AI in a turn-based strategy game.\n"
         "A feature is a python function that evaluates a game state after a potential action and returns a numeric or boolean value.\n"
         "The function signature must be `def my_feature_func(ctx: FeatureContext) -> int | float | bool | None:`\n"
-        f"Here are the rules for the entities in the game:\n{entity_rules}\n\n"
-        f"Here is the definition of the `FeatureContext` class, which is passed to your function:\n"
-        f"```python\n{feature_context_code}\n```\n"
+        f"{get_general_rules_prompt()}\n"
+        f"Game entities:\n{entity_rules}\n\n"
+        f"Relevant definitions:\n"
+        f"```python\n{feature_context_code}\n\n{choice_context}\n\n{entity_context}\n\n{engine_context}```\n"
         "Here are some example features:\n"
         "```python\n"
         "def damage_to_enemies(ctx: FeatureContext) -> int:\n"
@@ -95,7 +134,7 @@ def propose_new_features_for_strategy(
         f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
         "Provide a descriptive name and the python code for each feature. "
         "Features names should be very clear, as users won't be able to see the body. "
-        "Never write stub functions."
+        "Never write stub functions.",
     )
     feature_gen_conv.add_message(feature_gen_prompt)
     # todo improve prompting, no stub functions, name should literally describe behavior
@@ -142,12 +181,13 @@ def propose_weights(
 ) -> dict[str, float]:
     conv = Conversation()
     weight_prompt = (
-        f"Here are the rules for the entities in the game:\n{entity_rules}\n\n"
         "Provide weights on how often an AI agent should favor actions with certain features in a turn based strategy game. "
         "Only weight features relevant to your strategy. "
         "Positive weights mean the AI should favor actions with that feature, and negative weights avoid. "
         "Absolute top priorities can have weights up to +- 20, while more common priorities should be at or below +- 5. "
-        f"Here is the list of all possible features:\n"
+        f"{get_general_rules_prompt()}\n"
+        f"Game entities:\n{entity_rules}\n\n"
+        f"All possible features:\n"
         f"{json.dumps(feature_catalog, indent=2)}\n\n"
         f"For your strategy, focus on being *{strategy}*.\n"
         f"Make sure that your features differentiate locations after moving (actor.move_pos), or the actor would behave randomly when no one is in range.\n"
