@@ -5,9 +5,15 @@ from events import query, before, TurnEndEvent
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 
 
+@dataclass
 class Modifier:
     owner: Entity = field(init=False)
     text: str = ""
+    name: str = field(init=False)
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls.name = cls.__name__
 
 
 class SummonModifier(Modifier):

@@ -74,8 +74,8 @@ def propose_new_features_for_strategy(
         return
 
     feature_gen_conv = Conversation()
-    feature_context_code = inspect.getsource(FeatureContext)
-
+    feature_context_code = inspect.getsource(FeatureContext)  # todo add more context
+    # todo make sure plausbiblemoveandaction move_pos is included
     feature_gen_prompt = (
         "Propose choice-features for an AI in a turn-based strategy game.\n"
         "A feature is a python function that evaluates a game state after a potential action and returns a numeric or boolean value.\n"
@@ -93,7 +93,9 @@ def propose_new_features_for_strategy(
         "    return ctx.new_hp(ctx.actor)\n"
         "```\n\n"
         f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
-        "Provide a descriptive name and the python code for each feature."
+        "Provide a descriptive name and the python code for each feature. "
+        "Features names should be very clear, as users won't be able to see the body. "
+        "Never write stub functions."
     )
     feature_gen_conv.add_message(feature_gen_prompt)
     # todo improve prompting, no stub functions, name should literally describe behavior
@@ -148,6 +150,7 @@ def propose_weights(
         f"Here is the list of all possible features:\n"
         f"{json.dumps(feature_catalog, indent=2)}\n\n"
         f"For your strategy, focus on being *{strategy}*.\n"
+        f"Make sure that your features differentiate locations after moving (actor.move_pos), or the actor would behave randomly when no one is in range.\n"
         "For each relevant feature, provide the feature name and a weight."
     )
     conv.add_message(weight_prompt)
