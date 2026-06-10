@@ -39,18 +39,20 @@ class NewFeatures(BaseModel):
 
 def get_entity_rules(engine: "Engine") -> str:
     entity_rules_parts = []
-    
+
     teams = {}
     for entity in engine.entities:
         if entity.team not in teams:
             teams[entity.team] = []
         teams[entity.team].append(entity)
-        
+
     for team, entities in sorted(teams.items()):
         entity_rules_parts.append(f"Team {team}:")
         unique_entities = {e.name: e for e in entities}.values()
         for entity in unique_entities:
-            rules = f"  Entity: {entity.name} (HP: {entity.max_hp}, Speed: {entity.speed})"
+            rules = (
+                f"  Entity: {entity.name} (HP: {entity.max_hp}, Speed: {entity.speed})"
+            )
             if hasattr(entity, "abilities"):
                 for ability in entity.abilities:
                     if hasattr(ability, "text") and ability.text:
@@ -67,7 +69,7 @@ def get_entity_rules(engine: "Engine") -> str:
     return entity_rules
 
 
-def get_definitions(obj):
+def get_definitions(obj) -> str:
     source = inspect.getsource(obj)
     tree = ast.parse(source)
 
@@ -90,7 +92,7 @@ def get_definitions(obj):
                 f"class {node.name}({bases})" if bases else f"class {node.name}"
             )
 
-    return defs
+    return "\n".join(defs)
 
 
 def get_general_rules_prompt():
@@ -121,10 +123,9 @@ def propose_new_features_for_strategy(
     engine_context = get_definitions(Engine)
     choice_context = get_definitions(PlausibleMoveAndAction)
 
-    # todo make sure plausbiblemoveandaction move_pos is included
     feature_gen_prompt = (
         "Propose choice-features for an AI in a turn-based strategy game.\n"
-        "A feature is a python function that evaluates a game state after a potential action and returns a numeric or boolean value.\n"
+        "A feature is a python function that evaluates a game state after a potential action and returns a numeric or boolean value that could be useful in evaulating if it was a good choice.\n"
         "The function signature must be `def my_feature_func(ctx: FeatureContext) -> int | float | bool | None:`\n"
         f"{get_general_rules_prompt()}\n"
         f"Game entities:\n{entity_rules}\n\n"
@@ -132,20 +133,66 @@ def propose_new_features_for_strategy(
         f"```python\n{feature_context_code}\n\n{choice_context}\n\n{entity_context}\n\n{engine_context}```\n"
         "Here are some example features:\n"
         "```python\n"
-        "def damage_to_enemies(ctx: FeatureContext) -> int:\n"
-        "    return sum(ctx.damage_dealt(e) for e in ctx.enemies)\n\n"
-        "def enemies_killed(ctx: FeatureContext) -> int:\n"
-        "    return sum(1 for e in ctx.enemies if ctx.new_hp(e) is not None and ctx.new_hp(e) <= 0)\n\n"
-        "def self_hp(ctx: FeatureContext) -> int | None:\n"
-        "    return ctx.new_hp(ctx.actor)\n"
-        "```\n\n"
+        """\
+def damage_to_enemy_mr_example(ctx: FeatureContext) -> int:
+    enemy = ctx.get_enemy_by_name("Mr. Example")
+    if not enemy:
+        return 0
+    return ctx.damage_dealt(enemy)
+
+def damage_to_enemies(ctx: FeatureContext) -> int:
+    return sum(ctx.damage_dealt(e) for e in ctx.enemies)
+
+def healing_done_to_allies(ctx: FeatureContext) -> int:
+    return sum(ctx.heal_received(a) for a in ctx.allies)
+
+def enemies_killed(ctx: FeatureContext) -> int:
+    return sum(
+        1 for e in ctx.enemies if ctx.new_hp(e) is not None and ctx.new_hp(e) <= 0
+    )
+
+def self_hp(ctx: FeatureContext) -> int | None:
+    return ctx.new_hp(ctx.actor)
+
+def enemy_mr_example_hp_le_3(ctx: FeatureContext) -> bool:
+    mr_examples = ctx.get_enemies_by_name("Mr. Example")
+    return any(ctx.new_hp(e) is not None and ctx.new_hp(e) <= 3 for e in mr_examples)
+
+def do_nothing_on_turn_4(ctx: FeatureContext) -> bool:
+    return ctx.choice.ability.name == "Do Nothing" and ctx.engine.round_num == 4
+
+def allied_hero_near_enemy_mr_example(ctx: FeatureContext) -> bool:
+    enemy_mr_example = ctx.get_enemies_by_name("Mr. Example")
+    return any(
+        ctx.new_distance(am, er) is not None and ctx.new_distance(am, er) <= 2
+        for am in ctx.allies
+        for er in enemy_mr_example
+    )
+
+def use_example_strike(ctx: FeatureContext) -> bool:
+    return (
+        ctx.choice.ability.name == "Example Strike" and ctx.actor.name == "Mr. Example"
+    )
+
+def number_of_enemies_hit(ctx: FeatureContext) -> int:
+    return len(ctx.hit_enemies)
+
+def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
+    return min(
+        (
+            ctx.new_distance(ctx.actor, e)
+            for e in ctx.enemies
+            if ctx.new_distance(ctx.actor, e) is not None
+        ),
+        default=0,
+    )
+        """
         f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
         "Provide a descriptive name and the python code for each feature. "
         "Features names should be very clear, as users won't be able to see the body. "
-        "Never write stub functions.",
+        "Never write stub functions."
     )
     feature_gen_conv.add_message(feature_gen_prompt)
-    # todo improve prompting, no stub functions, name should literally describe behavior
 
     new_features_response = prompt(
         model=STRONG_LLM,
@@ -190,8 +237,8 @@ def propose_weights(
     conv = Conversation()
     weight_prompt = (
         "Provide weights on how often an AI agent should favor actions with certain features in a turn based strategy game. "
-        "Only weight features relevant to your strategy. "
-        "Positive weights mean the AI should favor actions with that feature, and negative weights avoid. "
+        "Weight features relevant to your strategy. The legal move with the highest total score (sum over weight*feature_value) will be chosen by the AI. "
+        "Positive weights are favored and negative are avoided. "
         "Absolute top priorities can have weights up to +- 20, while more common priorities should be at or below +- 5. "
         f"{get_general_rules_prompt()}\n"
         f"Game entities:\n{entity_rules}\n\n"
