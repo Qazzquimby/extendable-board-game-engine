@@ -42,10 +42,8 @@ class BattleHungerToken(Token):
     # (todo later) Moving away from Axe costs you twice as many spaces.
 
     @after(DeathEvent)
-    def on_kill_clear_this_and_DoT(
-        self, engine: "Engine", subject: "Entity", killer: Optional["Entity"] = None
-    ) -> None:
-        if killer == self.owner and isinstance(subject, Hero):
+    def on_kill_clear_this_and_DoT(self, event: DeathEvent) -> None:
+        if event.killer == self.owner and isinstance(event.subject, Hero):
             self.owner.remove_token(BattleHungerToken)
             self.owner.remove_token(DamageOverTimeToken, amount=99)
 
