@@ -478,8 +478,6 @@ def _get_plausible_uses_of_ability_at_pos(
                     target = engine.entity_at(target_point)
                     if not target:
                         continue
-                    if isinstance(ability.aiming, TargetEntity) and target == actor:
-                        continue
                     if (
                         not plausibly_positive
                         and target.team == actor.team
