@@ -53,7 +53,10 @@ class LLMModel:
 
 
 CHEAP_LLM = LLMModel(route="google/gemini-2.5-flash", input_cost_micros_per_million=1.5)
-STRONG_LLM = CHEAP_LLM  # LLMModel(route="google/gemini-2.5-pro", input_cost_micros_per_million=12.5 # todo
+# STRONG_LLM = LLMModel(
+#     route="~google/gemini-pro-latest", input_cost_micros_per_million=12.5
+# )
+STRONG_LLM = CHEAP_LLM
 
 
 T = TypeVar("T", bound=BaseModel)

@@ -192,13 +192,13 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
     )
         """
         f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
-        "Generate for all entities on both teams. ",
+        "Generate for all entities on both teams. "
         "Provide a fairly literal and descriptive name and the python code for each feature. "
         "Features names should be clear and say exactly what they do, as users won't be able to see the body. "
         "Besides the helpers in the context object, features are predictive, calculated before the action happens. "
         "A feature for 'number of enemies in aoe range' would make sense while 'number of enemies who were given damage over time' wouldn't, since they won't have the token yet.\n "
         "No 'action did what it was supposed to do' features since it hasn't yet and of course it will. No features that would score the same for every choice, like 'its now turn 6'\n"
-        "Never write stub functions. Do not try to import anything not given. ",
+        "Never write stub functions. Do not try to import anything not given. "
     )
     feature_gen_conv.add_message(feature_gen_prompt)
 
@@ -242,7 +242,7 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
 
 
 def propose_weights(
-    entity_rules: str, feature_catalog: List[str], strategy: str
+    entity_rules: str, feature_catalog: List[str], strategy: str, team_id: int
 ) -> dict[str, float]:
     conv = Conversation()
     weight_prompt = (
@@ -255,7 +255,7 @@ def propose_weights(
         f"All possible features:\n"
         f"{json.dumps(feature_catalog, indent=2)}\n\n"
         f"For your strategy, focus on being *{strategy}*.\n"
-        "Generate for all entities on both teams. "
+        f"Generate weights specifically for playing as **Team {team_id}**. "
         f"Make sure that your features differentiate locations after moving (actor.move_pos), or the actor would behave randomly when no one is in range.\n"
         "The rules are permissive and usually allow actions like attacking yourself. Avoid naive weights that would trigger wasting strong limited abilities or using an ability negatively.\n"
         "For each relevant feature, provide the feature name and a weight."
@@ -303,11 +303,12 @@ def get_proposed_weights_for_strategies(
     feature_catalog: List[str],
     strategies: List[str],
     game_setup_id: str,
+    team_id: int,
 ) -> List[Dict[str, float]]:
     entity_rules = get_entity_rules(engine)
     all_weights = []
 
-    weights_dir = Path("feature_packs") / game_setup_id / "weights"
+    weights_dir = Path("feature_packs") / game_setup_id / f"team{team_id}" / "weights"
     weights_dir.mkdir(parents=True, exist_ok=True)
 
     for strategy in strategies:
@@ -320,7 +321,7 @@ def get_proposed_weights_for_strategies(
             with open(weights_file, "r") as f:
                 weights = json.load(f)
         else:
-            weights = propose_weights(entity_rules, feature_catalog, strategy)
+            weights = propose_weights(entity_rules, feature_catalog, strategy, team_id)
             with open(weights_file, "w") as f:
                 json.dump(weights, f, indent=2)
 

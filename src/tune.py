@@ -42,6 +42,7 @@ def _get_or_create_initial_weight_stats(
     tuning_dir: Path,
     feature_catalog_names: List[str],
     strategies: List[str],
+    team_id: int,
 ) -> Dict[str, Tuple[float, float]]:
     initial_stats_file = tuning_dir / "initial_weight_stats.json"
     if initial_stats_file.exists():
@@ -49,12 +50,13 @@ def _get_or_create_initial_weight_stats(
         with open(initial_stats_file, "r") as f:
             return json.load(f)
 
-    print("Proposing initial weights with LLM using strategies:", strategies)
+    print(f"Proposing initial weights for Team {team_id} with LLM using strategies:", strategies)
     all_proposed_weights = get_proposed_weights_for_strategies(
         engine=engine,
         feature_catalog=feature_catalog_names,
         strategies=strategies,
         game_setup_id=game_setup_id,
+        team_id=team_id,
     )
 
     feature_stats: Dict[str, Tuple[float, float]] = {}
@@ -227,7 +229,7 @@ def tune_weights(config: TuningConfig):
         base_tuning_dir / team_dir_name for team_dir_name in TEAM_DIR_NAMES
     ]
     initial_stats_list = []
-    for team_tuning_dir in team_tuning_dirs:
+    for team_id, team_tuning_dir in enumerate(team_tuning_dirs):
         team_tuning_dir.mkdir(exist_ok=True)
         initial_stats = _get_or_create_initial_weight_stats(
             engine=dummy_engine,
@@ -235,6 +237,7 @@ def tune_weights(config: TuningConfig):
             tuning_dir=team_tuning_dir,
             feature_catalog_names=feature_catalog_names,
             strategies=config.strategies,
+            team_id=team_id,
         )
         initial_stats_list.append(initial_stats)
 
@@ -256,8 +259,8 @@ if __name__ == "__main__":
     )
     config = TuningConfig(
         game_setup=game_setup,
-        generations=20,
-        population_size=4,
+        generations=50,
+        population_size=10,
         strategies=["aggressive", "careful", "optimal", "clever", "combo-oriented"],
     )
     # optimal, clever, combo-oriented, balanced

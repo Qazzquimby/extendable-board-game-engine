@@ -33,7 +33,7 @@ class PlayerPopulation:
                 mean, std_dev = initial_weight_stats.get(feature.name, (0.0, 0.1))
                 if std_dev == 0.0:
                     std_dev = 0.1
-                weights[feature.name] = np.random.normal(mean, std_dev)
+                weights[feature.name] = np.random.normal(mean, std_dev * 1.5)
             population.append(weights)
         return population
 
@@ -58,11 +58,14 @@ class PlayerPopulation:
     ):
         # Tournament selection
         new_population = []
-        for _ in range(self.population_size):
-            p1_idx, p2_idx = random.sample(range(self.population_size), 2)
-            winner_idx = (
-                p1_idx if scores.get(p1_idx, 0) > scores.get(p2_idx, 0) else p2_idx
-            )
+        for i in range(self.population_size):
+            p1_idx = i
+            p2_idx = random.sample(range(self.population_size), k=1)
+
+            if scores.get(p1_idx, 0) > scores.get(p2_idx, 0):
+                winner_idx = p2_idx
+            else:
+                winner_idx = p1_idx
             new_population.append(self.population[winner_idx].copy())
 
         # Crossover and Mutation
@@ -89,13 +92,15 @@ class PlayerPopulation:
             crossover_point = random.randint(1, len(keys) - 1)
             for i in range(crossover_point):
                 key = keys[i]
-                child1[key], child2[key] = child2[key], child1[key]
+                child1[key], child2[key] = child2.get(key, 0), child1.get(key, 0)
         return child1, child2
 
     def _mutate(self, weights: Dict, rate: float, strength: float):
         for key in weights:
             if random.random() < rate:
-                weights[key] += np.random.normal(0, strength)
+                old_weight = weights.get(key, 0)
+                delta = np.random.normal(0, max(0.1, old_weight / 3))
+                weights[key] = old_weight + delta
 
 
 def run_tournament(
