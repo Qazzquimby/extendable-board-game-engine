@@ -68,7 +68,7 @@ class Router:
     def unsubscribe(self, modifier: "Modifier") -> None:
         self.subscribers = [sub for sub in self.subscribers if sub.modifier != modifier]
 
-    def publish(self, event: Any, phase: EventPhase) -> None:
+    def publish(self, event: Event, phase: EventPhase) -> None:
         for sub in list(self.subscribers):  # iterate copy
             if sub.event_type == type(event) and sub.phase == phase:
                 if sub.only_self:

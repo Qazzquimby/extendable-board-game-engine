@@ -197,6 +197,7 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
         "Features names should be clear and say exactly what they do, as users won't be able to see the body. "
         "Besides the helpers in the context object, features are predictive, calculated before the action happens. "
         "A feature for 'number of enemies in aoe range' would make sense while 'number of enemies who were given damage over time' wouldn't, since they won't have the token yet.\n "
+        "No 'action did what it was supposed to do' features since it hasn't yet and of course it will. No features that would score the same for every choice, like 'its now turn 6'\n"
         "Never write stub functions. Do not try to import anything not given. ",
     )
     feature_gen_conv.add_message(feature_gen_prompt)
