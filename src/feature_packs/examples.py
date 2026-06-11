@@ -38,9 +38,9 @@ def do_nothing_on_turn_4(ctx: FeatureContext) -> bool:
 def allied_hero_near_enemy_mr_example(ctx: FeatureContext) -> bool:
     enemy_mr_example = ctx.get_enemies_by_name("Mr. Example")
     return any(
-        ctx.new_distance(am, er) is not None and ctx.new_distance(am, er) <= 2
-        for am in ctx.allies
-        for er in enemy_mr_example
+        ctx.new_distance(ally, enemy) is not None and ctx.new_distance(ally, enemy) <= 2
+        for ally in ctx.allies
+        for enemy in enemy_mr_example
     )
 
 

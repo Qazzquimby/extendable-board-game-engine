@@ -168,9 +168,9 @@ def do_nothing_on_turn_4(ctx: FeatureContext) -> bool:
 def allied_hero_near_enemy_mr_example(ctx: FeatureContext) -> bool:
     enemy_mr_example = ctx.get_enemies_by_name("Mr. Example")
     return any(
-        ctx.new_distance(am, er) is not None and ctx.new_distance(am, er) <= 2
-        for am in ctx.allies
-        for er in enemy_mr_example
+        ctx.new_distance(ally, enemy) is not None and ctx.new_distance(ally, enemy) <= 2
+        for ally in ctx.allies
+        for enemy in enemy_mr_example
     )
 
 def use_example_strike(ctx: FeatureContext) -> bool:
@@ -192,11 +192,12 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
     )
         """
         f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
+        "Generate for all entities on both teams. ",
         "Provide a fairly literal and descriptive name and the python code for each feature. "
         "Features names should be clear and say exactly what they do, as users won't be able to see the body. "
         "Besides the helpers in the context object, features are predictive, calculated before the action happens. "
         "A feature for 'number of enemies in aoe range' would make sense while 'number of enemies who were given damage over time' wouldn't, since they won't have the token yet.\n "
-        "Never write stub functions. Do not try to import anything not given. "
+        "Never write stub functions. Do not try to import anything not given. ",
     )
     feature_gen_conv.add_message(feature_gen_prompt)
 
@@ -253,7 +254,9 @@ def propose_weights(
         f"All possible features:\n"
         f"{json.dumps(feature_catalog, indent=2)}\n\n"
         f"For your strategy, focus on being *{strategy}*.\n"
+        "Generate for all entities on both teams. "
         f"Make sure that your features differentiate locations after moving (actor.move_pos), or the actor would behave randomly when no one is in range.\n"
+        "The rules are permissive and usually allow actions like attacking yourself. Avoid naive weights that would trigger wasting strong limited abilities or using an ability negatively.\n"
         "For each relevant feature, provide the feature name and a weight."
     )
     conv.add_message(weight_prompt)
