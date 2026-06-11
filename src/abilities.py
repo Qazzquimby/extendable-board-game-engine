@@ -45,6 +45,8 @@ class ActionContext:
     is_hit: bool = True
     is_crit: bool = False
 
+    _target: "Entity" = None
+
     @property
     def target_point(self):
         if len(self.target_points) != 1:
@@ -53,7 +55,9 @@ class ActionContext:
 
     @property
     def target(self):
-        return self.engine.entity_at(self.target_point)
+        if not self._target:
+            return self.engine.entity_at(self.target_point)
+        return self._target
 
 
 DynamicInt = Union[int, Callable[[ActionContext], int]]

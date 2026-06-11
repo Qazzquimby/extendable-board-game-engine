@@ -37,7 +37,7 @@ class Grid:
         blocking_los_points: Optional[Set[Point]] = None,
     ) -> Set[Point]:
         """Finds all points within max_range, respecting walls. First step can be diagonal. Must have line of sight."""
-        if max_range < 0:
+        if max_range < 0 or start is None:
             return set()
 
         blocking_los_points = blocking_los_points or set()

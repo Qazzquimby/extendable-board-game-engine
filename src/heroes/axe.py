@@ -56,7 +56,7 @@ class CullingBladeInstruction(Instruction):
         self.plausibly_negative = True
 
     def execute(self, ctx: ActionContext) -> None:
-        if not hasattr(ctx.target, "hp"):
+        if not ctx.target or not hasattr(ctx.target, "hp"):
             return
         event = DamageEvent(
             source=ctx.source,
