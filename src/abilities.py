@@ -55,8 +55,8 @@ class ActionContext:
 
     @property
     def target(self):
-        if not self._target:
-            return self.engine.entity_at(self.target_point)
+        if self._target is None:
+            self._target = self.engine.entity_at(self.target_point)
         return self._target
 
 
@@ -111,6 +111,14 @@ class Ability:
 
     def __post_init__(self):
         self.charges = self.max_charges
+
+    def is_available(self):
+        if self.is_tapped:
+            return False
+        if self.charges is not None and self.charges <= 0:
+            return False
+
+        return True
 
     def execute(
         self,
