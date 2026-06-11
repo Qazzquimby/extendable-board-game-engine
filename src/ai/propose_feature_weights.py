@@ -188,9 +188,11 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
     )
         """
         f"Your task is to propose new features that would be useful for an AI with a '{strategy}' strategy.\n"
-        "Provide a descriptive name and the python code for each feature. "
-        "Features names should be very clear, as users won't be able to see the body. "
-        "Never write stub functions."
+        "Provide a fairly literal and descriptive name and the python code for each feature. "
+        "Features names should be clear and say exactly what they do, as users won't be able to see the body. "
+        "Besides the helpers in the context object, features are predictive, calculated before the action happens. "
+        "A feature for 'number of enemies in aoe range' would make sense while 'number of enemies who were given damage over time' wouldn't, since they won't have the token yet.\n "
+        "Never write stub functions. Do not try to import anything not given. "
     )
     feature_gen_conv.add_message(feature_gen_prompt)
 
@@ -225,6 +227,7 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
             f.write("FEATURES = [\n")
             for feature in new_features_response.features:
                 if feature.name in func_names_map:
+                    feature.name = feature.name.replace("'", "").replace('"', "")
                     f.write(
                         f"    WeightedFeature(name='{feature.name}', eval_func={func_names_map[feature.name]}, weight=0.0),\n"
                     )
@@ -281,7 +284,7 @@ def load_extended_feature_catalog(engine: "Engine", game_setup_id: str) -> List[
                 importlib.reload(module)
                 if hasattr(module, "FEATURES"):
                     feature_catalog.extend([wf.name for wf in module.FEATURES])
-            except ImportError as e:
+            except (ImportError, SyntaxError) as e:
                 print(f"Could not import {module_name}: {e}")
     return sorted(list(set(feature_catalog)))
 

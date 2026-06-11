@@ -268,7 +268,7 @@ def _compute_ability_features(
 
     # Derived features
     for entity in engine.entities:
-        new_pos_key = f"new_location_{entity.name}"
+        new_pos_key = f"{entity.name}_changed_position"
         entity_pos = features.get(new_pos_key, entity.pos)
         if not entity_pos:
             continue
@@ -277,7 +277,7 @@ def _compute_ability_features(
             if entity.id >= other_entity.id:
                 continue
 
-            other_pos_key = f"new_location_{other_entity.name}"
+            other_pos_key = f"{other_entity.name}_changed_position"
             other_pos = features.get(other_pos_key, other_entity.pos)
             if not other_pos:
                 continue

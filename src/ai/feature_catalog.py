@@ -44,9 +44,9 @@ def create_new_feature_catalog(engine: "Engine") -> List[str]:
 
     # Features from _compute_ability_features
     for ability in all_abilities:
-        features.add(f"use {ability.name}")
+        features.add(f"{ability.owner} use {ability.name}")
         for target_name in entity_names:
-            features.add(f"use {ability.name} targeting {target_name}")
+            features.add(f"{ability.owner} use {ability.name} targeting {target_name}")
             if isinstance(ability.aiming, MultipleAiming):
                 if ability.aiming.aimings:
                     for aiming_name in ability.aiming.aimings.keys():

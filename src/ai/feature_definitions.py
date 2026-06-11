@@ -49,7 +49,7 @@ def all_entity_names(engine: "Engine", ability: Optional["Ability"]) -> List[str
 DAMAGE_DEALT = Feature("damage_dealt_to_{name}", {"name": all_entity_names})
 KILLS = Feature("kills_{name}", {"name": all_entity_names})
 HEAL_DEALT = Feature("heal_dealt_to_{name}", {"name": all_entity_names})
-NEW_LOCATION = Feature("new_location_{name}", {"name": all_entity_names})
+NEW_LOCATION = Feature("{name}_changed_position", {"name": all_entity_names})
 
 
 class UseAbilityFeature(Feature):

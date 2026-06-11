@@ -256,7 +256,7 @@ if __name__ == "__main__":
     )
     config = TuningConfig(
         game_setup=game_setup,
-        generations=10,
+        generations=50,
         population_size=4,
         strategies=["aggressive", "careful"],
     )

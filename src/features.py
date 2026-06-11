@@ -73,7 +73,7 @@ class FeatureContext:
     def new_pos(self, entity: "Entity") -> Optional["Point"]:
         if not entity or not entity.pos:
             return None
-        pos_key = f"new_location_{entity.name}_{entity.id}"
+        pos_key = f"{entity.name}_changed_position"
         return self.core_features.get(pos_key, entity.pos)
 
     def new_hp(self, entity: "Entity") -> Optional[int]:
