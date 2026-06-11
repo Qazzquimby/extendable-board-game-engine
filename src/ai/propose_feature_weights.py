@@ -102,6 +102,10 @@ The game ends after round 6.
 """
 
 
+def clean_feature_name(feature):
+    feature.name = feature.name.replace("'", "").replace('"', "")
+
+
 def propose_new_features_for_strategy(
     entity_rules: str, strategy: str, game_setup_id: str
 ):
@@ -201,6 +205,8 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
         messages=feature_gen_conv.messages,
         return_type=NewFeatures,
     )
+    for feature in new_features_response.features:
+        clean_feature_name(feature)
 
     if new_features_response:
         with open(output_file, "w") as f:
@@ -227,7 +233,6 @@ def distance_to_nearest_enemy(ctx: FeatureContext) -> int:
             f.write("FEATURES = [\n")
             for feature in new_features_response.features:
                 if feature.name in func_names_map:
-                    feature.name = feature.name.replace("'", "").replace('"', "")
                     f.write(
                         f"    WeightedFeature(name='{feature.name}', eval_func={func_names_map[feature.name]}, weight=0.0),\n"
                     )
