@@ -50,7 +50,10 @@ def _get_or_create_initial_weight_stats(
         with open(initial_stats_file, "r") as f:
             return json.load(f)
 
-    print(f"Proposing initial weights for Team {team_id} with LLM using strategies:", strategies)
+    print(
+        f"Proposing initial weights for Team {team_id} with LLM using strategies:",
+        strategies,
+    )
     all_proposed_weights = get_proposed_weights_for_strategies(
         engine=engine,
         feature_catalog=feature_catalog_names,
@@ -88,7 +91,7 @@ class Tuner:
         self.initial_stats_list = initial_stats_list
         self.team_tuning_dirs = team_tuning_dirs
         self.populations: List[PlayerPopulation] = []
-        self.scores_list: List[Dict[int, float]] = []
+        self.elo_list: List[Dict[int, float]] = []
 
     def run(self):
         for gen in range(self.config.generations):
@@ -102,12 +105,12 @@ class Tuner:
             gen_dir.mkdir(exist_ok=True)
 
         self.populations = self._get_or_evolve_populations(gen, gen_dirs)
-        self.scores_list = self._get_or_run_tournament(gen, gen_dirs)
+        self.elo_list = self._get_or_run_tournament(gen, gen_dirs)
 
-        for i, scores in enumerate(self.scores_list):
-            best_player_idx = max(scores, key=scores.get, default=0)
+        for i, elos in enumerate(self.elo_list):
+            best_player_idx = max(elos, key=elos.get, default=0)
             print(
-                f"Best player of gen {gen} for team {i}: score {scores.get(best_player_idx, 0)}"
+                f"Best player of gen {gen} for team {i}: elo {elos.get(best_player_idx, 0):.1f}"
             )
 
     def _get_or_evolve_populations(
@@ -131,16 +134,16 @@ class Tuner:
                 print(f"Evolving population for team {i} gen {gen}.")
                 prev_gen_dir = team_tuning_dir / f"gen_{gen - 1}"
                 prev_pop_file = prev_gen_dir / "population.json"
-                prev_scores_file = prev_gen_dir / "scores.json"
+                prev_elo_file = prev_gen_dir / "elo.json"
 
-                if not prev_pop_file.exists() or not prev_scores_file.exists():
+                if not prev_pop_file.exists() or not prev_elo_file.exists():
                     raise FileNotFoundError(f"Missing data for evolution for team {i}")
 
                 pop = PlayerPopulation.load(prev_pop_file, self.feature_catalog)
-                with open(prev_scores_file, "r") as f:
-                    scores = {int(k): v for k, v in json.load(f).items()}
+                with open(prev_elo_file, "r") as f:
+                    elos = {int(k): v for k, v in json.load(f).items()}
                 pop.evolve(
-                    scores,
+                    elos,
                     self.config.mutation_rate,
                     self.config.mutation_strength,
                     self.config.crossover_prob,
@@ -153,13 +156,14 @@ class Tuner:
         self, gen: int, gen_dirs: List[Path]
     ) -> List[Dict[int, float]]:
         scores_files = [d / "scores.json" for d in gen_dirs]
-        if all(f.exists() for f in scores_files):
-            print(f"Loading scores for gen {gen} from cache.")
-            scores_list = []
-            for scores_file in scores_files:
-                with open(scores_file, "r") as f:
-                    scores_list.append({int(k): v for k, v in json.load(f).items()})
-            return scores_list
+        elo_files = [d / "elo.json" for d in gen_dirs]
+        if all(f.exists() for f in scores_files) and all(f.exists() for f in elo_files):
+            print(f"Loading elo for gen {gen} from cache.")
+            elo_list = []
+            for elo_file in elo_files:
+                with open(elo_file, "r") as f:
+                    elo_list.append({int(k): v for k, v in json.load(f).items()})
+            return elo_list
 
         print(f"Running tournament for gen {gen}.")
         game_logs_dir = self.base_tuning_dir / f"gen_{gen}_game_logs"
@@ -174,28 +178,30 @@ class Tuner:
                 json.dump([game_log.model_dump(mode="json")], f, indent=2)
             return game_log.winner_team
 
-        scores0, scores1 = run_tournament(
+        scores0, scores1, elo0, elo1 = run_tournament(
             self.populations[0],
             self.populations[1],
             engine_setup_fn=self.config.game_setup.create_engine,
             run_game_fn=run_game_fn,
         )
         scores_list = [scores0, scores1]
+        elo_list = [elo0, elo1]
         for i, scores in enumerate(scores_list):
             with open(scores_files[i], "w") as f:
                 json.dump(scores, f, indent=2)
-        return scores_list
+        for i, elo in enumerate(elo_list):
+            with open(elo_files[i], "w") as f:
+                json.dump(elo, f, indent=2)
+        return elo_list
 
     def save_best_weights(self):
-        for i, (pop, scores, tuning_dir) in enumerate(
-            zip(self.populations, self.scores_list, self.team_tuning_dirs)
+        for i, (pop, elos, tuning_dir) in enumerate(
+            zip(self.populations, self.elo_list, self.team_tuning_dirs)
         ):
-            if not pop or not scores:
-                print(
-                    f"No scores available for team {i}, skipping save of best weights."
-                )
+            if not pop or not elos:
+                print(f"No elo available for team {i}, skipping save of best weights.")
                 continue
-            best_player_idx = max(scores, key=scores.get, default=0)
+            best_player_idx = max(elos, key=elos.get, default=0)
             best_weights = pop.population[best_player_idx]
             best_weights_file = tuning_dir / "best_weights.json"
             with open(best_weights_file, "w") as f:
@@ -259,8 +265,8 @@ if __name__ == "__main__":
     )
     config = TuningConfig(
         game_setup=game_setup,
-        generations=50,
-        population_size=10,
+        generations=20,
+        population_size=25,
         strategies=["aggressive", "careful", "optimal", "clever", "combo-oriented"],
     )
     # optimal, clever, combo-oriented, balanced

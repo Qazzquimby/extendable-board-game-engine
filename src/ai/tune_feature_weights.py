@@ -51,7 +51,7 @@ class PlayerPopulation:
 
     def evolve(
         self,
-        scores: Dict[int, int],
+        scores: Dict[int, float],
         mutation_rate: float,
         mutation_strength: float,
         crossover_prob: float,
@@ -60,12 +60,12 @@ class PlayerPopulation:
         new_population = []
         for i in range(self.population_size):
             p1_idx = i
-            p2_idx = random.sample(range(self.population_size), k=1)
+            p2_idx = random.sample(range(self.population_size), k=1)[0]
 
             if scores.get(p1_idx, 0) > scores.get(p2_idx, 0):
-                winner_idx = p2_idx
-            else:
                 winner_idx = p1_idx
+            else:
+                winner_idx = p2_idx
             new_population.append(self.population[winner_idx].copy())
 
         # Crossover and Mutation
@@ -112,6 +112,11 @@ def run_tournament(
 ):
     scores0 = {i: 0 for i in range(population0.population_size)}
     scores1 = {i: 0 for i in range(population1.population_size)}
+    
+    elo0 = {i: 1000.0 for i in range(population0.population_size)}
+    elo1 = {i: 1000.0 for i in range(population1.population_size)}
+    
+    K = 32
 
     for i in range(population0.population_size):
         for j in range(population1.population_size):
@@ -136,8 +141,22 @@ def run_tournament(
             for _ in range(num_games_per_matchup):
                 engine = engine_setup_fn()
                 winner = run_game_fn(engine, {0: agent0, 1: agent1}, (i, j))
+                
+                actual0 = 0.5
+                actual1 = 0.5
                 if winner == 0:
                     scores0[i] += 1
+                    actual0 = 1.0
+                    actual1 = 0.0
                 elif winner == 1:
                     scores1[j] += 1
-    return scores0, scores1
+                    actual0 = 0.0
+                    actual1 = 1.0
+                
+                expected0 = 1 / (1 + 10 ** ((elo1[j] - elo0[i]) / 400))
+                expected1 = 1 / (1 + 10 ** ((elo0[i] - elo1[j]) / 400))
+                
+                elo0[i] += K * (actual0 - expected0)
+                elo1[j] += K * (actual1 - expected1)
+                
+    return scores0, scores1, elo0, elo1
