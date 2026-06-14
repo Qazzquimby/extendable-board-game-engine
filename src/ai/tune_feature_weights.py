@@ -72,7 +72,7 @@ class PlayerPopulation:
         next_gen = []
         for i in range(0, self.population_size, 2):
             parent1 = new_population[i]
-            parent2 = new_population[i + 1]
+            parent2 = new_population[(i + 1) % len(new_population)]
 
             child1, child2 = self._crossover(parent1, parent2, crossover_prob)
 
@@ -112,10 +112,10 @@ def run_tournament(
 ):
     scores0 = {i: 0 for i in range(population0.population_size)}
     scores1 = {i: 0 for i in range(population1.population_size)}
-    
+
     elo0 = {i: 1000.0 for i in range(population0.population_size)}
     elo1 = {i: 1000.0 for i in range(population1.population_size)}
-    
+
     K = 32
 
     for i in range(population0.population_size):
@@ -141,7 +141,7 @@ def run_tournament(
             for _ in range(num_games_per_matchup):
                 engine = engine_setup_fn()
                 winner = run_game_fn(engine, {0: agent0, 1: agent1}, (i, j))
-                
+
                 actual0 = 0.5
                 actual1 = 0.5
                 if winner == 0:
@@ -152,11 +152,11 @@ def run_tournament(
                     scores1[j] += 1
                     actual0 = 0.0
                     actual1 = 1.0
-                
+
                 expected0 = 1 / (1 + 10 ** ((elo1[j] - elo0[i]) / 400))
                 expected1 = 1 / (1 + 10 ** ((elo0[i] - elo1[j]) / 400))
-                
+
                 elo0[i] += K * (actual0 - expected0)
                 elo1[j] += K * (actual1 - expected1)
-                
+
     return scores0, scores1, elo0, elo1

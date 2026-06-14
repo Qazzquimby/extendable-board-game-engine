@@ -132,8 +132,7 @@ class Engine:
                 before_state = self.to_model()
 
             if self.current_hero.hp <= 0:
-                self.next_turn()  # todo doesn't work with summons
-                continue
+                continue  # skip this turn, they're dead.
 
             agent = self.agents[self.current_hero.team]
             feature_evaluator = getattr(agent, "feature_evaluator", None)
@@ -174,7 +173,7 @@ class Engine:
                 continue
 
             # Check win condition
-            time_up = self.round_num >= 6
+            time_up = self.round_num >= 7
             team_0_living_members = [
                 e for e in self.entities if e.team == 0 and e.hp > 0
             ]
@@ -236,15 +235,19 @@ class Engine:
             self._advance_hero_indices()
 
         for i in range(99):
-            try:
-                self.current_hero = self._get_current_hero()
+            new_current_hero = self._get_current_hero()
+            if new_current_hero is None:
+                self._advance_hero_indices()
+            else:
+                self.current_hero = new_current_hero
                 TurnStartEvent(self.current_hero).resolve()
                 return
-            except IndexError:
-                self._advance_hero_indices()
 
-    def _get_current_hero(self):
-        return self.team_heroes[self.current_team][self.current_hero_row_index]
+    def _get_current_hero(self) -> Optional["Entity"]:
+        try:
+            return self.team_heroes[self.current_team][self.current_hero_row_index]
+        except IndexError:
+            return None
 
     def ask(self, query: "Query"):
         self.router.publish(query, EventPhase.QUERY)

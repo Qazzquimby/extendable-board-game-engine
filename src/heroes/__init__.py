@@ -8,14 +8,14 @@ from point import Point
 class MeleeHero(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
-            engine=engine, name="Melee Hero", hp=10, speed=3, pos=pos, team=team
+            engine=engine, name="Melee Hero", hp=12, speed=2, pos=pos, team=team
         )
         self.abilities.append(
             Ability(
                 name="Melee Attack",
-                text="Target in range 1: 2 damage",
+                text="Target in range 1: 4 damage",
                 aiming=TargetEntity(in_range=1),
-                instructions=[DamageInstruction(amount=2)],
+                instructions=[DamageInstruction(amount=4)],
                 is_default=True,
                 owner=self,
             )
