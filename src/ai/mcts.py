@@ -271,19 +271,17 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
 
             if not sim_env.rng.stochastic_flag and edge.child_node_key is not None:
                 next_key = edge.child_node_key
-                if type(best_action).__name__ == "PlausibleMoveAndAction":
+                sim_env.next_turn()
+                while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                    if sim_env.is_done:
+                        break
                     sim_env.next_turn()
-                    while sim_env.current_hero and sim_env.current_hero.hp <= 0:
-                        if sim_env.is_done:
-                            break
-                        sim_env.next_turn()
             else:
-                if type(best_action).__name__ == "PlausibleMoveAndAction":
+                sim_env.next_turn()
+                while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                    if sim_env.is_done:
+                        break
                     sim_env.next_turn()
-                    while sim_env.current_hero and sim_env.current_hero.hp <= 0:
-                        if sim_env.is_done:
-                            break
-                        sim_env.next_turn()
                 next_key = sim_env.hash()
 
                 if not sim_env.rng.stochastic_flag:
