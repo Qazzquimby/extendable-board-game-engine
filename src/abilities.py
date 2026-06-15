@@ -197,15 +197,20 @@ class Ability:
         for target_point in all_target_points:
             target = engine.entity_at(target_point)
             if target:
-                roll = engine.rng.randint(1, 6)  # todo rolling should be an event
                 defense = target.get_defense(attack_source=source, ability=self)
                 defense = min(4, defense)
-                if roll > defense:
+                crit_chance = source.get_crit(subject=target, ability=self)
+
+                if defense > 0 or crit_chance > 0:
+                    roll = engine.rng.randint(1, 6)  # todo rolling should be an event
+                    if roll > defense:
+                        hit_target_points.add(target_point)
+                    if roll >= 7 - crit_chance:
+                        crit_target_points.add(target_point)
+                else:
+                    # No roll means auto hits
                     hit_target_points.add(target_point)
 
-                crit_chance = source.get_crit(subject=target, ability=self)
-                if roll >= 7 - crit_chance:
-                    crit_target_points.add(target_point)
         return hit_target_points, crit_target_points
 
 
