@@ -495,7 +495,7 @@ class StandardBackpropagation(BackpropagationStrategy):
 class MCTSAgent(Agent):
     """An agent that uses MCTS to select actions."""
 
-    def __init__(self, num_simulations: int = 300):
+    def __init__(self, num_simulations: int = 10_000):
         self.num_simulations = num_simulations
         self.selection = PUCTSelection(exploration_constant=1.0)
         self.expansion = UniformExpansion()
@@ -521,15 +521,29 @@ class MCTSAgent(Agent):
 
         history_to_replay = list(env.action_history)
 
+        # Precompute actions to replay to avoid expensive get_legal_actions() calls
+        actions_to_replay = []
+        replay_env = env.setup.create_engine(agents=env.agents, seed=env.initial_seed)
+        replay_env.rng.stochastic_flag = False
+        for action_idx in history_to_replay:
+            if action_idx == -1:
+                replay_env.next_turn()
+                actions_to_replay.append(None)
+            elif action_idx >= 0:
+                legal = replay_env.get_legal_actions()
+                action = legal[action_idx]
+                replay_env.step(action, action_idx=action_idx)
+                actions_to_replay.append(action)
+
         for _ in range(self.num_simulations):
             sim_env = env.setup.create_engine(agents=env.agents, seed=env.initial_seed)
+            sim_env.rng.stochastic_flag = False
 
-            for action_idx in history_to_replay:
+            for action_idx, action in zip(history_to_replay, actions_to_replay):
                 if action_idx == -1:
                     sim_env.next_turn()
                 elif action_idx >= 0:
-                    legal = sim_env.get_legal_actions()
-                    sim_env.step(legal[action_idx], action_idx=action_idx)
+                    sim_env.step(action, action_idx=action_idx)
 
             result = self.selection.select(
                 root_node, sim_env, self.cache, self.num_simulations, None

@@ -19,4 +19,5 @@ if __name__ == "__main__":
     )
     engine = game_setup.create_engine(agents={0: agent, 1: agent})
     game_log = engine.run_game()
-    print("done")
+    log_json = json.dumps([game_log.model_dump()])
+    print(log_json)
