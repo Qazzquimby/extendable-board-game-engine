@@ -21,8 +21,8 @@ class GameSetup:
         team1_names = sorted([cls.__name__ for cls in self.team1_classes])
         return f"g{self.grid_size}_t0_{'_'.join(team0_names)}_vs_t1_{'_'.join(team1_names)}"
 
-    def create_engine(self, agents: Optional[Dict[int, "Agent"]] = None) -> Engine:
-        engine = Engine(grid=Grid(self.grid_size, self.grid_size), agents=agents)
+    def create_engine(self, agents: Optional[Dict[int, "Agent"]] = None, seed: int = 42) -> Engine:
+        engine = Engine(grid=Grid(self.grid_size, self.grid_size), agents=agents, setup=self, seed=seed)
 
         for i, entity_class in enumerate(self.team0_classes):
             entity_class(engine=engine, pos=Point(0, i), team=0)

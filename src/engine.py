@@ -79,7 +79,10 @@ class Engine:
         seed: int = 42,
         grid: Grid = None,
         agents: Optional[Dict[int, Agent]] = None,
+        setup: Optional["GameSetup"] = None,
     ) -> None:
+        self.setup = setup
+        self.initial_seed = seed
         self.action_history = []
         self.router = Router()
         self.agents: Dict[int, Agent] = agents or {}
@@ -101,22 +104,12 @@ class Engine:
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
 
     @property
-    def rng_used(self) -> bool:
-        if hasattr(self.rng, "stochastic_flag"):
-            return self.rng.stochastic_flag
-        return False
-
-    @property
     def is_done(self):
         if self.round_num > 6:
             return True
 
         alive_teams = {e.team for e in self.living_entities}
         return len(alive_teams) <= 1
-
-    def clear_rng_flag(self):
-        if hasattr(self.rng, "stochastic_flag"):
-            self.rng.stochastic_flag = False
 
     def get_legal_actions(self) -> List[Choice]:
         if self.is_done or not self.current_hero or self.current_hero.hp <= 0:
@@ -173,11 +166,8 @@ class Engine:
 
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
-
         winner_team = None
-
         after_state = None
-
         RoundStartEvent(engine=self).resolve()
 
         while self.round_num <= 6:
@@ -196,34 +186,30 @@ class Engine:
             chosen_action: PlausibleMoveAndAction = None
             turn_over = False
             while not turn_over:
-                plausible_move_and_actions = get_plausible_move_and_actions(
-                    actor=self.current_hero,
-                    engine=self,
-                    feature_evaluator=feature_evaluator,
-                )
-                plausible_free_actions = get_plausible_free_actions(
-                    actor=self.current_hero,
-                    engine=self,
-                    feature_evaluator=feature_evaluator,
-                )
-
-                all_choices: List[Choice] = (
-                    plausible_move_and_actions + plausible_free_actions
-                )
+                all_choices = self.get_legal_actions()
                 if not all_choices:
-                    turn_over = True
+                    turn_over = True  # eg stunned
                     continue
 
-                action_choice = self.get_choice(
+                action_index = self.get_choice_index(
                     team=self.current_hero.team, choices=all_choices
                 )
+                action_choice = all_choices[action_index]
 
                 if isinstance(action_choice, PlausibleMoveAndAction):
-                    self.step(actor=self.current_hero, action=action_choice)
+                    self.step(
+                        actor=self.current_hero,
+                        action=action_choice,
+                        action_idx=action_index,
+                    )
                     chosen_action = action_choice
                     turn_over = True
                 elif isinstance(action_choice, PlausibleFreeAction):
-                    self.step(actor=self.current_hero, action=action_choice)
+                    self.step(
+                        actor=self.current_hero,
+                        action=action_choice,
+                        action_idx=action_index,
+                    )
 
             if not chosen_action:
                 continue
@@ -267,9 +253,11 @@ class Engine:
     def step(
         self,
         action: Union[PlausibleMoveAndAction, PlausibleFreeAction],
+        action_idx: int,
         actor: Optional[Entity] = None,
     ) -> None:
-        self.action_history.append(action)
+        self.action_history.append(action_idx)
+
         if actor is None:
             actor = self.current_hero
         if isinstance(action, PlausibleMoveAndAction):
@@ -289,7 +277,7 @@ class Engine:
                 RoundStartEvent(self).resolve()
 
     def next_turn(self) -> None:
-        self.action_history.append("NEXT_TURN")
+        self.action_history.append(-1)  # end turn
         will_be_first_turn = self.current_hero is None
 
         if not will_be_first_turn:
@@ -350,11 +338,11 @@ class Engine:
         entity_states = frozenset(
             (e.id, e.hp, e.pos, e.move_actions, e.standard_actions, e.free_actions)
             for e in self.entities
-            if getattr(e, "hp", 0) > 0
-        )
+        )  # todo account for modifiers and subscribers
         return hash(
             (
                 self.round_num,
+                self.current_hero_row_index,
                 self.current_team,
                 self.current_hero.id if self.current_hero else None,
                 entity_states,

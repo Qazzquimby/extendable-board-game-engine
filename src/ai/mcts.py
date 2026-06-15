@@ -10,9 +10,7 @@ from typing import (
 import abc
 from dataclasses import dataclass
 
-from cachetools import LRUCache
-
-from choices import Choice
+from choices import Choice, PlausibleMoveAndAction
 from engine import Agent, Engine
 
 DEBUG = True
@@ -138,17 +136,15 @@ class MCTSNode:
 
 class MCTSNodeCache:
     def __init__(self):
-        self.enabled = True
-        self._key_to_node: LRUCache[int, MCTSNode] = LRUCache(1024 * 128)
+        self._key_to_node: Dict[int, MCTSNode] = {}
 
     def get_matching_node(self, key: int) -> Optional[MCTSNode]:
-        if self.enabled:
-            return self._key_to_node.get(key, None)
-        return None
+        return self._key_to_node.get(key, None)
 
     def cache_node(self, key: int, node: MCTSNode):
-        if self.enabled:
-            self._key_to_node[key] = node
+        self._key_to_node[key] = node
+        if len(self._key_to_node) > 2_000_000:
+            self._key_to_node.clear()
 
 
 @dataclass
@@ -258,15 +254,16 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 start_node=node,
                 contender_actions=contender_actions,
             )
+            # todo, dont calculate legal moves every step of simulation.
             legal_actions = sim_env.get_legal_actions()
             best_action = legal_actions[best_action_index]
 
-            sim_env.clear_rng_flag()
+            sim_env.rng.stochastic_flag = False
 
             edge = current_node.edges[best_action_index]
-            sim_env.step(best_action)
+            sim_env.step(best_action, action_idx=best_action_index)
 
-            if not sim_env.rng_used and edge.child_node_key is not None:
+            if not sim_env.rng.stochastic_flag and edge.child_node_key is not None:
                 next_key = edge.child_node_key
                 if type(best_action).__name__ == "PlausibleMoveAndAction":
                     sim_env.next_turn()
@@ -283,7 +280,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                         sim_env.next_turn()
                 next_key = sim_env.hash()
 
-                if not sim_env.rng_used:
+                if not sim_env.rng.stochastic_flag:
                     edge.child_node_key = next_key
 
             if path.has_visited_key(next_key):
@@ -432,12 +429,13 @@ class RandomRolloutEvaluation(EvaluationStrategy):
             if env.is_done:
                 break
 
-            legal_actions = env.get_legal_actions()
+            legal_actions = env.get_legal_actions()  # can avoid recomputing these?
             if not legal_actions:
                 break
-            action = random.choice(legal_actions)
+            action_idx = random.randrange(len(legal_actions))
+            action = legal_actions[action_idx]
 
-            env.step(action)
+            env.step(action, action_idx=action_idx)
             if type(action).__name__ == "PlausibleMoveAndAction":
                 env.next_turn()
                 while env.current_hero and env.current_hero.hp <= 0:
@@ -492,7 +490,7 @@ class StandardBackpropagation(BackpropagationStrategy):
 class MCTSAgent(Agent):
     """An agent that uses MCTS to select actions."""
 
-    def __init__(self, num_simulations: int = 50):
+    def __init__(self, num_simulations: int = 300):
         self.num_simulations = num_simulations
         self.selection = PUCTSelection(exploration_constant=1.0)
         self.expansion = UniformExpansion()
@@ -504,8 +502,9 @@ class MCTSAgent(Agent):
         if len(choices) <= 1:
             return 0
 
-        actor = choices[0].ability.owner
-        env = actor.owner.engine
+        first_choice: PlausibleMoveAndAction = choices[0]
+        actor = first_choice.ability.owner
+        env = actor.engine
 
         root_key = env.hash()
         root_node = self.cache.get_matching_node(root_key)
@@ -515,18 +514,20 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
-        real_history = list(env.action_history)
+        history_to_replay = list(env.action_history)
 
         for _ in range(self.num_simulations):
-            env.reset()
-            for action in real_history:
-                if action == "NEXT_TURN":
-                    env.next_turn()
-                else:
-                    env.step(action)
+            sim_env = env.setup.create_engine(agents=env.agents, seed=env.initial_seed)
+
+            for action_idx in history_to_replay:
+                if action_idx == -1:
+                    sim_env.next_turn()
+                elif action_idx >= 0:
+                    legal = sim_env.get_legal_actions()
+                    sim_env.step(legal[action_idx], action_idx=action_idx)
 
             result = self.selection.select(
-                root_node, env, self.cache, self.num_simulations, None
+                root_node, sim_env, self.cache, self.num_simulations, None
             )
 
             if not result.leaf_env.is_done:
@@ -545,14 +546,6 @@ class MCTSAgent(Agent):
                 1 - result.leaf_node.current_player_index: -val,
             }
             self.backprop.backpropagate(result.path, player_to_value)
-
-        # Restore real state
-        env.reset()
-        for action in real_history:
-            if action == "NEXT_TURN":
-                env.next_turn()
-            else:
-                env.step(action)
 
         best_idx = 0
         best_visits = -1
