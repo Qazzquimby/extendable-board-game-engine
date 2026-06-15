@@ -15,8 +15,6 @@ from cachetools import LRUCache
 from base_environment import (
     ActionType,
     BaseEnvironment,
-    StateWithKey,
-    StateType,
 )
 from engine import Agent
 
@@ -25,16 +23,11 @@ DEBUG = True
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
 
 
-def _get_current_player_from_state(state: StateType) -> int:
-    """Gets the current player from a state dictionary, accommodating both old and new env styles."""
-    return state.current_team
-
-
 @dataclass
 class PathStep:
     """A single step in the MCTS selection path."""
 
-    node: "MCTSNodeWithState"
+    node: "MCTSNode"
     # None iff first node
     action_taken_to_reach_this_node: Optional[ActionType]
 
@@ -48,8 +41,7 @@ class SearchPath:
         self.add(node=initial_node, action_leading_to_node=None)
 
     def add(self, node: "MCTSNode", action_leading_to_node: Optional[ActionType]):
-        if isinstance(node, MCTSNodeWithState) and node.state_with_key:
-            self._visited_keys.add(node.state_with_key.key)
+        self._visited_keys.add(node.key)
         self._steps.append(PathStep(node, action_leading_to_node))
 
     def has_visited_key(self, key: int) -> bool:
@@ -62,16 +54,14 @@ class SearchPath:
         return len(self._steps)
 
     @property
-    def last_node(self) -> "MCTSNodeWithState":
+    def last_node(self) -> "MCTSNode":
         if not self._steps:
             raise IndexError("SearchPath is empty, cannot get last node.")
         return self._steps[-1].node
 
     def get_step_details(
         self, steps_from_end: int
-    ) -> Tuple[
-        "MCTSNodeWithState", Optional[ActionType], Optional["MCTSNodeWithState"]
-    ]:
+    ) -> Tuple["MCTSNode", Optional[ActionType], Optional["MCTSNode"]]:
         """
         Helper for backpropagation. Gets current node, action that led to it, and its parent.
         steps_from_end=0 is the leaf, index_from_end=1 is its parent, etc.
@@ -123,16 +113,19 @@ class DeterministicEdge(Edge):
         prior: float,
         num_visits: int = 0,
         total_value: float = 0.0,  # from perspective of player taking the action
-        child_node: Optional["MCTSNodeWithState"] = None,
     ):
         super().__init__(prior=prior, num_visits=num_visits, total_value=total_value)
-        self.child_node = child_node
+        self.child_node_key: Optional[int] = None
 
 
 class MCTSNode:
     def __init__(
         self,
+        key: int,
+        current_player_index: int,
     ):
+        self.key = key
+        self.player_idx = current_player_index
         self.edges: Dict[int, DeterministicEdge] = {}
         self.is_expanded = False
 
@@ -140,39 +133,22 @@ class MCTSNode:
         self.num_visits = 0
         self.total_value = 0.0
 
-
-class MCTSNodeWithState(MCTSNode):
-    """Represents a node in the MCTS tree."""
-
-    def __init__(
-        self,
-        state_with_key: StateWithKey,
-    ):
-        super().__init__()
-        self.state_with_key = state_with_key
-
     @property
     def current_player_index(self):
-        if hasattr(self, "player_idx"):
-            current_player_index = self.player_idx
-        else:
-            current_player_index = _get_current_player_from_state(
-                self.state_with_key.state
-            )
-        return current_player_index
+        return self.player_idx
 
 
 class MCTSNodeCache:
     def __init__(self):
         self.enabled = True
-        self._key_to_node: LRUCache[int, MCTSNodeWithState] = LRUCache(1024 * 8)
+        self._key_to_node: LRUCache[int, MCTSNode] = LRUCache(1024 * 128)
 
-    def get_matching_node(self, key: int) -> Optional[MCTSNodeWithState]:
+    def get_matching_node(self, key: int) -> Optional[MCTSNode]:
         if self.enabled:
             return self._key_to_node.get(key, None)
         return None
 
-    def cache_node(self, key: int, node: MCTSNodeWithState):
+    def cache_node(self, key: int, node: MCTSNode):
         if self.enabled:
             self._key_to_node[key] = node
 
@@ -208,7 +184,7 @@ class ExpansionStrategy(abc.ABC):
     @abc.abstractmethod
     def expand(
         self,
-        node: "MCTSNodeWithState",
+        node: "MCTSNode",
         # env: BaseEnvironment,
     ) -> None:
         """
@@ -226,7 +202,7 @@ class EvaluationStrategy(abc.ABC):
     @abc.abstractmethod
     def evaluate(
         self,
-        node: "MCTSNodeWithState",
+        node: "MCTSNode",
         # env: BaseEnvironment
     ) -> float:
         """
@@ -267,7 +243,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
 
     def select(
         self,
-        node: MCTSNodeWithState,
+        node: MCTSNode,
         sim_env: BaseEnvironment,
         cache: "MCTSNodeCache",
         remaining_sims: int,
@@ -278,7 +254,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
         node is reached or a cycle is detected. Modifies sim_env.
         """
         path = SearchPath(initial_node=node)
-        current_node: MCTSNodeWithState = node
+        current_node: MCTSNode = node
 
         while not sim_env.is_done:
             if not current_node.is_expanded:
@@ -291,25 +267,45 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             )
             legal_actions = sim_env.get_legal_actions()
             best_action = legal_actions[best_action_index]
+
+            sim_env.clear_rng_flag()
+
             step_result = sim_env.step(best_action)
 
-            if path.has_visited_key(step_result.next_state_with_key.key):
+            if step_result is not None:
+                next_key = step_result.next_state_with_key.key
+            else:
+                sim_env.next_turn()
+                while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                    is_done = (
+                        sim_env.is_done()
+                        if callable(sim_env.is_done)
+                        else sim_env.is_done
+                    )
+                    if is_done:
+                        break
+                    sim_env.next_turn()
+                next_key = sim_env.hash()
+
+            if path.has_visited_key(next_key):
                 # Cycle detected
                 return SelectionResult(path=path, leaf_env=sim_env)
 
-            next_node = cache.get_matching_node(key=step_result.next_state_with_key.key)
+            next_node = cache.get_matching_node(key=next_key)
             if not next_node:
-                next_node = MCTSNodeWithState(
-                    state_with_key=step_result.next_state_with_key
+                next_node = MCTSNode(
+                    key=next_key, current_player_index=sim_env.get_current_player()
                 )
-                cache.cache_node(
-                    key=step_result.next_state_with_key.key, node=next_node
-                )
-                path.add(node=next_node, action_leading_to_node=best_action_index)
-                return SelectionResult(path=path, leaf_env=sim_env)
+                cache.cache_node(key=next_key, node=next_node)
 
+            # Cache deterministic transitions
+            edge = current_node.edges[best_action_index]
+            is_stochastic = getattr(sim_env, "rng_used", True)
+            if not is_stochastic:
+                edge.child_node_key = next_key
+
+            path.add(node=next_node, action_leading_to_node=best_action_index)
             current_node = next_node
-            path.add(current_node, best_action_index)
 
         # Reached a terminal state
         return SelectionResult(path=path, leaf_env=sim_env)
@@ -406,8 +402,13 @@ class PUCTSelection(MCTSSelectionStrategyBase):
 class UniformExpansion(ExpansionStrategy):
     """Expands a node by creating children for all legal actions with uniform priors."""
 
-    def expand(self, node: MCTSNodeWithState, env_at_node: BaseEnvironment) -> None:
-        if node.is_expanded or env_at_node.is_done:
+    def expand(self, node: MCTSNode, env_at_node: BaseEnvironment) -> None:
+        is_done = (
+            env_at_node.is_done
+            if callable(env_at_node.is_done)
+            else env_at_node.is_done
+        )
+        if node.is_expanded or is_done:
             return
 
         legal_actions = env_at_node.get_legal_actions()
@@ -425,7 +426,7 @@ class RandomRolloutEvaluation(EvaluationStrategy):
         self.max_rollout_depth = max_rollout_depth
         self.discount_factor = discount_factor  # Usually 1.0 for MCTS terminal rewards
 
-    def evaluate(self, node: MCTSNodeWithState, env: BaseEnvironment) -> float:
+    def evaluate(self, node: MCTSNode, env: BaseEnvironment) -> float:
         """Simulate game from the given environment state using random policy."""
         player_at_start = env.get_current_player()
 
@@ -435,21 +436,35 @@ class RandomRolloutEvaluation(EvaluationStrategy):
                 return 0.0
             return 1.0 if winner == player_at_start else -1.0
 
-        sim_env = env.copy()
         current_step = 0
 
-        while not sim_env.is_done and current_step < self.max_rollout_depth:
-            legal_actions = sim_env.get_legal_actions()
+        while current_step < self.max_rollout_depth:
+            if env.is_done:
+                break
+
+            legal_actions = env.get_legal_actions()
             if not legal_actions:
                 break
             action = random.choice(legal_actions)
-            sim_env.step(action)
+
+            step_result = env.step(action)
+            if (
+                step_result is None
+                and type(action).__name__ == "PlausibleMoveAndAction"
+            ):
+                if hasattr(env, "next_turn"):
+                    env.next_turn()
+                    while env.current_hero and env.current_hero.hp <= 0:
+                        if env.is_done:
+                            break
+                        env.next_turn()
+
             current_step += 1
 
         if current_step >= self.max_rollout_depth:
             return 0.0
 
-        winner = sim_env.get_winning_player()
+        winner = env.get_winning_player()
         value = 0.0
         if winner is not None:
             value = 1.0 if winner == player_at_start else -1.0
@@ -518,10 +533,13 @@ class MCTSAgent(Agent):
 
         env = actor.owner.engine
 
-        root_node = self.cache.get_matching_node(env.hash())
+        root_key = env.hash()
+        root_node = self.cache.get_matching_node(root_key)
         if not root_node:
-            root_node = MCTSNodeWithState(StateWithKey.from_state(env))
-            self.cache.cache_node(env.hash(), root_node)
+            root_node = MCTSNode(
+                key=root_key, current_player_index=env.get_current_player()
+            )
+            self.cache.cache_node(root_key, root_node)
 
         for _ in range(self.num_simulations):
             sim_env = env.copy()

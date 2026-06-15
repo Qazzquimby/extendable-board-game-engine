@@ -47,6 +47,32 @@ class RandomAgent(Agent):
         return random.randint(0, len(choices) - 1)
 
 
+class TrackedRandom(random.Random):
+    def __init__(self, seed=None):
+        super().__init__(seed)
+        self.stochastic_flag = False
+
+    def random(self):
+        self.stochastic_flag = True
+        return super().random()
+
+    def randint(self, a, b):
+        self.stochastic_flag = True
+        return super().randint(a, b)
+
+    def choice(self, seq):
+        self.stochastic_flag = True
+        return super().choice(seq)
+
+    def shuffle(self, x, random=None):
+        self.stochastic_flag = True
+        super().shuffle(x, random)
+        
+    def sample(self, population, k, counts=None):
+        self.stochastic_flag = True
+        return super().sample(population, k, counts=counts)
+
+
 class Engine:
     def __init__(
         self,
@@ -58,7 +84,7 @@ class Engine:
         self.agents: Dict[int, Agent] = agents or {}
         self.entities: List["Entity"] = []
         self.markers: List["Marker"] = []
-        self.rng = random.Random(seed)
+        self.rng = TrackedRandom(seed)
         self.round_num: int = 0
 
         self.team_heroes: List[List[Hero]] = None  # run finalize
@@ -72,6 +98,25 @@ class Engine:
         self._next_id: int = 1
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
+
+    @property
+    def rng_used(self) -> bool:
+        if hasattr(self.rng, 'stochastic_flag'):
+            return self.rng.stochastic_flag
+        return False
+        
+    def clear_rng_flag(self):
+        if hasattr(self.rng, 'stochastic_flag'):
+            self.rng.stochastic_flag = False
+
+    def get_legal_actions(self) -> List[Choice]:
+        if self.is_done() or not self.current_hero or self.current_hero.hp <= 0:
+            return []
+        agent = self.agents.get(self.current_hero.team)
+        feature_evaluator = getattr(agent, "feature_evaluator", None) if agent else None
+        moves = get_plausible_move_and_actions(self.current_hero, self, feature_evaluator)
+        frees = get_plausible_free_actions(self.current_hero, self, feature_evaluator)
+        return moves + frees
 
     def finalize_setup(self):
         self.team_heroes = [
@@ -209,8 +254,10 @@ class Engine:
         return GameLog(winner_team=winner_team, logs=logs)
 
     def step(
-        self, actor: Entity, action: Union[PlausibleMoveAndAction, PlausibleFreeAction]
+        self, action: Union[PlausibleMoveAndAction, PlausibleFreeAction], actor: Optional[Entity] = None
     ) -> None:
+        if actor is None:
+            actor = self.current_hero
         if isinstance(action, PlausibleMoveAndAction):
             for point in action.move_path:
                 ChangeLocationEvent(actor, point).resolve()
