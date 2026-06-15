@@ -123,6 +123,7 @@ class MCTSNode:
         self.key = key
         self.player_idx = current_player_index
         self.edges: Dict[int, DeterministicEdge] = {}
+        self.actions: List[Choice] = []
         self.is_expanded = False
 
         # for value estimate, not actually needed
@@ -254,9 +255,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 start_node=node,
                 contender_actions=contender_actions,
             )
-            # todo, dont calculate legal moves every step of simulation.
-            legal_actions = sim_env.get_legal_actions()
-            best_action = legal_actions[best_action_index]
+            best_action = current_node.actions[best_action_index]
 
             sim_env.rng.stochastic_flag = False
 
@@ -401,6 +400,7 @@ class UniformExpansion(ExpansionStrategy):
         legal_actions = env_at_node.get_legal_actions()
         assert legal_actions
         assert not node.edges
+        node.actions = legal_actions
         for action_index, action in enumerate(legal_actions):
             node.edges[action_index] = DeterministicEdge(prior=1.0)
         node.is_expanded = True
