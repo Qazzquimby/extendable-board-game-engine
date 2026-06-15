@@ -1,32 +1,47 @@
 from dataclasses import dataclass
 
-from aimings import TargetEntity
+from aimings import TargetEntity, MultipleAiming
+from areas import Burst
 from engine import (
     Engine,
     Hero,
-    after,
-    HealEvent,
     query,
-    ActionContext,
-    Instruction,
 )
 from modifiers import Modifier
 from queries import QueryDefense
-from events import DeathEvent
+from events import DeathEvent, after, HealEvent, TurnStartEvent
 from abilities import (
     Ability,
     DamageInstruction,
+    Instruction,
+    ActionContext,
 )
 from point import Point
 
 
-class AllViktoriasHealWhenAnyViktoriaKills(Modifier):
+class OnFirstTurnSpawnOtherViktoria(Modifier):
+    text = "Deploy: Create a copy of this in your deploy zone, without this ability."
+    @after(TurnStartEvent)
+    def spawn_viktoria(self, event: TurnStartEvent):
+        if hasattr(event.subject, "is_original") and event.subject.is_original:
+            pass
+            # todo choose adjacent space
+            #  create viktoria with is_original=False
+
+
+class OnStartOfTurnMayTeleportAnotherViktoriaHereThenTeleport1(Modifier):
+    text="Start of turn: Another Viktoria in range 4 may teleport adjacent to this. Teleport 1."
+    @after(TurnStartEvent)
+    def start_of_turn(self, event: TurnStartEvent):
+        pass # get other viktorias, they can choose to teleport to any space in burst1. Then you can choose to teleport burst 1.
+
+class OnKillAllViktoriasHeal(Modifier):
     @after(DeathEvent, only_self=False)
     def on_kill(self, event: DeathEvent):
         if event.killer == self.owner:
             for entity in self.owner.engine.living_entities:
                 if entity.name == "Viktoria":
-                    HealEvent(self.owner.engine, subject=entity, amount=2).resolve()
+                    HealEvent(subject=entity, amount=2).resolve()
 
 
 class DefenseModifier(Modifier):
@@ -39,51 +54,61 @@ class DefenseModifier(Modifier):
         q.result += self.amount
 
 
-class OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies(Modifier):
+class OnDeathOtherViktoriasHealAndGainDef(Modifier):
     @after(DeathEvent)
     def on_death(self):
         for entity in self.owner.engine.living_entities:
             if entity.name == "Viktoria" and entity != self.owner:
-                HealEvent(self.owner.engine, subject=entity, amount=2).resolve()
+                HealEvent(subject=entity, amount=2).resolve()
                 self.owner.add_modifier(DefenseModifier(owner=entity, amount=2))
 
 
-@dataclass
-class KatanaBurstInstruction(Instruction):
-    def execute(self, ctx: ActionContext) -> None:
-        from events import DamageEvent
+class DragonsBreathPull(Instruction):
+    def __post__init__(self):
+        self.plausibly_negative=True
 
-        if not ctx.target or not hasattr(ctx.target, "pos"):
+    def execute(self, ctx: ActionContext) -> None:
+        if not ctx.target or not hasattr(ctx.target, "hp"):
             return
-        points_in_range = ctx.engine.grid.get_points_in_range(
-            start=ctx.target.pos, max_range=1
-        )
-        for entity in ctx.engine.living_entities:
-            if (
-                entity != ctx.target
-                and entity.team != ctx.source.team
-                and entity.pos in points_in_range
-            ):
-                DamageEvent(
-                    ctx.engine, source=ctx.source, subject=entity, amount=1
-                ).resolve()
+        # todo get all viktorias in burst 4. For each, pull 4 toward target.
+
 
 
 class Viktoria(Hero):
-    def __init__(self, engine: Engine, pos: Point, team: int):
+    def __init__(self, engine: Engine, pos: Point, team: int, is_original=True):
+        self.is_original = is_original
         super().__init__(
             engine=engine, name="Viktoria", hp=6, speed=3, pos=pos, team=team
         )
-        self.add_modifier(AllViktoriasHealWhenAnyViktoriaKills())
-        self.add_modifier(OtherViktoriasHealAndGain2DefWhenAnyViktoriaDies())
+        self.add_modifier(OnFirstTurnSpawnOtherViktoria())
+        self.add_modifier(OnKillAllViktoriasHeal())
+        self.add_modifier(OnDeathOtherViktoriasHealAndGainDef())
 
         self.abilities.append(
             Ability(
                 name="Enchanted Katana",
-                aiming=TargetEntity(in_range=1),
-                instructions=[DamageInstruction(amount=2), KatanaBurstInstruction()],
+                text="Range 1, 2dmg +2Crit. Other enemies in burst 1, 1dmg",
+                aiming=MultipleAiming(
+                    {"target": TargetEntity(in_range=1), "burst": Burst(radius=1)}
+                ),  # todo, how to do "all in burst except target
+                instructions=[
+                    DamageInstruction(aiming_name="target", amount=2),
+                    DamageInstruction(aiming_name="burst", amount=1),
+                    # todo check no crit or miss on aoe. Included, not target.
+                ],
                 crit_chance=2,
                 is_default=True,
                 owner=self,
             )
         )
+        self.abilities.append(
+            Ability(
+                name="Dragon's Breath",
+                text = "Target enemy in range 4. All Viktorias in range 4 of the target pull 4 towards it.",
+                aiming=TargetEntity(in_range=4),
+                instructions=[
+                    DragonsBreathPull()
+                ]
+            )
+        )
+        # todo dragonsbreath
