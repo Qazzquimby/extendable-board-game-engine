@@ -8,15 +8,12 @@ from typing import (
     Iterator,
 )
 import abc
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from cachetools import LRUCache
 
-from base_environment import (
-    ActionType,
-    BaseEnvironment,
-)
-from engine import Agent
+from choices import Choice
+from engine import Agent, Engine
 
 DEBUG = True
 
@@ -29,7 +26,7 @@ class PathStep:
 
     node: "MCTSNode"
     # None iff first node
-    action_taken_to_reach_this_node: Optional[ActionType]
+    action_taken_to_reach_this_node: Optional[Choice]
 
 
 class SearchPath:
@@ -40,7 +37,7 @@ class SearchPath:
         self._visited_keys: set[int] = set()
         self.add(node=initial_node, action_leading_to_node=None)
 
-    def add(self, node: "MCTSNode", action_leading_to_node: Optional[ActionType]):
+    def add(self, node: "MCTSNode", action_leading_to_node: Optional[Choice]):
         self._visited_keys.add(node.key)
         self._steps.append(PathStep(node, action_leading_to_node))
 
@@ -61,7 +58,7 @@ class SearchPath:
 
     def get_step_details(
         self, steps_from_end: int
-    ) -> Tuple["MCTSNode", Optional[ActionType], Optional["MCTSNode"]]:
+    ) -> Tuple["MCTSNode", Optional[Choice], Optional["MCTSNode"]]:
         """
         Helper for backpropagation. Gets current node, action that led to it, and its parent.
         steps_from_end=0 is the leaf, index_from_end=1 is its parent, etc.
@@ -116,6 +113,7 @@ class DeterministicEdge(Edge):
     ):
         super().__init__(prior=prior, num_visits=num_visits, total_value=total_value)
         self.child_node_key: Optional[int] = None
+        # todo how could a 1 child edge have no child..? Fix if wrong
 
 
 class MCTSNode:
@@ -158,9 +156,8 @@ class SelectionResult:
     """Holds the results of the MCTS selection phase."""
 
     path: SearchPath
-    leaf_env: (
-        BaseEnvironment  # worried these may be large and waste memory. Not needed?
-    )
+    leaf_env: Engine
+    # todo worried these may be large and waste memory. Not needed?
 
     @property
     def leaf_node(self):
@@ -172,8 +169,6 @@ class SelectionStrategy(abc.ABC):
     def select(
         self,
         node: "MCTSNode",
-        # sim_env: BaseEnvironment,
-        # cache: "MCTSNodeCache",
         remaining_sims: int,
         contender_actions: Optional[set],
     ) -> SelectionResult:
@@ -185,7 +180,6 @@ class ExpansionStrategy(abc.ABC):
     def expand(
         self,
         node: "MCTSNode",
-        # env: BaseEnvironment,
     ) -> None:
         """
         Expand a leaf node by adding children based on legal actions.
@@ -203,7 +197,6 @@ class EvaluationStrategy(abc.ABC):
     def evaluate(
         self,
         node: "MCTSNode",
-        # env: BaseEnvironment
     ) -> float:
         """
         Evaluate a leaf node to estimate its value.
@@ -244,7 +237,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
     def select(
         self,
         node: MCTSNode,
-        sim_env: BaseEnvironment,
+        sim_env: Engine,
         cache: "MCTSNodeCache",
         remaining_sims: int,
         contender_actions: Optional[set],
@@ -270,22 +263,28 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
 
             sim_env.clear_rng_flag()
 
-            step_result = sim_env.step(best_action)
+            edge = current_node.edges[best_action_index]
+            sim_env.step(best_action)
 
-            if step_result is not None:
-                next_key = step_result.next_state_with_key.key
-            else:
-                sim_env.next_turn()
-                while sim_env.current_hero and sim_env.current_hero.hp <= 0:
-                    is_done = (
-                        sim_env.is_done()
-                        if callable(sim_env.is_done)
-                        else sim_env.is_done
-                    )
-                    if is_done:
-                        break
+            if not sim_env.rng_used and edge.child_node_key is not None:
+                next_key = edge.child_node_key
+                if type(best_action).__name__ == "PlausibleMoveAndAction":
                     sim_env.next_turn()
+                    while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                        if sim_env.is_done:
+                            break
+                        sim_env.next_turn()
+            else:
+                if type(best_action).__name__ == "PlausibleMoveAndAction":
+                    sim_env.next_turn()
+                    while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                        if sim_env.is_done:
+                            break
+                        sim_env.next_turn()
                 next_key = sim_env.hash()
+
+                if not sim_env.rng_used:
+                    edge.child_node_key = next_key
 
             if path.has_visited_key(next_key):
                 # Cycle detected
@@ -298,13 +297,9 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 )
                 cache.cache_node(key=next_key, node=next_node)
 
-            # Cache deterministic transitions
-            edge = current_node.edges[best_action_index]
-            is_stochastic = getattr(sim_env, "rng_used", True)
-            if not is_stochastic:
-                edge.child_node_key = next_key
-
-            path.add(node=next_node, action_leading_to_node=best_action_index)
+            path.add(
+                node=next_node, action_leading_to_node=best_action_index
+            )  # FIX TYPE
             current_node = next_node
 
         # Reached a terminal state
@@ -326,7 +321,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             }
 
         best_score = -float("inf")
-        best_action_index: Optional[ActionType] = None
+        best_action_index: Optional[int] = None
 
         # Use 1 if num_visits is 0 to avoid issues with log(0) in some UCB formulas if not handled by an IF statement
         parent_visits = current_node.num_visits if current_node.num_visits > 0 else 1
@@ -402,13 +397,8 @@ class PUCTSelection(MCTSSelectionStrategyBase):
 class UniformExpansion(ExpansionStrategy):
     """Expands a node by creating children for all legal actions with uniform priors."""
 
-    def expand(self, node: MCTSNode, env_at_node: BaseEnvironment) -> None:
-        is_done = (
-            env_at_node.is_done
-            if callable(env_at_node.is_done)
-            else env_at_node.is_done
-        )
-        if node.is_expanded or is_done:
+    def expand(self, node: MCTSNode, env_at_node: Engine) -> None:
+        if node.is_expanded or env_at_node.is_done:
             return
 
         legal_actions = env_at_node.get_legal_actions()
@@ -426,7 +416,7 @@ class RandomRolloutEvaluation(EvaluationStrategy):
         self.max_rollout_depth = max_rollout_depth
         self.discount_factor = discount_factor  # Usually 1.0 for MCTS terminal rewards
 
-    def evaluate(self, node: MCTSNode, env: BaseEnvironment) -> float:
+    def evaluate(self, node: MCTSNode, env: Engine) -> float:
         """Simulate game from the given environment state using random policy."""
         player_at_start = env.get_current_player()
 
@@ -447,17 +437,13 @@ class RandomRolloutEvaluation(EvaluationStrategy):
                 break
             action = random.choice(legal_actions)
 
-            step_result = env.step(action)
-            if (
-                step_result is None
-                and type(action).__name__ == "PlausibleMoveAndAction"
-            ):
-                if hasattr(env, "next_turn"):
+            env.step(action)
+            if type(action).__name__ == "PlausibleMoveAndAction":
+                env.next_turn()
+                while env.current_hero and env.current_hero.hp <= 0:
+                    if env.is_done:
+                        break
                     env.next_turn()
-                    while env.current_hero and env.current_hero.hp <= 0:
-                        if env.is_done:
-                            break
-                        env.next_turn()
 
             current_step += 1
 
@@ -503,15 +489,6 @@ class StandardBackpropagation(BackpropagationStrategy):
                 edge_to_update.total_value += value
 
 
-@dataclass
-class PolicyResult:
-    """Holds the results of the MCTS policy calculation."""
-
-    chosen_action: ActionType
-    action_probabilities: Dict[ActionType, float] = field(default_factory=dict)
-    action_visits: Dict[ActionType, int] = field(default_factory=dict)
-
-
 class MCTSAgent(Agent):
     """An agent that uses MCTS to select actions."""
 
@@ -523,14 +500,11 @@ class MCTSAgent(Agent):
         self.backprop = StandardBackpropagation()
         self.cache = MCTSNodeCache()
 
-    def choose(self, choices: List[ActionType]) -> int:
+    def choose(self, choices: List[Choice]) -> int:
         if len(choices) <= 1:
             return 0
 
-        actor = getattr(choices[0], "ability", None)
-        if not actor or not hasattr(actor, "owner") or not actor.owner:
-            return 0
-
+        actor = choices[0].ability.owner
         env = actor.owner.engine
 
         root_key = env.hash()
@@ -541,10 +515,18 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
+        real_history = list(env.action_history)
+
         for _ in range(self.num_simulations):
-            sim_env = env.copy()
+            env.reset()
+            for action in real_history:
+                if action == "NEXT_TURN":
+                    env.next_turn()
+                else:
+                    env.step(action)
+
             result = self.selection.select(
-                root_node, sim_env, self.cache, self.num_simulations, None
+                root_node, env, self.cache, self.num_simulations, None
             )
 
             if not result.leaf_env.is_done:
@@ -564,6 +546,14 @@ class MCTSAgent(Agent):
             }
             self.backprop.backpropagate(result.path, player_to_value)
 
+        # Restore real state
+        env.reset()
+        for action in real_history:
+            if action == "NEXT_TURN":
+                env.next_turn()
+            else:
+                env.step(action)
+
         best_idx = 0
         best_visits = -1
         for action_idx, edge in root_node.edges.items():
@@ -577,6 +567,6 @@ class MCTSAgent(Agent):
 
         return best_idx
 
-    def select_action(self, choices: List[ActionType]) -> ActionType:
+    def select_action(self, choices: List[Choice]) -> Choice:
         idx = self.choose(choices)
         return choices[idx]

@@ -80,6 +80,7 @@ class Engine:
         grid: Grid = None,
         agents: Optional[Dict[int, Agent]] = None,
     ) -> None:
+        self.action_history = []
         self.router = Router()
         self.agents: Dict[int, Agent] = agents or {}
         self.entities: List["Entity"] = []
@@ -268,6 +269,7 @@ class Engine:
         action: Union[PlausibleMoveAndAction, PlausibleFreeAction],
         actor: Optional[Entity] = None,
     ) -> None:
+        self.action_history.append(action)
         if actor is None:
             actor = self.current_hero
         if isinstance(action, PlausibleMoveAndAction):
@@ -287,6 +289,7 @@ class Engine:
                 RoundStartEvent(self).resolve()
 
     def next_turn(self) -> None:
+        self.action_history.append("NEXT_TURN")
         will_be_first_turn = self.current_hero is None
 
         if not will_be_first_turn:

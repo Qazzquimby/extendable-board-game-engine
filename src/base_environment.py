@@ -117,6 +117,7 @@ class BaseEnvironment(abc.ABC):
         self._state_with_key: Optional[StateWithKey] = None
         self.state: Optional[StateType] = None
         self._instance_cache: dict = {}
+        self.action_history: List[ActionType] = []
 
     def reset(self) -> StateWithKey:
         """
@@ -127,6 +128,7 @@ class BaseEnvironment(abc.ABC):
         """
         self._dirty = True
         self._instance_cache = {}
+        self.action_history.clear()
         state_with_key = self._reset()
         self.state = state_with_key.state
         return state_with_key
@@ -146,6 +148,7 @@ class BaseEnvironment(abc.ABC):
         Args:
             action: The action taken by the current player.
         """
+        self.action_history.append(action)
         reward, done = self._step(action)
         self._dirty = True
         self._instance_cache = {}
