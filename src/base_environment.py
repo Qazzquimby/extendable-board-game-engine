@@ -80,12 +80,6 @@ class StateWithKey:
     state: StateType
     key: int
 
-    @property
-    def done(self) -> bool:
-        """Checks if the game is over."""
-        # This is specific to environments that have a 'game' table with a 'done' column.
-        return self.state.is_done()
-
     @classmethod
     def from_state(cls, state: StateType):
         key = cls._get_key_for_state(state)

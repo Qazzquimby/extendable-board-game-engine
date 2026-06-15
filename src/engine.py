@@ -67,7 +67,7 @@ class TrackedRandom(random.Random):
     def shuffle(self, x, random=None):
         self.stochastic_flag = True
         super().shuffle(x, random)
-        
+
     def sample(self, population, k, counts=None):
         self.stochastic_flag = True
         return super().sample(population, k, counts=counts)
@@ -101,20 +101,30 @@ class Engine:
 
     @property
     def rng_used(self) -> bool:
-        if hasattr(self.rng, 'stochastic_flag'):
+        if hasattr(self.rng, "stochastic_flag"):
             return self.rng.stochastic_flag
         return False
-        
+
+    @property
+    def is_done(self):
+        if self.round_num > 6:
+            return True
+
+        alive_teams = {e.team for e in self.living_entities}
+        return len(alive_teams) <= 1
+
     def clear_rng_flag(self):
-        if hasattr(self.rng, 'stochastic_flag'):
+        if hasattr(self.rng, "stochastic_flag"):
             self.rng.stochastic_flag = False
 
     def get_legal_actions(self) -> List[Choice]:
-        if self.is_done() or not self.current_hero or self.current_hero.hp <= 0:
+        if self.is_done or not self.current_hero or self.current_hero.hp <= 0:
             return []
         agent = self.agents.get(self.current_hero.team)
         feature_evaluator = getattr(agent, "feature_evaluator", None) if agent else None
-        moves = get_plausible_move_and_actions(self.current_hero, self, feature_evaluator)
+        moves = get_plausible_move_and_actions(
+            self.current_hero, self, feature_evaluator
+        )
         frees = get_plausible_free_actions(self.current_hero, self, feature_evaluator)
         return moves + frees
 
@@ -254,7 +264,9 @@ class Engine:
         return GameLog(winner_team=winner_team, logs=logs)
 
     def step(
-        self, action: Union[PlausibleMoveAndAction, PlausibleFreeAction], actor: Optional[Entity] = None
+        self,
+        action: Union[PlausibleMoveAndAction, PlausibleFreeAction],
+        actor: Optional[Entity] = None,
     ) -> None:
         if actor is None:
             actor = self.current_hero
@@ -318,7 +330,7 @@ class Engine:
         return self
 
     def get_winning_player(self) -> Optional[int]:
-        if not self.is_done():
+        if not self.is_done:
             return None
         team_0 = [e for e in self.entities if e.team == 0 and e.hp > 0]
         team_1 = [e for e in self.entities if e.team == 1 and e.hp > 0]
@@ -330,13 +342,6 @@ class Engine:
 
     def get_network_spec(self) -> Dict:
         return {}
-
-    def is_done(self) -> bool:
-        if self.round_num > 6:
-            return True
-
-        alive_teams = {e.team for e in self.living_entities}
-        return len(alive_teams) <= 1
 
     def hash(self) -> int:
         entity_states = frozenset(
