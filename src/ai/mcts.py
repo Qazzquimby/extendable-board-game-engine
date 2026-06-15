@@ -138,9 +138,16 @@ class MCTSNode:
 class MCTSNodeCache:
     def __init__(self):
         self._key_to_node: Dict[int, MCTSNode] = {}
+        self.hits = 0
+        self.misses = 0
 
     def get_matching_node(self, key: int) -> Optional[MCTSNode]:
-        return self._key_to_node.get(key, None)
+        node = self._key_to_node.get(key, None)
+        if node:
+            self.hits += 1
+        else:
+            self.misses += 1
+        return node
 
     def cache_node(self, key: int, node: MCTSNode):
         self._key_to_node[key] = node
