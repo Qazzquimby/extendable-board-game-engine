@@ -9,6 +9,8 @@ from typing import (
     Union,
 )
 
+from tqdm import tqdm
+
 from choices import (
     Choice,
     PlausibleFreeAction,
@@ -170,7 +172,9 @@ class Engine:
         after_state = None
         RoundStartEvent(engine=self).resolve()
 
+        pbar = tqdm(total=6 * len(self.entities))
         while self.round_num <= 6:
+            pbar.update()
             self.next_turn()
             if after_state:
                 before_state = after_state
@@ -248,6 +252,7 @@ class Engine:
             if done:
                 break
 
+        pbar.close()
         return GameLog(winner_team=winner_team, logs=logs)
 
     def step(
@@ -263,8 +268,11 @@ class Engine:
         if isinstance(action, PlausibleMoveAndAction):
             for point in action.move_path:
                 ChangeLocationEvent(actor, point).resolve()
-        
-        current_ability = next((a for a in actor.abilities if a.name == action.ability.name), action.ability)
+
+        current_ability = next(
+            (a for a in actor.abilities if a.name == action.ability.name),
+            action.ability,
+        )
         current_ability.execute(
             engine=self, source=actor, aiming_result=action.aiming_result
         )
@@ -339,10 +347,22 @@ class Engine:
     def hash(self) -> int:
         entity_states = []
         for e in self.entities:
-            abilities_state = tuple((a.name, getattr(a, 'is_tapped', False), getattr(a, 'charges', None)) for a in e.abilities)
+            abilities_state = tuple(
+                (a.name, getattr(a, "is_tapped", False), getattr(a, "charges", None))
+                for a in e.abilities
+            )
             modifiers_state = tuple(m.__class__.__name__ for m in e.modifiers)
             entity_states.append(
-                (e.id, e.hp, e.pos, e.move_actions, e.standard_actions, e.free_actions, abilities_state, modifiers_state)
+                (
+                    e.id,
+                    e.hp,
+                    e.pos,
+                    e.move_actions,
+                    e.standard_actions,
+                    e.free_actions,
+                    abilities_state,
+                    modifiers_state,
+                )
             )
         marker_states = frozenset((m.id, m.name, m.pos, m.team) for m in self.markers)
         return hash(

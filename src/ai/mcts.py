@@ -16,6 +16,7 @@ from engine import Agent, Engine
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
+NUM_SIMS = 1_000
 
 
 @dataclass
@@ -495,7 +496,7 @@ class StandardBackpropagation(BackpropagationStrategy):
 class MCTSAgent(Agent):
     """An agent that uses MCTS to select actions."""
 
-    def __init__(self, num_simulations: int = 10_000):
+    def __init__(self, num_simulations: int = NUM_SIMS):
         self.num_simulations = num_simulations
         self.selection = PUCTSelection(exploration_constant=1.0)
         self.expansion = UniformExpansion()

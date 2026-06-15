@@ -41,11 +41,11 @@ class PlausibleMoveAndAction(Choice):
         self.movement_name = movement_name
         self.aiming_result = aiming_result
 
-        features = (
-            self._compute_features(actor, engine, feature_evaluator)
-            if engine and actor and aiming_result
-            else {}
-        )
+        features = {}  # (
+        #     self._compute_features(actor, engine, feature_evaluator)
+        #     if engine and actor and aiming_result
+        #     else {}
+        # )
         super().__init__(features=features)
 
     def _compute_features(
@@ -315,7 +315,7 @@ class PlausibleFreeAction(Choice):
         self.ability = ability
         self.aiming_result = aiming_result
 
-        features = self._compute_features(actor, engine, feature_evaluator)
+        features = {}  # self._compute_features(actor, engine, feature_evaluator)
         super().__init__(features=features)
 
     @property
