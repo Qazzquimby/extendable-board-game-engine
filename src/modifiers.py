@@ -26,7 +26,7 @@ class Modifier:
 
     def log_trigger(self, event):
         return log(
-            f"{self.owner.name}'s {self.name} triggered {event.__class__.__name__}."
+            f"{event.__class__.__name__} triggered {self.owner.name}'s {self.name}."
         )
 
 

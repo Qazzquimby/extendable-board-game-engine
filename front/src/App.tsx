@@ -64,8 +64,9 @@ function App() {
       <h1>Game Log Visualizer</h1>
       <input type="file" accept=".json,.jsonl" onChange={handleFileChange} />
       {games.length > 0 && (
-        <>
-          <div style={{ margin: '10px 0' }}>
+        <div style={{ display: 'flex' }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ margin: '10px 0' }}>
             <label>
               Select Game: 
               <select 
@@ -98,8 +99,21 @@ function App() {
               <p>"{currentLogEntry.action.movement_name}" to [{String(getDestination(currentLogEntry))}], then performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
             </div>
           )}
+          <div>
           {stateToRender && <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action} />}
-        </>
+          </div>
+          </div>
+          <div style={{ width: '300px', marginLeft: '20px', borderLeft: '1px solid #ccc', paddingLeft: '20px', height: '95vh', overflowY: 'auto' }}>
+            <h2>Turn Log</h2>
+            {currentLogEntry?.messages?.length ? (
+              currentLogEntry.messages.map((msg, index) => (
+                <p key={index} style={{ margin: '2px 0', fontSize: '14px', whiteSpace: 'pre-wrap' }}>{msg}</p>
+              ))
+            ) : (
+              <p>No log messages for this turn.</p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

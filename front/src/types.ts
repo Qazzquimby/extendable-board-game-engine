@@ -73,6 +73,7 @@ export interface ActionState {
   target: Target;
   ability: Ability;
   move_path?: MovePath;
+  move_pos?: (Point | null);
   movement_name?: MovementName;
   [k: string]: unknown;
 }

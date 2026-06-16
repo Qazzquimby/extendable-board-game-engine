@@ -196,9 +196,12 @@ def get_plausible_actions_after_movement(
         for (k, v) in plausible_actions_after_movement.items()
         if v.ability.name != "Do Nothing"
     }
-    if non_passing_plausible_actions_after_movement:
+    if non_passing_plausible_actions_after_movement and any(
+        action.valence in (Valence.GOOD, Valence.BAD)
+        for action in non_passing_plausible_actions_after_movement
+    ):
         plausible_actions_after_movement = non_passing_plausible_actions_after_movement
-    assert non_passing_plausible_actions_after_movement
+    assert plausible_actions_after_movement
     return plausible_actions_after_movement
 
 

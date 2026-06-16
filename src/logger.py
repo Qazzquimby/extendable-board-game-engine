@@ -12,8 +12,8 @@ class Logger:
         self.root = []
         self.stack = []
 
-    def __call__(self, message):
-        node = LogNode(message)
+    def __call__(self, message: str):
+        node = LogNode(message=message)
 
         if self.stack:
             self.stack[-1].children.append(node)
