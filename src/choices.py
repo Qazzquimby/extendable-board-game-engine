@@ -5,7 +5,7 @@ from ai.feature_definitions import NEW_LOCATION
 from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
 from entities import Entity
 from point import Point
-from queries import QueryLegalAimings
+from queries import QueryLegalAimings, QuerySpeed
 from valence import Valence
 
 if TYPE_CHECKING:
@@ -105,7 +105,7 @@ def get_plausible_movements(
     ally_points = {e.pos for e in allies if e.pos is not None}
     reachable_points = engine.grid.get_movable_spaces(
         start=actor.pos,
-        max_movement=actor.speed,
+        max_movement=QuerySpeed(actor).resolve().value,
         enemy_points=enemy_points,
         ally_points=ally_points,
     )
