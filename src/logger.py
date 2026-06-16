@@ -52,7 +52,7 @@ def _get_logs_in(nodes, indent=0):
     logs = []
     for node in nodes:
         logs.append("-" * indent + node.message)
-        _get_logs_in(node.children, indent + 1)
+        logs += _get_logs_in(node.children, indent + 1)
     return logs
 
 
