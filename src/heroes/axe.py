@@ -105,7 +105,7 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
 
     #       name: Receive damage from a Default Ability
     #       text: The attacker takes 1/2 the damage received, before Armor.
-    @before(DamageEvent)
+    @after(DamageEvent)
     def reflect_default_damage(self, event: "DamageEvent") -> None:
         if event.ability and event.ability.is_default and event.source:
             reflect_amt = div(event.amount.value, 2)
