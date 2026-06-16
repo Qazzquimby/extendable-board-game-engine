@@ -12,6 +12,7 @@ from ai.feature_definitions import (
     NEW_LOCATION,
     Feature,
 )
+from valence import Valence
 
 if TYPE_CHECKING:
     from engine import (
@@ -68,13 +69,14 @@ def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
 
 
-@dataclass(kw_only=True)
 class Instruction:
     """Base class for all ability effects."""
 
-    aiming_name: Optional[str] = field(default=None)
-    plausibly_positive: bool = False
-    plausibly_negative: bool = False
+    def __init__(
+        self, aiming_name: Optional[str] = None, valence: Valence = Valence.MIXED
+    ):
+        self.aiming_name = aiming_name
+        self.valence = valence
 
     def execute(self, ctx: ActionContext) -> None:
         pass
@@ -349,9 +351,7 @@ class PullInstruction(Instruction):
         if subject:
             dist = resolve_int(self.distance, ctx)
             PullEvent(
-                subject=ctx.target,
-                distance=dist,
-                source=ctx.source,
+                subject=ctx.target, distance=dist, toward_point=ctx.source.pos
             ).resolve()
 
 
@@ -455,6 +455,8 @@ class TeleportInstruction(Instruction):
         return [NEW_LOCATION]
 
 
-@dataclass
 class ApplyModifierInstruction(Instruction):
-    modifier_class: type
+    modifier_class: Type[Modifier]
+
+    def __post__init__(self):
+        self.valence = self.modifier_class.valence

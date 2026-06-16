@@ -4,12 +4,14 @@ from entities import Entity, Summon
 from events import query, before, TurnEndEvent
 from logger import log
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
+from valence import Valence
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Modifier:
+    text: str
+    valence: Valence
     owner: Entity = field(init=False)
-    text: str = ""
     name: str = field(init=False)
 
     def __init_subclass__(cls, **kwargs):
@@ -27,6 +29,7 @@ class Modifier:
 
 class SummonModifier(Modifier):
     owner: Summon = field(init=False)
+    valence: Valence = Valence.GOOD
 
 
 class Token(Modifier):
@@ -53,6 +56,8 @@ class ClearAtEndOfTurnMixin:
 
 
 class Immobile(Modifier):
+    valence = Valence.BAD
+
     @query(QueryCanMove)
     def prevent_move(self, q: QueryCanMove) -> None:
         q.result = False
@@ -63,6 +68,8 @@ class ImmobileToken(Immobile, Token, ClearAtEndOfTurnMixin):
 
 
 class Stunned(Modifier):
+    valence = Valence.BAD
+
     @query(QueryCanMove)
     def prevent_move(self, q: QueryCanMove) -> None:
         q.result = False
@@ -77,6 +84,8 @@ class StunnedToken(Stunned, Token, ClearAtEndOfTurnMixin):
 
 
 class Slow(Modifier):
+    valence = Valence.BAD
+
     def __init__(self, amount: int):
         self.amount = amount
 
@@ -90,6 +99,8 @@ class SlowToken(Slow, Token, ClearAtEndOfTurnMixin):
 
 
 class Armor(Modifier):
+    valence = Valence.GOOD
+
     @query(QueryHasArmor)
     def grant_armor(self, q: QueryHasArmor) -> None:
         q.result = True

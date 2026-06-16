@@ -276,12 +276,12 @@ class Engine:
 
         # todo cover included entities. Make aiming_result __str__
         with log(f"{actor.name} used {action.ability.name}{target_str}."):
-            current_ability = next(
-                (a for a in actor.abilities if a.name == action.ability.name),
-                action.ability,
-            )  # todo why not use action.ability
-            assert action.ability == current_ability
-            current_ability.execute(
+            # current_ability = next(
+            #     (a for a in actor.abilities if a.name == action.ability.name),
+            #     action.ability,
+            # )  # todo why not use action.ability
+            # assert action.ability.name == current_ability.name
+            action.ability.execute(
                 engine=self, source=actor, aiming_result=action.aiming_result
             )
 

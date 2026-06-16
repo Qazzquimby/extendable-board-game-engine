@@ -14,7 +14,7 @@ from engine import (
     Hero,
 )
 from logger import log
-from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor
+from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor, SlowToken
 from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
 from abilities import (
     Ability,
@@ -28,19 +28,19 @@ from abilities import (
 )
 from mod_value import div
 from point import Point
-
-if TYPE_CHECKING:
-    from entities import Entity
+from valence import Valence
 
 
 class DamageOverTimeToken(Token):
+    valence = Valence.BAD
+
     @before(TurnEndEvent)
     def take_damage(self, event: TurnEndEvent) -> None:
         DamageEvent(source=None, subject=self.owner, amount=self.amount).resolve()
 
 
 class BattleHungerToken(Token):
-    # (todo later) Moving away from Axe costs you twice as many spaces.
+    valence = Valence.BAD
 
     @after(DeathEvent)
     def on_kill_clear_this_and_DoT(self, event: DeathEvent) -> None:
@@ -75,6 +75,7 @@ class CullingBladeInstruction(Instruction):
 
 class AxeCounterHelix(Modifier):
     text = "When you take damage: Enemies in burst 1, 1dmg."
+    valence = Valence.GOOD
 
     def __post_init__(self):
         self.plausibly_positive = True
@@ -103,6 +104,7 @@ class AxeCounterHelix(Modifier):
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
     text = "When you receive damage from a Default Ability: The attacker takes 1/2 the damage received, before Armor."
+    valence = Valence.GOOD
 
     def __post_init__(self):
         self.plausibly_positive = True
@@ -182,8 +184,17 @@ class Axe(Hero):
                 """,
                 aiming=TargetEntity(in_range=3),
                 instructions=[
-                    GiveTokenInstruction(token_class=DamageOverTimeToken, amount=2),
-                    GiveTokenInstruction(token_class=BattleHungerToken, amount=1),
+                    GiveTokenInstruction(
+                        plausibly_positive=False, token_class=SlowToken
+                    ),
+                    GiveTokenInstruction(
+                        plausibly_positive=False,
+                        token_class=DamageOverTimeToken,
+                        amount=2,
+                    ),
+                    GiveTokenInstruction(
+                        plausibly_positive=False, token_class=BattleHungerToken
+                    ),
                 ],
                 max_charges=1,
                 owner=self,

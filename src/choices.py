@@ -188,19 +188,16 @@ def get_plausible_actions_after_movement(
         plausible_actions_after_movement.update(
             plausible_uses_of_ability_after_movement
         )
-    # assert plausible_actions_after_movement
-    if not plausible_actions_after_movement:
-        print("Impossible")
-        get_plausible_uses_of_ability_after_movement(
-            actor=actor,
-            engine=engine,
-            move_pos=move_pos,
-            movement_name=movement_name,
-            ability=actor.abilities[0],
-            feature_evaluator=feature_evaluator,
-        )
 
-    # including pass turn
+    # If any without name "Do Nothing" available, remove "Do Nothing"
+    non_passing_plausible_actions_after_movement = {
+        k: v
+        for (k, v) in plausible_actions_after_movement.items()
+        if v.ability.name != "Do Nothing"
+    }
+    if non_passing_plausible_actions_after_movement:
+        plausible_actions_after_movement = non_passing_plausible_actions_after_movement
+    assert non_passing_plausible_actions_after_movement
     return plausible_actions_after_movement
 
 
