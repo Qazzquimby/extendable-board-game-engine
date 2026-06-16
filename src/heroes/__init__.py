@@ -13,9 +13,9 @@ class MeleeHero(Hero):
         self.abilities.append(
             Ability(
                 name="Melee Attack",
-                text="Target in range 1: 4 damage",
+                text="Target in range 1: 3 damage",
                 aiming=TargetEntity(in_range=1),
-                instructions=[DamageInstruction(amount=4)],
+                instructions=[DamageInstruction(amount=3)],
                 is_default=True,
                 owner=self,
             )
