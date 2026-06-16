@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
+from logger import log
 from mod_value import ModInt
 
 if TYPE_CHECKING:
@@ -214,8 +215,10 @@ class DamageEvent(Event):
         new_hp = max(0, self.subject.hp - final_damage)
         self.subject.hp = new_hp
 
-        if self.subject.hp <= 0:
-            DeathEvent(subject=self.subject, killer=self.source).resolve()
+        source_name = self.source.name if self.source else "Environment"
+        with log(f"{source_name} dealt {final_damage} damage to {self.subject.name}."):
+            if self.subject.hp <= 0:
+                DeathEvent(subject=self.subject, killer=self.source).resolve()
 
 
 class DeathEvent(Event):
@@ -225,6 +228,7 @@ class DeathEvent(Event):
         self.killer = killer
 
     def _resolve(self) -> None:
+        log(f"{self.subject.name} died.")
         self.subject.pos = None
 
 
@@ -246,6 +250,7 @@ class HealEvent(Event):
     def _resolve(self) -> None:
         final_heal = max(0, self.amount.value)
         self.subject.hp += final_heal
+        log(f"{self.subject.name} healed {final_heal} HP.")
 
 
 ### TOKENS
@@ -261,6 +266,7 @@ class AddTokenEvent(Event):
         self.amount = amount
 
     def _resolve(self):
+        log(f"{self.subject.name} gained {self.amount} {self.token_class.__name__}.")
         for modifier in self.subject.modifiers:
             if isinstance(modifier, self.token_class):
                 modifier.add(self.amount)
@@ -281,6 +287,7 @@ class RemoveTokenEvent(Event):
         self.amount = amount
 
     def _resolve(self):
+        log(f"{self.subject.name} lost {self.amount} {self.token_class.__name__}.")
         for modifiers in self.subject.modifiers:
             if isinstance(modifiers, self.token_class):
                 modifiers.remove(self.amount)

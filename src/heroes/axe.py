@@ -13,6 +13,7 @@ from engine import (
     Engine,
     Hero,
 )
+from logger import log
 from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor
 from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
 from abilities import (
@@ -72,7 +73,7 @@ class CullingBladeInstruction(Instruction):
                 ctx.source.add_modifier(Armor())
 
 
-class AxeCleaveOnTakeDamage(Modifier):
+class AxeCounterHelix(Modifier):
     text = "When you take damage: Enemies in burst 1, 1dmg."
 
     def __post_init__(self):
@@ -87,9 +88,17 @@ class AxeCleaveOnTakeDamage(Modifier):
             points_in_range = self.owner.engine.grid.get_points_in_range(
                 start=self.owner.pos, max_range=1
             )
-            for entity in self.owner.engine.living_entities:
-                if entity.team != self.owner.team and entity.pos in points_in_range:
-                    DamageEvent(source=self.owner, subject=entity, amount=1).resolve()
+            entities_hit = [
+                entity
+                for entity in self.owner.engine.living_entities
+                if entity.team != self.owner.team and entity.pos in points_in_range
+            ]
+            if entities_hit:
+                with log(self.log_trigger(event)):
+                    for entity in entities_hit:
+                        DamageEvent(
+                            source=self.owner, subject=entity, amount=1
+                        ).resolve()
 
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
@@ -105,6 +114,9 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
         if event.ability and event.ability.is_default and event.source:
             reflect_amt = div(event.amount.value, 2)
             if reflect_amt > 0:
+                self.owner.engine.log(
+                    f"--{self.owner.name}'s {self.name} reflected {reflect_amt} damage to {event.source.name}."
+                )
                 DamageEvent(
                     source=self.owner,
                     subject=event.source,
@@ -116,7 +128,7 @@ class Axe(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
 
-        self.add_modifier(AxeCleaveOnTakeDamage())
+        self.add_modifier(AxeCounterHelix())
         self.add_modifier(AxeReflectHalfOfDamageFromDefaults())
 
         self.abilities.append(

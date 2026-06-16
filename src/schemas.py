@@ -14,6 +14,7 @@ class EntityState(BaseModel):
     move_actions: int
     standard_actions: int
     free_actions: int
+    modifiers: List[str] = []
 
 
 class EngineState(BaseModel):
@@ -44,6 +45,7 @@ class LogEntry(BaseModel):
     after_state: EngineState
     done: bool
     simulations: List[ActionSim] = []
+    messages: List[str] = []
 
 
 class GameLog(BaseModel):
