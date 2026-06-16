@@ -21,6 +21,7 @@ export type Team = number;
 export type MoveActions = number;
 export type StandardActions = number;
 export type FreeActions = number;
+export type Modifiers = string[];
 export type Entities = EntityState[];
 export type Actor = number;
 export type Target = number | null;
@@ -31,6 +32,7 @@ export type Done = boolean;
 export type Done1 = boolean;
 export type WinnerTeam1 = number | null;
 export type Simulations = ActionSim[];
+export type Messages = string[];
 export type Logs = LogEntry[];
 
 export interface GameLog {
@@ -44,6 +46,7 @@ export interface LogEntry {
   after_state: EngineState;
   done: Done;
   simulations?: Simulations;
+  messages?: Messages;
   [k: string]: unknown;
 }
 export interface EngineState {
@@ -62,13 +65,14 @@ export interface EntityState {
   move_actions: MoveActions;
   standard_actions: StandardActions;
   free_actions: FreeActions;
+  modifiers?: Modifiers;
   [k: string]: unknown;
 }
 export interface ActionState {
   actor: Actor;
   target: Target;
   ability: Ability;
-  move_path: MovePath;
+  move_path?: MovePath;
   movement_name?: MovementName;
   [k: string]: unknown;
 }

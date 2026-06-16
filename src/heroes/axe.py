@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from aimings import (
     TargetEntity,
@@ -114,14 +114,12 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
         if event.ability and event.ability.is_default and event.source:
             reflect_amt = div(event.amount.value, 2)
             if reflect_amt > 0:
-                self.owner.engine.log(
-                    f"--{self.owner.name}'s {self.name} reflected {reflect_amt} damage to {event.source.name}."
-                )
-                DamageEvent(
-                    source=self.owner,
-                    subject=event.source,
-                    amount=reflect_amt,
-                ).resolve()
+                with self.log_trigger(event):
+                    DamageEvent(
+                        source=self.owner,
+                        subject=event.source,
+                        amount=reflect_amt,
+                    ).resolve()
 
 
 class Axe(Hero):

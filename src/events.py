@@ -146,7 +146,7 @@ class ChangeLocationEvent(Event):
 
 
 class PullEvent(Event):
-    def __init__(self, subject: "Entity", distance: int, toward_point: Point):
+    def __init__(self, subject: "Entity", distance: int, toward_point: "Point"):
         super().__init__(engine=subject.engine, subject=subject)
         self.distance = ModInt(distance)
         self.toward_point = toward_point

@@ -160,6 +160,14 @@
         "free_actions": {
           "title": "Free Actions",
           "type": "integer"
+        },
+        "modifiers": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Modifiers",
+          "type": "array"
         }
       },
       "required": [
@@ -196,6 +204,14 @@
             "$ref": "#/$defs/ActionSim"
           },
           "title": "Simulations",
+          "type": "array"
+        },
+        "messages": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Messages",
           "type": "array"
         }
       },
