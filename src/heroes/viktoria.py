@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 from aimings import TargetEntity, MultipleAiming
 from areas import Burst
 from engine import (
@@ -9,7 +7,7 @@ from engine import (
 )
 from modifiers import Modifier
 from queries import QueryDefense
-from events import DeathEvent, after, HealEvent, TurnStartEvent
+from events import DeathEvent, after, HealEvent, TurnStartEvent, PullEvent
 from abilities import (
     Ability,
     DamageInstruction,
@@ -73,7 +71,20 @@ class DragonsBreathPull(Instruction):
     def execute(self, ctx: ActionContext) -> None:
         if not ctx.target or not hasattr(ctx.target, "hp"):
             return
-        # todo get all viktorias in burst 4. For each, pull 4 toward target.
+        burst_4_area = ctx.engine.grid.get_points_in_range(
+            start=ctx.target_point, max_range=4
+        )
+        viktorias_in_range = []
+        for point in burst_4_area:
+            entity = ctx.engine.entity_at(point)
+            if entity and entity.name == "Viktoria":
+                viktorias_in_range.append(entity)
+        for viktoria in viktorias_in_range:
+            PullEvent(
+                viktoria,
+                distance=4,
+                toward_point=ctx.target_point
+            )
 
 
 class Viktoria(Hero):

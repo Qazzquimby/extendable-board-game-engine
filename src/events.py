@@ -145,29 +145,24 @@ class ChangeLocationEvent(Event):
 
 
 class PullEvent(Event):
-    def __init__(
-        self,
-        subject: "Entity",
-        distance: int,
-        source: Optional["Entity"] = None,
-    ):
+    def __init__(self, subject: "Entity", distance: int, toward_point: Point):
         super().__init__(engine=subject.engine, subject=subject)
         self.distance = ModInt(distance)
-        self.source = source
+        self.toward_point = toward_point
 
     def _resolve(self) -> None:
-        if (
-            getattr(self.subject, "pos", None) is not None
-            and self.source
-            and getattr(self.source, "pos", None) is not None
-        ):
-            dist = max(0, self.distance.value)
-            if dist > 0:
-                path = self.subject.engine.grid.get_pull_path(
-                    self.subject.pos, self.source.pos, self.source.pos
-                )
-                if path and len(path) >= dist:
-                    self.subject.pos = path[dist - 1]
+        if not getattr(self.subject, "pos", None):
+            return
+        dist = max(0, self.distance.value)
+        if dist > 0:
+            path = self.subject.engine.grid.get_pull_path(
+                start=self.subject.pos,
+                pull_to=self.toward_point,
+            )
+            path = path[: self.distance]
+            for point in path:
+                ChangeLocationEvent(self.subject, point).resolve()
+        # todo test should pull as far as possible even if full path is impossible.
 
 
 class TurnStartEvent(Event):

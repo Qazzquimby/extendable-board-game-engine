@@ -179,25 +179,26 @@ class Grid:
                 f.write(self.visualize(start=start, target=target, path=None))
         return None
 
-    def get_push_path(
-        self, start: Point, target: Point, push_from: Point
-    ) -> Optional[List[Point]]:
+    def get_push_path(self, start: Point, push_from: Point) -> Optional[List[Point]]:
         """Finds a path where every step moves further away from the push_from point."""
 
         def is_away(curr: Point, nxt: Point) -> bool:
             return self.get_range(nxt, push_from) > self.get_range(curr, push_from)
 
         return self.get_path(start, target, valid_step=is_away)
+        # todo, pushing needs direction, not target
 
     def get_pull_path(
-        self, start: Point, target: Point, pull_to: Point
+        self,
+        start: Point,
+        pull_to: Point,
     ) -> Optional[List[Point]]:
         """Finds a path where every step moves closer to the pull_to point."""
 
         def is_toward(curr: Point, nxt: Point) -> bool:
             return self.get_range(nxt, pull_to) < self.get_range(curr, pull_to)
 
-        return self.get_path(start, target, valid_step=is_toward)
+        return self.get_path(start, pull_to, valid_step=is_toward)
 
     def get_line_of_sight(
         self,

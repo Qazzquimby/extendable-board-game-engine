@@ -15,6 +15,9 @@ class Modifier:
         super().__init_subclass__(**kwargs)
         cls.name = cls.__name__
 
+    def __str__(self):
+        return self.name
+
 
 class SummonModifier(Modifier):
     owner: Summon = field(init=False)
@@ -31,6 +34,9 @@ class Token(Modifier):
         self.amount -= amount
         if self.amount <= 0:
             self.owner.remove_modifier(self)
+
+    def __str__(self):
+        return f"{self.name} x {self.amount}"
 
 
 class ClearAtEndOfTurnMixin:
