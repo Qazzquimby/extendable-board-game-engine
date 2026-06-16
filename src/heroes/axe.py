@@ -77,9 +77,6 @@ class AxeCounterHelix(Modifier):
     text = "When you take damage: Enemies in burst 1, 1dmg."
     valence = Valence.GOOD
 
-    def __post_init__(self):
-        self.plausibly_positive = True
-
     # - name: Receive damage
     #   text: |-
     #     Enemies in burst 1, 1dmg
@@ -181,17 +178,12 @@ class Axe(Hero):
                 """,
                 aiming=TargetEntity(in_range=3),
                 instructions=[
+                    GiveTokenInstruction(token_class=SlowToken),
                     GiveTokenInstruction(
-                        plausibly_positive=False, token_class=SlowToken
-                    ),
-                    GiveTokenInstruction(
-                        plausibly_positive=False,
                         token_class=DamageOverTimeToken,
                         amount=2,
                     ),
-                    GiveTokenInstruction(
-                        plausibly_positive=False, token_class=BattleHungerToken
-                    ),
+                    GiveTokenInstruction(token_class=BattleHungerToken),
                 ],
                 max_charges=1,
                 owner=self,

@@ -15,6 +15,7 @@ from abilities import (
     ActionContext,
 )
 from point import Point
+from valence import Valence
 
 
 class OnFirstTurnSpawnOtherViktoria(Modifier):
@@ -65,8 +66,7 @@ class OnDeathOtherViktoriasHealAndGainDef(Modifier):
 
 
 class DragonsBreathPull(Instruction):
-    def __post__init__(self):
-        self.plausibly_negative = True
+    valence = Valence.MIXED
 
     def execute(self, ctx: ActionContext) -> None:
         if not ctx.target or not hasattr(ctx.target, "hp"):

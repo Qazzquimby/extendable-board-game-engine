@@ -6,6 +6,7 @@ from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, Multipl
 from entities import Entity
 from point import Point
 from queries import QueryLegalAimings
+from valence import Valence
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -432,16 +433,19 @@ def _get_plausible_uses_of_ability_at_pos(
     plausible_uses = {}
     with _ActorMovedView(engine, actor, pos) as sim_engine:
         if ability.instructions:
-            plausibly_positive = any(
-                instruction.plausibly_positive for instruction in ability.instructions
-            )
-            plausibly_negative = any(
-                instruction.plausibly_negative for instruction in ability.instructions
-            )
-            assert plausibly_positive or plausibly_negative
-        else:  # passing
-            plausibly_positive = True
-            plausibly_negative = True
+            valences = set(instruction.valence for instruction in ability.instructions)
+            has_good = Valence.GOOD in valences or Valence.MIXED in valences
+            has_bad = Valence.BAD in valences or Valence.MIXED in valences
+            if has_good and has_bad:
+                valence = Valence.MIXED
+            elif has_good:
+                valence = Valence.GOOD
+            elif has_bad:
+                valence = Valence.BAD
+            else:
+                assert False
+        else:
+            valence = Valence.MIXED
 
         raw_aimings = ability.aiming.get_all_aimings(
             engine=sim_engine, actor=actor, start_pos=pos, require_los=True
@@ -476,13 +480,13 @@ def _get_plausible_uses_of_ability_at_pos(
                     if not target:
                         continue
                     if (
-                        not plausibly_positive
+                        valence == Valence.BAD
                         and target.team == actor.team
                         and isinstance(ability.aiming, TargetEntity)
                     ):
                         continue
                     if (
-                        not plausibly_negative
+                        valence == Valence.GOOD
                         and target.team != actor.team
                         and isinstance(ability.aiming, TargetEntity)
                     ):
@@ -499,7 +503,6 @@ def _get_plausible_uses_of_ability_at_pos(
                             feature_evaluator=feature_evaluator,
                             **choice_kwargs,
                         )
-
             elif isinstance(ability.aiming, TargetSelf):
                 # target self just targets self. Ignore aiming_res.
                 key = (pos, actor.pos, ability.get_hash())
@@ -528,11 +531,11 @@ def _get_plausible_uses_of_ability_at_pos(
                     ability.get_hash(),
                 )
                 if key not in plausible_uses:
-                    if plausibly_positive:
+                    if valence in (Valence.GOOD, Valence.MIXED):
                         valid_targets = [
                             e for e in affected_entities if e.team == actor.team
                         ]
-                    elif plausibly_negative:
+                    elif valence in (Valence.BAD, Valence.MIXED):
                         valid_targets = [
                             e for e in affected_entities if e.team != actor.team
                         ]

@@ -318,9 +318,7 @@ class RemoveTokenInstruction(Instruction):
 # class PushInstruction(Instruction):
 #     distance: DynamicInt
 #
-# def __post_init__(self):
-#     self.plausibly_positive = True
-#     self.plausibly_negative = True
+# add valence
 
 #     # todo probably want direction param and update resolution
 #     def execute(self, ctx: ActionContext) -> None:
