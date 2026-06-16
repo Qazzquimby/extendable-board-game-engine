@@ -525,20 +525,24 @@ class MCTSAgent(Agent):
 
         # Precompute actions to replay to avoid expensive get_legal_actions() calls
         actions_to_replay = []
-        replay_env = env.setup.create_engine(agents=env.agents, seed=env.initial_seed)
-        replay_env.rng.stochastic_flag = False
-        for action_idx in history_to_replay:
-            if action_idx == -1:
-                replay_env.next_turn()
-                actions_to_replay.append(None)
-            elif action_idx >= 0:
-                legal = replay_env.get_legal_actions()
-                action = legal[action_idx]
-                replay_env.step(action, action_idx=action_idx)
-                actions_to_replay.append(action)
-
         log.enabled = False
         try:
+            # Get actions to replay
+            replay_env = env.setup.create_engine(
+                agents=env.agents, seed=env.initial_seed
+            )
+            replay_env.rng.stochastic_flag = False
+            for action_idx in history_to_replay:
+                if action_idx == -1:
+                    replay_env.next_turn()
+                    actions_to_replay.append(None)
+                elif action_idx >= 0:
+                    legal = replay_env.get_legal_actions()
+                    action = legal[action_idx]
+                    replay_env.step(action, action_idx=action_idx)
+                    actions_to_replay.append(action)
+
+            # sims
             for _ in range(self.num_simulations):
                 sim_env = env.setup.create_engine(
                     agents=env.agents, seed=env.initial_seed
