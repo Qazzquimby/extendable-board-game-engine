@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from events import PullEvent, DamageEvent, HealEvent, AddTokenEvent
+from events import PullEvent, DamageEvent, HealEvent, AddTokenEvent, ChangeLocationEvent
 from ai.feature_definitions import (
     DAMAGE_DEALT,
     FORCED_USE_ABILITY,
@@ -70,14 +70,12 @@ def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
 
 
+@dataclass(kw_only=True)
 class Instruction:
     """Base class for all ability effects."""
 
-    def __init__(
-        self, aiming_name: Optional[str] = None, valence: Valence = Valence.MIXED
-    ):
-        self.aiming_name = aiming_name
-        self.valence = valence
+    aiming_name: Optional[str] = None
+    valence: Valence = field(init=False, default=False)
 
     def execute(self, ctx: ActionContext) -> None:
         pass
@@ -222,9 +220,7 @@ class DamageInstruction(Instruction):
     amount: DynamicInt
     undefendable: bool = False
     irreducible: bool = False
-
-    def __post_init__(self):
-        self.plausibly_negative = True
+    valence = Valence.BAD
 
     def get_features(self, ctx: ActionContext) -> dict:
         features = {}
@@ -258,9 +254,7 @@ class DamageInstruction(Instruction):
 @dataclass
 class HealInstruction(Instruction):
     amount: DynamicInt
-
-    def __post_init__(self):
-        self.plausibly_positive = True
+    valence = Valence.GOOD
 
     def get_features(self, ctx: ActionContext) -> dict:
         features = {}
@@ -287,8 +281,7 @@ class GiveTokenInstruction(Instruction):
     amount: DynamicInt = 1
 
     def __post_init__(self):
-        self.plausibly_positive = True
-        self.plausibly_negative = True
+        self.valence = self.token_class.valence
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -307,8 +300,12 @@ class RemoveTokenInstruction(Instruction):
     amount: DynamicInt = 1
 
     def __post_init__(self):
-        self.plausibly_positive = True
-        self.plausibly_negative = True
+        if self.token_class.valence == Valence.GOOD:
+            self.valence = Valence.BAD
+        elif self.token_class.valence == Valence.BAD:
+            self.valence = Valence.GOOD
+        else:
+            self.valence = Valence.MIXED
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -341,10 +338,7 @@ class RemoveTokenInstruction(Instruction):
 @dataclass
 class PullInstruction(Instruction):
     distance: DynamicInt
-
-    def __post_init__(self):
-        self.plausibly_positive = True
-        self.plausibly_negative = True
+    valence = Valence.MIXED
 
     # todo probably want direction param and update resolution
     def execute(self, ctx: ActionContext) -> None:
@@ -361,10 +355,7 @@ class UseAnAbilityInstruction(Instruction):
     default_only: bool = False
     required_target: Optional["Point"] = None
     subject_chooses: bool = True
-
-    def __post_init__(self):
-        self.plausibly_positive = True
-        self.plausibly_negative = True
+    valence = Valence.MIXED
 
     def get_feature_templates(self) -> List["Feature"]:
         return [FORCED_USE_ABILITY]
@@ -410,8 +401,7 @@ class UseAnAbilityInstruction(Instruction):
 
 @dataclass
 class RefreshAbilityInstruction(Instruction):
-    def __post_init__(self):
-        self.plausibly_positive = True
+    valence = Valence.GOOD
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -425,10 +415,7 @@ class RefreshAbilityInstruction(Instruction):
 @dataclass
 class TeleportInstruction(Instruction):
     destination: DynamicPoint
-
-    def __post_init__(self):
-        self.plausibly_positive = True
-        self.plausibly_negative = True
+    valence = Valence.MIXED
 
     def get_features(self, ctx: ActionContext) -> dict:
         features = {}
@@ -450,12 +437,13 @@ class TeleportInstruction(Instruction):
                 if callable(self.destination)
                 else self.destination
             )
-            subject.pos = dest  # todo should be event
+            ChangeLocationEvent(subject=subject, new_pos=dest).resolve()
 
     def get_feature_templates(self) -> List["Feature"]:
         return [NEW_LOCATION]
 
 
+@dataclass(kw_only=True)
 class ApplyModifierInstruction(Instruction):
     modifier_class: Type[Modifier]
 

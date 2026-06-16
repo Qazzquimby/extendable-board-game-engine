@@ -51,8 +51,7 @@ class BattleHungerToken(Token):
 
 @dataclass
 class CullingBladeInstruction(Instruction):
-    def __post_init__(self):
-        self.plausibly_negative = True
+    valence = Valence.BAD
 
     def execute(self, ctx: ActionContext) -> None:
         if not ctx.target or not hasattr(ctx.target, "hp"):
@@ -106,9 +105,6 @@ class AxeCounterHelix(Modifier):
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
     text = "When you receive damage from a Default Ability: The attacker takes 1/2 the damage received, before Armor."
     valence = Valence.GOOD
-
-    def __post_init__(self):
-        self.plausibly_positive = True
 
     #       name: Receive damage from a Default Ability
     #       text: The attacker takes 1/2 the damage received, before Armor.
