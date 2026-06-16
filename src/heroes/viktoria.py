@@ -80,11 +80,7 @@ class DragonsBreathPull(Instruction):
             if entity and entity.name == "Viktoria":
                 viktorias_in_range.append(entity)
         for viktoria in viktorias_in_range:
-            PullEvent(
-                viktoria,
-                distance=4,
-                toward_point=ctx.target_point
-            )
+            PullEvent(viktoria, distance=4, toward_point=ctx.target_point)
 
 
 class Viktoria(Hero):

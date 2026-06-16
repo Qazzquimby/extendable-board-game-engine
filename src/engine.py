@@ -29,6 +29,7 @@ from events import (
     RoundStartEvent,
 )
 from grid import Grid
+from logger import reset_logs, get_logs, log
 from point import Point
 from queries import QueryIsAlive, Query
 from schemas import EngineState, GameLog, LogEntry, ActionState
@@ -184,9 +185,8 @@ class Engine:
             if self.current_hero.hp <= 0:
                 continue  # skip this turn, they're dead.
 
-            agent = self.agents[self.current_hero.team]
-            feature_evaluator = getattr(agent, "feature_evaluator", None)
-
+            # agent = self.agents[self.current_hero.team]
+            # feature_evaluator = getattr(agent, "feature_evaluator", None)
             chosen_action: PlausibleMoveAndAction = None
             turn_over = False
             while not turn_over:
@@ -246,8 +246,10 @@ class Engine:
                 action=action_state,
                 after_state=after_state,
                 done=done,
+                messages=get_logs(),
             )
             logs.append(log_entry)
+            reset_logs()
 
             if done:
                 break
@@ -265,17 +267,23 @@ class Engine:
 
         if actor is None:
             actor = self.current_hero
+
+        target_str = f" on {action.target.name}" if action.target else ""
+
         if isinstance(action, PlausibleMoveAndAction):
             for point in action.move_path:
                 ChangeLocationEvent(actor, point).resolve()
 
-        current_ability = next(
-            (a for a in actor.abilities if a.name == action.ability.name),
-            action.ability,
-        )
-        current_ability.execute(
-            engine=self, source=actor, aiming_result=action.aiming_result
-        )
+        # todo cover included entities. Make aiming_result __str__
+        with log(f"{actor.name} used {action.ability.name}{target_str}."):
+            current_ability = next(
+                (a for a in actor.abilities if a.name == action.ability.name),
+                action.ability,
+            )  # todo why not use action.ability
+            assert action.ability == current_ability
+            current_ability.execute(
+                engine=self, source=actor, aiming_result=action.aiming_result
+            )
 
     def _advance_hero_indices(self):
         self.current_team = (self.current_team + 1) % NUM_TEAMS

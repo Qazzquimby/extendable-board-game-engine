@@ -2,6 +2,7 @@ from dataclasses import field, dataclass
 
 from entities import Entity, Summon
 from events import query, before, TurnEndEvent
+from logger import log
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 
 
@@ -17,6 +18,11 @@ class Modifier:
 
     def __str__(self):
         return self.name
+
+    def log_trigger(self, event):
+        return log(
+            f"{self.owner.name}'s {self.name} triggered {event.__class__.__name__}."
+        )
 
 
 class SummonModifier(Modifier):
@@ -91,30 +97,3 @@ class Armor(Modifier):
 
 class ArmorToken(Armor, Token, ClearAtEndOfTurnMixin):
     pass
-
-
-# @dataclass
-# class Taunted(Modifier):
-#     taunter: Entity
-#
-#     @query(QueryLegalActions)
-#     def force_attack(self, q: QueryLegalActions) -> None:
-#         forced_actions = []
-#         # for ability in self.owner.abilities:
-#         for (
-#             ability
-#         ) in (
-#             q.result
-#         ):  # It should start initialized to all legal actions including move.
-#             if ability.is_default:
-#                 import copy
-#
-#                 action = copy.deepcopy(ability)
-#                 action.subject = self.taunter
-#                 forced_actions.append(action)
-#         q.result = forced_actions
-#         self.owner.remove_modifier(self)
-#
-#     @query(QueryCanMove)
-#     def prevent_move(self, q: QueryCanMove) -> None:
-#         q.result = False
