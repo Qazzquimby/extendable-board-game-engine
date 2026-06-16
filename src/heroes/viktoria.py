@@ -21,6 +21,7 @@ from point import Point
 
 class OnFirstTurnSpawnOtherViktoria(Modifier):
     text = "Deploy: Create a copy of this in your deploy zone, without this ability."
+
     @after(TurnStartEvent)
     def spawn_viktoria(self, event: TurnStartEvent):
         if hasattr(event.subject, "is_original") and event.subject.is_original:
@@ -30,10 +31,12 @@ class OnFirstTurnSpawnOtherViktoria(Modifier):
 
 
 class OnStartOfTurnMayTeleportAnotherViktoriaHereThenTeleport1(Modifier):
-    text="Start of turn: Another Viktoria in range 4 may teleport adjacent to this. Teleport 1."
+    text = "Start of turn: Another Viktoria in range 4 may teleport adjacent to this. Teleport 1."
+
     @after(TurnStartEvent)
     def start_of_turn(self, event: TurnStartEvent):
-        pass # get other viktorias, they can choose to teleport to any space in burst1. Then you can choose to teleport burst 1.
+        pass  # get other viktorias, they can choose to teleport to any space in burst1. Then you can choose to teleport burst 1.
+
 
 class OnKillAllViktoriasHeal(Modifier):
     @after(DeathEvent, only_self=False)
@@ -65,13 +68,12 @@ class OnDeathOtherViktoriasHealAndGainDef(Modifier):
 
 class DragonsBreathPull(Instruction):
     def __post__init__(self):
-        self.plausibly_negative=True
+        self.plausibly_negative = True
 
     def execute(self, ctx: ActionContext) -> None:
         if not ctx.target or not hasattr(ctx.target, "hp"):
             return
         # todo get all viktorias in burst 4. For each, pull 4 toward target.
-
 
 
 class Viktoria(Hero):
@@ -104,11 +106,9 @@ class Viktoria(Hero):
         self.abilities.append(
             Ability(
                 name="Dragon's Breath",
-                text = "Target enemy in range 4. All Viktorias in range 4 of the target pull 4 towards it.",
+                text="Target enemy in range 4. All Viktorias in range 4 of the target pull 4 towards it.",
                 aiming=TargetEntity(in_range=4),
-                instructions=[
-                    DragonsBreathPull()
-                ]
+                instructions=[DragonsBreathPull()],
             )
         )
         # todo dragonsbreath
