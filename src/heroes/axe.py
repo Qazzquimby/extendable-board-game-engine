@@ -73,6 +73,7 @@ class CullingBladeInstruction(Instruction):
                 ctx.source.add_modifier(Armor())
 
 
+@dataclass(kw_only=True)
 class AxeCounterHelix(Modifier):
     text = "When you take damage: Enemies in burst 1, 1dmg."
     valence = Valence.GOOD

@@ -1,6 +1,5 @@
 from typing import List, Optional, TYPE_CHECKING, Type, TypeVar, Generic
 
-from abilities import Ability
 from events import EventPhase
 from mod_value import ModInt
 
@@ -48,8 +47,8 @@ class QueryLegalAimings(Query["AimingResult"]):
         self.ability = ability
 
 
-class QueryLegalActions(Query[List[Ability]]):
-    def __init__(self, subject: "Entity", base_result: List[Ability]):
+class QueryLegalActions(Query[List["Ability"]]):
+    def __init__(self, subject: "Entity", base_result: List["Ability"]):
         super().__init__(subject=subject, base_result=base_result)
 
 

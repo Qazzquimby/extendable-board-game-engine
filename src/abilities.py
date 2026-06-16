@@ -13,13 +13,14 @@ from ai.feature_definitions import (
     Feature,
 )
 from valence import Valence
+from modifiers import Modifier, Token
 
 if TYPE_CHECKING:
     from engine import (
         Engine,
         Entity,
     )
-    from modifiers import Modifier, Token
+
     from point import Point
 
 

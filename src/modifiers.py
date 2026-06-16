@@ -1,17 +1,20 @@
 from dataclasses import field, dataclass
+from typing import TYPE_CHECKING
 
-from entities import Entity, Summon
 from events import query, before, TurnEndEvent
 from logger import log
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 from valence import Valence
 
+if TYPE_CHECKING:
+    from entities import Entity, Summon
+
 
 @dataclass(kw_only=True)
 class Modifier:
-    text: str
-    valence: Valence
-    owner: Entity = field(init=False)
+    text: str = field(default=False, init=False)
+    valence: Valence = field(default=False, init=False)
+    owner: "Entity" = field(init=False)
     name: str = field(init=False)
 
     def __init_subclass__(cls, **kwargs):
@@ -28,7 +31,7 @@ class Modifier:
 
 
 class SummonModifier(Modifier):
-    owner: Summon = field(init=False)
+    owner: "Summon" = field(init=False)
     valence: Valence = Valence.GOOD
 
 
