@@ -11,8 +11,12 @@ class Logger:
     def __init__(self):
         self.root = []
         self.stack = []
+        self.enabled = True
 
     def __call__(self, message: str):
+        if not self.enabled:
+            return _DummyScope()
+
         node = LogNode(message=message)
 
         if self.stack:
@@ -21,6 +25,14 @@ class Logger:
             self.root.append(node)
 
         return _Scope(self, node)
+
+
+class _DummyScope:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc, tb):
+        pass
 
 
 class _Scope:

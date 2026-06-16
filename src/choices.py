@@ -191,14 +191,16 @@ def get_plausible_actions_after_movement(
         )
 
     # If any without name "Do Nothing" available, remove "Do Nothing"
-    non_passing_plausible_actions_after_movement = {
+    non_passing_plausible_actions_after_movement: dict[
+        tuple, PlausibleMoveAndAction
+    ] = {
         k: v
         for (k, v) in plausible_actions_after_movement.items()
         if v.ability.name != "Do Nothing"
     }
     if non_passing_plausible_actions_after_movement and any(
-        action.valence in (Valence.GOOD, Valence.BAD)
-        for action in non_passing_plausible_actions_after_movement
+        v.ability.valence in (Valence.GOOD, Valence.BAD)
+        for v in non_passing_plausible_actions_after_movement.values()
     ):
         plausible_actions_after_movement = non_passing_plausible_actions_after_movement
     assert plausible_actions_after_movement

@@ -113,6 +113,22 @@ class Ability:
     def __post_init__(self):
         self.charges = self.max_charges
 
+    @property
+    def valence(self):
+        has_good = any(
+            instruction.valence == Valence.GOOD for instruction in self.instructions
+        )
+        has_bad = any(
+            instruction.valence == Valence.BAD for instruction in self.instructions
+        )
+        if has_good and has_bad:
+            return Valence.MIXED
+        if has_good:
+            return Valence.GOOD
+        if has_bad:
+            return Valence.BAD
+        assert False
+
     def is_available(self):
         if self.is_tapped:
             return False
@@ -126,7 +142,7 @@ class Ability:
         engine: "Engine",
         source: "Entity",
         aiming_result: Union[AimingResult, MultipleAimingResults],
-    ) -> None:  # todo, execute is not used yet
+    ) -> None:
         if self.charges is not None:
             self.charges -= 1
         if self.taps:

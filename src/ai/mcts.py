@@ -12,11 +12,12 @@ from dataclasses import dataclass
 
 from choices import Choice, PlausibleMoveAndAction
 from engine import Agent, Engine
+from logger import log
 
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
-NUM_SIMS = 1_000
+NUM_SIMS = 10  # 1_000
 
 
 @dataclass
@@ -536,36 +537,42 @@ class MCTSAgent(Agent):
                 replay_env.step(action, action_idx=action_idx)
                 actions_to_replay.append(action)
 
-        for _ in range(self.num_simulations):
-            sim_env = env.setup.create_engine(agents=env.agents, seed=env.initial_seed)
-            sim_env.rng.stochastic_flag = False
+        log.enabled = False
+        try:
+            for _ in range(self.num_simulations):
+                sim_env = env.setup.create_engine(
+                    agents=env.agents, seed=env.initial_seed
+                )
+                sim_env.rng.stochastic_flag = False
 
-            for action_idx, action in zip(history_to_replay, actions_to_replay):
-                if action_idx == -1:
-                    sim_env.next_turn()
-                elif action_idx >= 0:
-                    sim_env.step(action, action_idx=action_idx)
+                for action_idx, action in zip(history_to_replay, actions_to_replay):
+                    if action_idx == -1:
+                        sim_env.next_turn()
+                    elif action_idx >= 0:
+                        sim_env.step(action, action_idx=action_idx)
 
-            result = self.selection.select(
-                root_node, sim_env, self.cache, self.num_simulations, None
-            )
+                result = self.selection.select(
+                    root_node, sim_env, self.cache, self.num_simulations, None
+                )
 
-            if not result.leaf_env.is_done:
-                self.expansion.expand(result.leaf_node, result.leaf_env)
-                val = self.evaluation.evaluate(result.leaf_node, result.leaf_env)
-            else:
-                winner = result.leaf_env.get_winning_player()
-                curr_player = result.leaf_node.current_player_index
-                if winner is None:
-                    val = 0.0
+                if not result.leaf_env.is_done:
+                    self.expansion.expand(result.leaf_node, result.leaf_env)
+                    val = self.evaluation.evaluate(result.leaf_node, result.leaf_env)
                 else:
-                    val = 1.0 if winner == curr_player else -1.0
+                    winner = result.leaf_env.get_winning_player()
+                    curr_player = result.leaf_node.current_player_index
+                    if winner is None:
+                        val = 0.0
+                    else:
+                        val = 1.0 if winner == curr_player else -1.0
 
-            player_to_value = {
-                result.leaf_node.current_player_index: val,
-                1 - result.leaf_node.current_player_index: -val,
-            }
-            self.backprop.backpropagate(result.path, player_to_value)
+                player_to_value = {
+                    result.leaf_node.current_player_index: val,
+                    1 - result.leaf_node.current_player_index: -val,
+                }
+                self.backprop.backpropagate(result.path, player_to_value)
+        finally:
+            log.enabled = True
 
         best_idx = 0
         best_visits = -1

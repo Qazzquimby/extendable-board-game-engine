@@ -99,7 +99,7 @@ class Entity:
             move_actions=self.move_actions,
             standard_actions=self.standard_actions,
             free_actions=self.free_actions,
-            modifiers=[str(modifier for modifier in self.modifiers)],
+            modifiers=[str(modifier) for modifier in self.modifiers],
         )
 
     def get_hash(self) -> float:

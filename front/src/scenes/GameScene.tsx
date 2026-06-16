@@ -200,7 +200,7 @@ private drawEntity(entity: EntityState, isActive: boolean) {
         hpForeground.fillRect(-hpBarWidth/2, hpBarY, hpBarWidth * hpPercent, hpBarHeight);
 
         const hpText = this.add.text(0, hpBarY + hpBarHeight/2, `${entity.hp}`, {
-            fontSize: '10px',
+            fontSize: '18px',
             color: '#ffffff'
         }).setOrigin(0.5);
 
