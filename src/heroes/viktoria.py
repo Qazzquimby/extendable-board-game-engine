@@ -111,7 +111,7 @@ class DragonsBreathPull(Instruction):
                 viktorias_in_range.append(entity)
         for viktoria in viktorias_in_range:
             with log("Dragon's Breath Pull"):
-                PullEvent(viktoria, distance=4, toward_point=ctx.target_point)
+                PullEvent(viktoria, distance=4, toward_point=ctx.target_point).resolve()
 
 
 class Viktoria(Hero):

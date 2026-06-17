@@ -51,8 +51,6 @@ class Entity:
         self.engine.add_entity(self)
         self.pos = pos  # runs setter
 
-        DeployEvent(self).resolve()
-
     @property
     def pos(self) -> Optional[Point]:
         return self._pos

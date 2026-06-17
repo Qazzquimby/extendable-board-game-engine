@@ -27,6 +27,7 @@ from events import (
     Router,
     ChangeLocationEvent,
     RoundStartEvent,
+    DeployEvent,
 )
 from grid import Grid
 from logger import reset_logs, get_logs, log
@@ -131,6 +132,8 @@ class Engine:
             [e for e in self.entities if e.team == team] for team in range(NUM_TEAMS)
         ]
         self.num_hero_rows = max([len(team) for team in self.team_heroes])
+        for entity in self.entities:
+            DeployEvent(entity).resolve()
 
     def get_choice_index(self, team: int, choices: List[ChoiceT]) -> int:
         if not choices:

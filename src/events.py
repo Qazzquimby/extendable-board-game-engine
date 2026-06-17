@@ -161,6 +161,7 @@ class PullEvent(Event):
                 pull_to=self.toward_point,
             )
             path = path[: self.distance]
+            log(f"Pulling {self.subject.name} to {path[-1]}")
             for point in path:
                 ChangeLocationEvent(self.subject, point).resolve()
         # todo test should pull as far as possible even if full path is impossible.
