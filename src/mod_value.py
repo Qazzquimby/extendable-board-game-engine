@@ -10,13 +10,21 @@ def div(numerator: int, denominator: int) -> int:
 
 
 class ModInt:
-    def __init__(self, base: int):
+    def __init__(self, base: Union[int, "ModInt"], is_irreducible=False):
         self.base: int = base
         self._adds: List[Union[int, Callable[[], int]]] = []
         self._mults: List[Union[float, Callable[[], float]]] = []
         self._resistances: List[Union[bool, Callable[[], bool]]] = []
         self._caps: List[Union[int, Callable[[int], int]]] = []
-        self.is_irreducible: bool = False
+        self.is_irreducible: bool = is_irreducible
+
+        if isinstance(base, ModInt):
+            self.base = base.base
+            self._adds = base._adds
+            self._mults = base._mults
+            self._resistances = base._resistances
+            self._caps = base._caps
+            self.is_irreducible = base.is_irreducible
 
     def __int__(self):
         return self.value
