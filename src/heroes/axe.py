@@ -13,7 +13,6 @@ from engine import (
     Engine,
     Hero,
 )
-from logger import log
 from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor, SlowToken
 from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
 from abilities import (

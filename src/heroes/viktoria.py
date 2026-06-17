@@ -1,13 +1,16 @@
-from aimings import TargetEntity, MultipleAiming
+from dataclasses import dataclass
+
+from aimings import TargetEntity, MultipleAiming, IncludeArea
 from areas import Burst
 from engine import (
     Engine,
     Hero,
     query,
 )
+from logger import log
 from modifiers import Modifier
 from queries import QueryDefense
-from events import DeathEvent, after, HealEvent, TurnStartEvent, PullEvent
+from events import DeathEvent, after, HealEvent, DeployEvent, PullEvent, TurnStartEvent
 from abilities import (
     Ability,
     DamageInstruction,
@@ -17,16 +20,31 @@ from abilities import (
 from point import Point
 from valence import Valence
 
+VIKTORIA_NAME = "Viktoria"
+
 
 class OnFirstTurnSpawnOtherViktoria(Modifier):
     text = "Deploy: Create a copy of this in your deploy zone, without this ability."
 
-    @after(TurnStartEvent)
-    def spawn_viktoria(self, event: TurnStartEvent):
+    @after(DeployEvent)
+    def spawn_viktoria(self, event: DeployEvent):
         if hasattr(event.subject, "is_original") and event.subject.is_original:
-            pass
-            # todo choose adjacent space
-            #  create viktoria with is_original=False
+            with self.log_trigger(event):
+                legal_spaces = event.engine.grid.get_points_in_range(
+                    start=event.subject.pos, max_range=1
+                )
+                open_spaces = [
+                    space for space in legal_spaces if not event.engine.entity_at(space)
+                ]
+                if open_spaces:
+                    target_space = open_spaces[0]
+                    Viktoria(
+                        engine=event.engine,
+                        pos=target_space,
+                        team=event.subject.team,
+                        is_original=False,
+                    )
+                    log(f"New Viktoria spawned at {target_space}")
 
 
 class OnStartOfTurnMayTeleportAnotherViktoriaHereThenTeleport1(Modifier):
@@ -34,7 +52,16 @@ class OnStartOfTurnMayTeleportAnotherViktoriaHereThenTeleport1(Modifier):
 
     @after(TurnStartEvent)
     def start_of_turn(self, event: TurnStartEvent):
-        pass  # get other viktorias, they can choose to teleport to any space in burst1. Then you can choose to teleport burst 1.
+        with self.log_trigger(event):
+            spaces_in_range = event.engine.grid.get_points_in_range(
+                start=event.subject.pos, max_range=4
+            )
+            for space in spaces_in_range:
+                entity = event.engine.entity_at(space)
+                if entity and entity.name == VIKTORIA_NAME:
+                    # todo they can choose to teleport to any space in burst1. Then you can choose to teleport burst 1.
+                    #  only do plausible movements to avoid explosive action space.
+                    pass
 
 
 class OnKillAllViktoriasHeal(Modifier):
@@ -42,14 +69,16 @@ class OnKillAllViktoriasHeal(Modifier):
     def on_kill(self, event: DeathEvent):
         if event.killer == self.owner:
             for entity in self.owner.engine.living_entities:
-                if entity.name == "Viktoria":
-                    HealEvent(subject=entity, amount=2).resolve()
+                if entity.name == VIKTORIA_NAME:
+                    with self.log_trigger(event):
+                        HealEvent(subject=entity, amount=2).resolve()
 
 
+@dataclass(kw_only=True)
 class DefenseModifier(Modifier):
-    def __init__(self, owner, amount):
-        super().__init__(owner)
-        self.amount = amount
+    amount: int
+    text = "You can only be hit on a d6 roll higher than your defense"
+    valence = Valence.GOOD
 
     @query(QueryDefense)
     def modify_defense(self, q: QueryDefense):
@@ -58,11 +87,12 @@ class DefenseModifier(Modifier):
 
 class OnDeathOtherViktoriasHealAndGainDef(Modifier):
     @after(DeathEvent)
-    def on_death(self):
+    def on_death(self, event: DeathEvent):
         for entity in self.owner.engine.living_entities:
-            if entity.name == "Viktoria" and entity != self.owner:
-                HealEvent(subject=entity, amount=2).resolve()
-                self.owner.add_modifier(DefenseModifier(owner=entity, amount=2))
+            if entity.name == VIKTORIA_NAME and entity != self.owner:
+                with self.log_trigger(event):
+                    HealEvent(subject=entity, amount=2).resolve()
+                    self.owner.add_modifier(DefenseModifier(amount=2))
 
 
 class DragonsBreathPull(Instruction):
@@ -77,17 +107,18 @@ class DragonsBreathPull(Instruction):
         viktorias_in_range = []
         for point in burst_4_area:
             entity = ctx.engine.entity_at(point)
-            if entity and entity.name == "Viktoria":
+            if entity and entity.name == VIKTORIA_NAME:
                 viktorias_in_range.append(entity)
         for viktoria in viktorias_in_range:
-            PullEvent(viktoria, distance=4, toward_point=ctx.target_point)
+            with log("Dragon's Breath Pull"):
+                PullEvent(viktoria, distance=4, toward_point=ctx.target_point)
 
 
 class Viktoria(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int, is_original=True):
         self.is_original = is_original
         super().__init__(
-            engine=engine, name="Viktoria", hp=6, speed=3, pos=pos, team=team
+            engine=engine, name=VIKTORIA_NAME, hp=6, speed=3, pos=pos, team=team
         )
         self.add_modifier(OnFirstTurnSpawnOtherViktoria())
         self.add_modifier(OnKillAllViktoriasHeal())
@@ -98,8 +129,11 @@ class Viktoria(Hero):
                 name="Enchanted Katana",
                 text="Range 1, 2dmg +2Crit. Other enemies in burst 1, 1dmg",
                 aiming=MultipleAiming(
-                    {"target": TargetEntity(in_range=1), "burst": Burst(radius=1)}
-                ),  # todo, how to do "all in burst except target
+                    {
+                        "target": TargetEntity(in_range=1),
+                        "burst": IncludeArea(area=Burst(radius=1)),
+                    }
+                ),  # todo, how to do "all in burst except target, and all enemies
                 instructions=[
                     DamageInstruction(aiming_name="target", amount=2),
                     DamageInstruction(aiming_name="burst", amount=1),
@@ -118,4 +152,3 @@ class Viktoria(Hero):
                 instructions=[DragonsBreathPull()],
             )
         )
-        # todo dragonsbreath

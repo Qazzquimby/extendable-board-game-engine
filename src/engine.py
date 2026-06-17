@@ -37,6 +37,7 @@ from schemas import EngineState, GameLog, LogEntry, ActionState
 ChoiceT = TypeVar("ChoiceT", bound="Choice")
 
 NUM_TEAMS = 2
+NUM_ROUNDS = 6
 
 
 class Agent(abc.ABC):
@@ -92,7 +93,7 @@ class Engine:
         self.entities: List["Entity"] = []
         self.markers: List["Marker"] = []
         self.rng = TrackedRandom(seed)
-        self.round_num: int = 0
+        self.round_num: int = 1
 
         self.team_heroes: List[List[Hero]] = None  # run finalize
         self.num_hero_rows: int = None  # run finalize
@@ -108,7 +109,7 @@ class Engine:
 
     @property
     def is_done(self):
-        if self.round_num > 6:
+        if self.round_num > NUM_ROUNDS:
             return True
 
         alive_teams = {e.team for e in self.living_entities}
@@ -173,8 +174,8 @@ class Engine:
         after_state = None
         RoundStartEvent(engine=self).resolve()
 
-        pbar = tqdm(total=6 * len(self.entities))
-        while self.round_num <= 6:
+        pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
+        while self.round_num <= NUM_ROUNDS:
             pbar.update()
             self.next_turn()
             if after_state:
@@ -219,15 +220,10 @@ class Engine:
                 continue
 
             # Check win condition
-            time_up = self.round_num >= 7
-            team_0_living_members = [
-                e for e in self.entities if e.team == 0 and e.hp > 0
-            ]
-            team_1_living_members = [
-                e for e in self.entities if e.team == 1 and e.hp > 0
-            ]
-            done = time_up or not team_0_living_members or not team_1_living_members
-            if done:
+            is_done = self.is_done
+            if is_done:
+                team_0_living_members = [e for e in self.living_entities if e.team == 0]
+                team_1_living_members = [e for e in self.living_entities if e.team == 1]
                 if len(team_0_living_members) > len(team_1_living_members):
                     winner_team = 0
                 elif len(team_1_living_members) > len(team_0_living_members):
@@ -245,13 +241,13 @@ class Engine:
                 before_state=before_state,
                 action=action_state,
                 after_state=after_state,
-                done=done,
+                done=is_done,
                 messages=get_logs(),
             )
             logs.append(log_entry)
             reset_logs()
 
-            if done:
+            if is_done:
                 break
 
         pbar.close()

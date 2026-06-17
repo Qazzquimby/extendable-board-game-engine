@@ -8,6 +8,7 @@ from events import (
     SummonEvent,
     AddTokenEvent,
     RemoveTokenEvent,
+    DeployEvent,
 )
 from point import Point
 from queries import (
@@ -49,6 +50,8 @@ class Entity:
         self.free_actions: int = 0
         self.engine.add_entity(self)
         self.pos = pos  # runs setter
+
+        DeployEvent(self).resolve()
 
     @property
     def pos(self) -> Optional[Point]:

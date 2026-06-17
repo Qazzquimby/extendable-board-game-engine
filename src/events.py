@@ -166,6 +166,14 @@ class PullEvent(Event):
         # todo test should pull as far as possible even if full path is impossible.
 
 
+class DeployEvent(Event):
+    def __init__(self, subject: "Entity"):
+        super().__init__(engine=subject.engine, subject=subject)
+
+    def _resolve(self) -> None:
+        pass
+
+
 class TurnStartEvent(Event):
     def __init__(self, subject: "Entity"):
         super().__init__(engine=subject.engine, subject=subject)

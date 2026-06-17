@@ -59,7 +59,7 @@ class QueryCanMove(Query[bool]):
 
 class QuerySpeed(Query[ModInt]):
     def __init__(self, subject: "Entity"):
-        super().__init__(subject=subject, base_result=subject.speed)
+        super().__init__(subject=subject, base_result=ModInt(subject.speed))
 
 
 class QueryDefense(Query[ModInt]):
