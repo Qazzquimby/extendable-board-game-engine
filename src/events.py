@@ -204,7 +204,7 @@ class DamageEvent(Event):
         self,
         source: Optional["Entity"],
         subject: "Entity",
-        amount: int,
+        amount: int | ModInt,
         ability: Optional["Ability"] = None,
     ):
         super().__init__(engine=subject.engine, subject=subject)
@@ -217,12 +217,13 @@ class DamageEvent(Event):
             self.amount.add(-1)
 
         final_damage = max(0, self.amount.value)
+        old_hp = self.subject.hp
         new_hp = max(0, self.subject.hp - final_damage)
         self.subject.hp = new_hp
 
         source_name = self.source.name if self.source else "Environment"
         with log(f"{source_name} dealt {final_damage} damage to {self.subject.name}."):
-            if self.subject.hp <= 0:
+            if self.subject.hp <= 0 and old_hp > 0:
                 DeathEvent(subject=self.subject, killer=self.source).resolve()
 
 
@@ -248,7 +249,7 @@ class SummonEvent(Event):
 
 
 class HealEvent(Event):
-    def __init__(self, subject: "Entity", amount: int):
+    def __init__(self, subject: "Entity", amount: int | ModInt):
         super().__init__(engine=subject.engine, subject=subject)
         self.amount = ModInt(amount)
 
