@@ -64,56 +64,73 @@ function App() {
       <h1>Game Log Visualizer</h1>
       <input type="file" accept=".json,.jsonl" onChange={handleFileChange} />
       {games.length > 0 && (
-        <div style={{ display: 'flex' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ margin: '10px 0' }}>
-            <label>
-              Select Game: 
-              <select 
-                value={currentGameIndex} 
-                onChange={(e) => {
-                  setCurrentGameIndex(Number(e.target.value));
-                  setCurrentStep(0);
-                }}
-                style={{ marginLeft: '10px' }}
-              >
-                {games.map((g, i) => (
-                  <option key={i} value={i}>Game {i + 1} {g.winner_team !== null ? `(Team ${g.winner_team} Won)` : '(Tie)'}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div>
-            <button onClick={() => setCurrentStep(s => Math.max(0, s - 1))} disabled={currentStep === 0}>
-              Previous
-            </button>
-            <span> Step {currentStep} / {log.length - 1} </span>
-            <button onClick={() => setCurrentStep(s => Math.min(log.length - 1, s + 1))} disabled={currentStep === log.length - 1}>
-              Next
-            </button>
-          </div>
-          {currentLogEntry && 'action' in currentLogEntry && (
-            <div>
-              <h3>Action</h3>
-              <p>Actor: {currentLogEntry.action.actor}</p>
-              <p>"{currentLogEntry.action.movement_name}" to [{String(getDestination(currentLogEntry))}], then performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
+          <div style={{display: 'flex'}}>
+            <div style={{
+              width: '300px',
+              marginLeft: '20px',
+              borderLeft: '1px solid #ccc',
+              paddingLeft: '20px',
+              height: '95vh',
+              overflowY: 'auto'
+            }}>
+              <h2>Turn Log</h2>
+              {currentLogEntry?.messages?.length ? (
+                  currentLogEntry.messages.map((msg, index) => (
+                      <p key={index} style={{
+                        margin: '2px 0',
+                        fontSize: '14px',
+                        whiteSpace: 'pre-wrap'
+                      }}>{msg}</p>
+                  ))
+              ) : (
+                  <p>No log messages for this turn.</p>
+              )}
             </div>
-          )}
-          <div>
-          {stateToRender && <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action} />}
+            <div style={{flex: 1}}>
+              <div style={{margin: '10px 0'}}>
+                <label>
+                  Select Game:
+                  <select
+                      value={currentGameIndex}
+                      onChange={(e) => {
+                        setCurrentGameIndex(Number(e.target.value));
+                        setCurrentStep(0);
+                      }}
+                      style={{marginLeft: '10px'}}
+                  >
+                    {games.map((g, i) => (
+                        <option key={i}
+                                value={i}>Game {i + 1} {g.winner_team !== null ? `(Team ${g.winner_team} Won)` : '(Tie)'}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div>
+                <button onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
+                        disabled={currentStep === 0}>
+                  Previous
+                </button>
+                <span> Step {currentStep} / {log.length - 1} </span>
+                <button onClick={() => setCurrentStep(s => Math.min(log.length - 1, s + 1))}
+                        disabled={currentStep === log.length - 1}>
+                  Next
+                </button>
+              </div>
+              {currentLogEntry && 'action' in currentLogEntry && (
+                  <div>
+                    <h3>Action</h3>
+                    <p>Actor: {currentLogEntry.action.actor}</p>
+                    <p>"{currentLogEntry.action.movement_name}" to
+                      [{String(getDestination(currentLogEntry))}], then
+                      performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
+                  </div>
+              )}
+              <div>
+                {stateToRender &&
+                    <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action}/>}
+              </div>
+            </div>
           </div>
-          </div>
-          <div style={{ width: '300px', marginLeft: '20px', borderLeft: '1px solid #ccc', paddingLeft: '20px', height: '95vh', overflowY: 'auto' }}>
-            <h2>Turn Log</h2>
-            {currentLogEntry?.messages?.length ? (
-              currentLogEntry.messages.map((msg, index) => (
-                <p key={index} style={{ margin: '2px 0', fontSize: '14px', whiteSpace: 'pre-wrap' }}>{msg}</p>
-              ))
-            ) : (
-              <p>No log messages for this turn.</p>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );
