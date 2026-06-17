@@ -472,6 +472,37 @@ class RandomRolloutEvaluation(EvaluationStrategy):
         return value
 
 
+class HeuristicEvaluation(EvaluationStrategy):
+    """Evaluates a node by a health-based heuristic."""
+
+    def __init__(self, heuristic_weight: float = 0.1):
+        self.heuristic_weight = heuristic_weight
+
+    def evaluate(self, node: MCTSNode, env: Engine) -> float:
+        """Calculates a score based on remaining health of both teams."""
+        current_player = node.current_player_index
+
+        if env.is_done:
+            winner = env.get_winning_player()
+            if winner is None:
+                return 0.0
+            return 1.0 if winner == current_player else -1.0
+
+        team_hp = [0.0, 0.0]
+        for entity in env.living_entities:
+            team_hp[entity.team] += entity.hp
+
+        my_team_hp = team_hp[current_player]
+        other_team_hp = team_hp[1 - current_player]
+
+        total_hp = my_team_hp + other_team_hp
+        if total_hp == 0:
+            return 0.0  # Should be covered by is_done, but for safety.
+
+        health_advantage = (my_team_hp - other_team_hp) / total_hp
+        return health_advantage * self.heuristic_weight
+
+
 class StandardBackpropagation(BackpropagationStrategy):
     """Updates node statistics by backpropagating the evaluation value."""
 
@@ -508,7 +539,7 @@ class MCTSAgent(Agent):
         self.num_simulations = num_simulations
         self.selection = PUCTSelection(exploration_constant=1.0)
         self.expansion = UniformExpansion()
-        self.evaluation = RandomRolloutEvaluation(max_rollout_depth=20)
+        self.evaluation = HeuristicEvaluation()
         self.backprop = StandardBackpropagation()
         self.cache = MCTSNodeCache()
 
