@@ -550,6 +550,12 @@ class MCTSAgent(Agent):
                     actions_to_replay.append(action)
                 else:
                     assert False
+                if replay_env.rng.stochastic_flag:
+                    raise RuntimeError(
+                        "Stochastic event during deterministic MCTS replay."
+                    )
+            if replay_env.hash() != env.hash():  # replay round 1, env round 2
+                raise RuntimeError("MCTS replay has desynced from original environment")
 
             # sims
             for _ in range(self.num_simulations):

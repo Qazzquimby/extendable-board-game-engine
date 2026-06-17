@@ -391,7 +391,7 @@ class Engine:
     def get_network_spec(self) -> Dict:
         return {}
 
-    def hash(self) -> int:
+    def _get_hash_info(self):
         entity_states = []
         for e in self.entities:
             abilities_state = tuple(
@@ -412,13 +412,14 @@ class Engine:
                 )
             )
         marker_states = frozenset((m.id, m.name, m.pos, m.team) for m in self.markers)
-        return hash(
-            (
-                self.round_num,
-                self.current_hero_row_index,
-                self.current_team,
-                self.current_turn_hero.id if self.current_turn_hero else None,
-                frozenset(entity_states),
-                marker_states,
-            )
+        return (
+            self.round_num,
+            self.current_hero_row_index,
+            self.current_team,
+            self.current_turn_hero.id if self.current_turn_hero else None,
+            frozenset(entity_states),
+            marker_states,
         )
+
+    def hash(self) -> int:
+        return hash(self._get_hash_info())
