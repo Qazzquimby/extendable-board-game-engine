@@ -341,21 +341,15 @@ class Grid:
 
     def get_line_of_sight(
         self,
-        start_pos: Point,
-        target_pos: Point,
+        start_pos: "Point",
+        target_pos: "Point",
         visualize_file: Optional[str] = None,
-        blocked_points: Optional[Set[Point]] = None,
+        blocked_points: Optional[Set["Point"]] = None,
     ) -> Tuple[bool, bool]:
         """
         Calculates visibility based strictly on corner-to-corner math.
         Returns (isVisible, hasCover).
         """
-        if blocked_points:
-            blocked_points = blocked_points.copy()
-            blocked_points.update(self.walls)
-        else:
-            blocked_points = self.walls.copy()
-
         if start_pos == target_pos:
             if visualize_file:
                 with open(visualize_file, "w") as f:
@@ -369,81 +363,95 @@ class Grid:
                     )
             return True, False
 
-        # 1. Corner Selection based on proximity
-        corner_x = 1.0 if target_pos.x >= start_pos.x else 0.0
-        corner_y = 1.0 if target_pos.y >= start_pos.y else 0.0
+        sx, sy = start_pos.x, start_pos.y
+        tx, ty = target_pos.x, target_pos.y
+        dx = tx - sx
+        dy = ty - sy
 
-        # Mathematical float coordinates of the chosen corners
-        x0, y0 = float(start_pos.x + corner_x), float(start_pos.y + corner_y)
-        x1, y1 = float(target_pos.x + corner_x), float(target_pos.y + corner_y)
+        # Avoid O(N) set copying overhead; use a fast lookup helper instead
+        walls = self.walls
 
-        # 2. Geometry Check: Does the segment intersect any wall interior?
+        def is_blocked(p: Tuple[int, int]) -> bool:
+            return (p in walls) or (blocked_points is not None and p in blocked_points)
+
         visible = True
 
-        # Handle the simple diagonal cases first (common rule: squeezing points is blocked)
-        dx = target_pos.x - start_pos.x
-        dy = target_pos.y - start_pos.y
+        # 1. Handle simple horizontal/vertical/diagonal cases
         if dx == 0:
             step = 1 if dy > 0 else -1
-            for y in range(start_pos.y + step, target_pos.y, step):
-                if (start_pos.x, y) in blocked_points:
+            for y in range(sy + step, ty, step):
+                if is_blocked((sx, y)):
                     visible = False
                     break
         elif dy == 0:
             step = 1 if dx > 0 else -1
-            for x in range(start_pos.x + step, target_pos.x, step):
-                if (x, start_pos.y) in blocked_points:
+            for x in range(sx + step, tx, step):
+                if is_blocked((x, sy)):
                     visible = False
                     break
         elif abs(dx) == abs(dy):
-            gap_w1 = (start_pos.x + (1 if dx > 0 else -1), start_pos.y)
-            gap_w2 = (start_pos.x, start_pos.y + (1 if dy > 0 else -1))
-            if gap_w1 in blocked_points and gap_w2 in blocked_points:
+            gap_w1 = (sx + (1 if dx > 0 else -1), sy)
+            gap_w2 = (sx, sy + (1 if dy > 0 else -1))
+            if is_blocked(gap_w1) and is_blocked(gap_w2):
                 visible = False
 
-        # Perform ray tracing (DDA-style) if not already blocked
-        if visible:
-            distance = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+        # 2. Perform ray tracing (DDA-style) if not already blocked
+        if visible and dx != 0 and dy != 0:
+            corner_x = 1.0 if dx >= 0 else 0.0
+            corner_y = 1.0 if dy >= 0 else 0.0
+
+            x0, y0 = float(sx + corner_x), float(sy + corner_y)
+            x1, y1 = float(tx + corner_x), float(ty + corner_y)
+
+            # Use multiplication instead of exponentiation (** 2 is slower in Python)
+            distance = math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
+
             if distance > 0:
-                steps = distance * 2
-                for i in range(1, int(steps)):
-                    t = i / steps
-                    curr_x = x0 + t * (x1 - x0)
-                    curr_y = y0 + t * (y1 - y0)
+                steps = int(distance * 2)
+                if steps > 1:
+                    # Pre-calculate step sizes instead of computing `t` every iteration
+                    step_x = (x1 - x0) / steps
+                    step_y = (y1 - y0) / steps
 
-                    grid_x, grid_y = math.floor(curr_x), math.floor(curr_y)
-                    local_x, local_y = curr_x % 1.0, curr_y % 1.0
+                    curr_x, curr_y = x0, y0
+                    start_tup, target_tup = (sx, sy), (tx, ty)
 
-                    if Point(grid_x, grid_y) in blocked_points:
-                        if (grid_x, grid_y) == (start_pos.x, start_pos.y) or (
-                            grid_x,
-                            grid_y,
-                        ) == (target_pos.x, target_pos.y):
-                            continue
+                    EPSILON = 0.000001
+                    UPPER_BOUND = 1.0 - EPSILON
 
-                        EPSILON = 0.000001
-                        if (EPSILON < local_x < (1.0 - EPSILON)) and (
-                            EPSILON < local_y < (1.0 - EPSILON)
-                        ):
-                            visible = False
-                            break
+                    for _ in range(1, steps):
+                        curr_x += step_x
+                        curr_y += step_y
+                        grid_x = int(curr_x // 1)
+                        grid_y = int(curr_y // 1)
+                        grid_tup = (grid_x, grid_y)
+
+                        if grid_tup != start_tup and grid_tup != target_tup:
+                            if is_blocked(grid_tup):
+                                local_x = curr_x % 1.0
+                                local_y = curr_y % 1.0
+
+                                if (EPSILON < local_x < UPPER_BOUND) and (
+                                    EPSILON < local_y < UPPER_BOUND
+                                ):
+                                    visible = False
+                                    break
 
         # 3. Covered Check (Must be visible)
         has_cover = False
         if visible:
-            neighbors = [
-                (target_pos.x - 1, target_pos.y),
-                (target_pos.x + 1, target_pos.y),
-                (target_pos.x, target_pos.y - 1),
-                (target_pos.x, target_pos.y + 1),
-            ]
-            target_dist = (target_pos.x - start_pos.x) ** 2 + (
-                target_pos.y - start_pos.y
-            ) ** 2
+            target_dist_sq = dx * dx + dy * dy
+            neighbors = (
+                (tx - 1, ty),
+                (tx + 1, ty),
+                (tx, ty - 1),
+                (tx, ty + 1),
+            )
+
             for nx, ny in neighbors:
-                if (nx, ny) in self.walls:
-                    wall_dist = (nx - start_pos.x) ** 2 + (ny - start_pos.y) ** 2
-                    if wall_dist < target_dist:
+                if (nx, ny) in walls:
+                    wall_dist_sq = (nx - sx) * (nx - sx) + (ny - sy) * (ny - sy)
+                    if wall_dist_sq < target_dist_sq:
                         has_cover = True
                         break
 
