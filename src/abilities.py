@@ -1,3 +1,4 @@
+import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
@@ -110,6 +111,34 @@ class Ability:
     is_undefendable: bool = False
     defense: int = 0
     crit_chance: int = 0
+
+    def __deepcopy__(self, memo):
+        # Even though this is a dataclass, a custom __deepcopy__ is much faster.
+        if id(self) in memo:
+            return memo[id(self)]
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        result.name = self.name
+        result.aiming = copy.deepcopy(self.aiming, memo)
+        result.text = self.text
+        result.instructions = copy.deepcopy(self.instructions, memo)
+        result.owner = copy.deepcopy(self.owner, memo)
+        result.is_default = self.is_default
+        result.action_cost = self.action_cost
+        result.modifiers = copy.deepcopy(self.modifiers, memo)
+        result.taps = self.taps
+        result.is_tapped = self.is_tapped
+        result.tapped_this_turn = self.tapped_this_turn
+        result.max_charges = self.max_charges
+        result.charges = self.charges
+        result.is_ultimate = self.is_ultimate
+        result.ultimate_turn = self.ultimate_turn
+        result.is_undefendable = self.is_undefendable
+        result.defense = self.defense
+        result.crit_chance = self.crit_chance
+        return result
 
     def __post_init__(self):
         self.charges = self.max_charges
@@ -414,13 +443,14 @@ class UseAnAbilityInstruction(Instruction):
         possible_aimings = chosen_ability.aiming.get_all_aimings(
             engine=ctx.engine, actor=subject, require_los=True
         )
-        aiming = possible_aimings[0]
+        if possible_aimings:
+            aiming = possible_aimings[0]
 
-        chosen_ability.execute(
-            engine=ctx.engine,
-            source=subject,
-            aiming_result=aiming,
-        )
+            chosen_ability.execute(
+                engine=ctx.engine,
+                source=subject,
+                aiming_result=aiming,
+            )
 
 
 @dataclass

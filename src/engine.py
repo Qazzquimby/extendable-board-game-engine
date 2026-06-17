@@ -371,6 +371,46 @@ class Engine:
     def copy(self) -> "Engine":
         return copy.deepcopy(self)
 
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+
+        # --- Set up new engine instance
+        # Shared/immutable objects
+        result.setup = self.setup
+        result.agents = self.agents
+        result.grid = self.grid
+        if result.grid:
+            result.grid.engine = result
+        result.router = Router()
+
+        # Copy simple state
+        result.initial_seed = self.initial_seed
+        result.action_history = list(self.action_history)
+        result.rng = copy.deepcopy(self.rng, memo)  # rng has its own state
+        result.round_num = self.round_num
+        result.num_hero_rows = self.num_hero_rows
+        result.current_team = self.current_team
+        result.current_hero_row_index = self.current_hero_row_index
+        result.activation_index = self.activation_index
+        result._next_id = self._next_id
+        result._entity_by_pos = {}
+        result._markers_by_pos = {}
+
+        # --- Deep copy object graph. This is order-dependent.
+        # This will call __deepcopy__ on each entity and modifier, populating the memo.
+        result.entities = copy.deepcopy(self.entities, memo)
+        result.markers = copy.deepcopy(self.markers, memo)
+
+        # Now that all entities are in memo, we can copy lists that reference them.
+        result.team_heroes = copy.deepcopy(self.team_heroes, memo)
+        result.current_turn_hero = copy.deepcopy(self.current_turn_hero, memo)
+        result.active_entity = copy.deepcopy(self.active_entity, memo)
+        result.activation_queue = copy.deepcopy(self.activation_queue, memo)
+
+        return result
+
     def get_current_player(self) -> int:
         return self.current_team
 

@@ -528,47 +528,11 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
-        history_to_replay = list(env.action_history)
-
-        # Precompute actions to replay to avoid expensive get_legal_actions() calls
-        actions_to_replay = []
         log.enabled = False
         try:
-            # Get actions to replay
-            replay_env = env.setup.create_engine(
-                agents=env.agents, seed=env.initial_seed
-            )
-            replay_env.rng.stochastic_flag = False
-            for action_idx in history_to_replay:
-                if action_idx == -1:
-                    replay_env.next_turn()
-                    actions_to_replay.append(None)
-                elif action_idx >= 0:
-                    legal = replay_env.get_legal_actions()
-                    action = legal[action_idx]
-                    replay_env.step(action, action_idx=action_idx)
-                    actions_to_replay.append(action)
-                else:
-                    assert False
-                if replay_env.rng.stochastic_flag:
-                    raise RuntimeError(
-                        "Stochastic event during deterministic MCTS replay."
-                    )
-            if replay_env.hash() != env.hash():  # replay round 1, env round 2
-                raise RuntimeError("MCTS replay has desynced from original environment")
-
-            # sims
             for _ in range(self.num_simulations):
-                sim_env = env.setup.create_engine(
-                    agents=env.agents, seed=env.initial_seed
-                )
+                sim_env = env.copy()
                 sim_env.rng.stochastic_flag = False
-
-                for action_idx, action in zip(history_to_replay, actions_to_replay):
-                    if action_idx == -1:
-                        sim_env.next_turn()
-                    elif action_idx >= 0:
-                        sim_env.step(action, action_idx=action_idx)
 
                 result = self.selection.select(
                     root_node, sim_env, self.cache, self.num_simulations, None
