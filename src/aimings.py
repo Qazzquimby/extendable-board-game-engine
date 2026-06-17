@@ -78,11 +78,18 @@ class Aiming(abc.ABC):
 class MultipleAiming(Aiming):
     """Requires multiple aimings. The dict keys are just identifiers for the aimings, and can be used in instructions to refer to specific targets."""
 
-    def __init__(self, aimings: Union[List[Aiming], Dict[str, Aiming]]):
+    def __init__(
+        self,
+        aimings: Union[List[Aiming], Dict[str, Aiming]],
+        exclusions: Optional[Dict[str, str]] = None,
+    ):
+        # Exclusions is {"aiming": "has this aiming subtracted"}
+        # For example 'all others than target in burst 1' -> {"burst": "target"}
         super().__init__()
         if isinstance(aimings, list):
             aimings = {f"{i}": t for i, t in enumerate(aimings)}
         self.aimings = aimings
+        self.exclusions = exclusions or {}
 
     def get_all_aimings(
         self,
@@ -111,9 +118,42 @@ class MultipleAiming(Aiming):
         for combination in itertools.product(*aiming_lists):
             sub_aimings_dict = dict(zip(aiming_names, combination))
 
+            # Apply exclusions - need to copy because AimingResult objects can be shared across combinations
+            sub_aimings_dict = {
+                name: AimingResult(
+                    target_points=list(result.target_points),
+                    included_points=list(result.included_points),
+                    sub_aimings=result.sub_aimings,
+                )
+                for name, result in sub_aimings_dict.items()
+            }
+
+            for to_filter_name, from_filter_name in self.exclusions.items():
+                if (
+                    to_filter_name in sub_aimings_dict
+                    and from_filter_name in sub_aimings_dict
+                ):
+                    to_filter_result = sub_aimings_dict[to_filter_name]
+                    from_filter_result = sub_aimings_dict[from_filter_name]
+
+                    points_to_exclude = set(from_filter_result.target_points) | set(
+                        from_filter_result.included_points
+                    )
+
+                    to_filter_result.target_points = [
+                        p
+                        for p in to_filter_result.target_points
+                        if p not in points_to_exclude
+                    ]
+                    to_filter_result.included_points = [
+                        p
+                        for p in to_filter_result.included_points
+                        if p not in points_to_exclude
+                    ]
+
             combined_target_points = []
             combined_included_points = []
-            for sub_aiming_result in combination:
+            for sub_aiming_result in sub_aimings_dict.values():
                 combined_target_points.extend(sub_aiming_result.target_points)
                 combined_included_points.extend(sub_aiming_result.included_points)
 
@@ -254,5 +294,5 @@ class IncludeArea(Aiming):
                 if not self.condition or self.condition(engine, actor, point):
                     filtered_points.append(point)
             if filtered_points:
-                res.append(AimingResult(included_points=list(area_points)))
+                res.append(AimingResult(included_points=filtered_points))
         return res

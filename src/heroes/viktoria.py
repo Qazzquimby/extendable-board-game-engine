@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from aimings import TargetEntity, MultipleAiming, IncludeArea
+from aimings import TargetEntity, MultipleAiming, IncludeArea, is_enemy_aim_condition
 from areas import Burst
 from engine import (
     Engine,
@@ -131,14 +131,18 @@ class Viktoria(Hero):
                 text="Range 1, 2dmg +2Crit. Other enemies in burst 1, 1dmg",
                 aiming=MultipleAiming(
                     {
-                        "target": TargetEntity(in_range=1),
-                        "burst": IncludeArea(area=Burst(radius=1)),
-                    }
-                ),  # todo, how to do "all in burst except target, and all enemies
+                        "target": TargetEntity(
+                            in_range=1, condition=is_enemy_aim_condition
+                        ),
+                        "burst": IncludeArea(
+                            area=Burst(radius=1), condition=is_enemy_aim_condition
+                        ),
+                    },
+                    exclusions={"burst": "target"},
+                ),
                 instructions=[
                     DamageInstruction(aiming_name="target", amount=2),
                     DamageInstruction(aiming_name="burst", amount=1),
-                    # todo check no crit or miss on aoe. Included, not target.
                 ],
                 crit_chance=2,
                 is_default=True,
