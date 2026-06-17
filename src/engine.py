@@ -322,22 +322,31 @@ class Engine:
 
     def next_turn(self) -> None:
         self.action_history.append(-1)  # end turn
-        will_be_first_turn = self.current_turn_hero is None
 
-        if not will_be_first_turn:
+        if self.current_turn_hero is not None:
             TurnEndEvent(self.current_turn_hero).resolve()
-            self._advance_hero_indices()
 
-        for i in range(99):
+        while not self.is_done:
+            self._advance_hero_indices()
             new_current_activator = self._get_current_activator()
             if new_current_activator is None:
-                self._advance_hero_indices()
-            else:
-                self.current_turn_hero = new_current_activator
-                TurnStartEvent(self.current_turn_hero).resolve()
-                self.setup_activation_queue()
-                self.advance_to_next_activator()
-                return
+                continue
+
+            self.current_turn_hero = new_current_activator
+            TurnStartEvent(self.current_turn_hero).resolve()
+
+            self.setup_activation_queue()
+            self.advance_to_next_activator()
+
+            if self.active_entity is not None:
+                return  # We found an active entity.
+
+            # This hero's turn has no one to act (e.g. they and their summons are dead),
+            # so end the turn and find the next.
+            TurnEndEvent(self.current_turn_hero).resolve()
+
+        # Game is done.
+        self.active_entity = None
 
     def _get_current_activator(self) -> Optional["Entity"]:
         try:
