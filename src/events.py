@@ -265,7 +265,7 @@ class AddTokenEvent(Event):
         self,
         subject: "Entity",
         token_class: Type["Token"],
-        amount: int,
+        amount: int = 1,
     ):
         super().__init__(engine=subject.engine, subject=subject)
         self.token_class = token_class

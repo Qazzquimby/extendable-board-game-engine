@@ -281,15 +281,17 @@ class Grid:
             if not (0 <= next_pos.x < self.width and 0 <= next_pos.y < self.height):
                 break  # Out of bounds
 
-            if (
-                self.is_movement_blocked(current, next_pos)
-                or next_pos in occupied_points
-            ):
-                break  # Movement blocked
+            if self.is_movement_blocked(current, next_pos):
+                break  # Movement blocked by wall
 
             path.append(next_pos)
             current = next_pos
 
+        while path:
+            if path[-1] in occupied_points:
+                path = path[:-1]
+            else:
+                break
         return path
 
     def get_pull_path(
@@ -299,6 +301,11 @@ class Grid:
         Finds a path of valid positions towards a pull point.
         The path does not include the start point.
         """
+        enemy_points = {
+            e.pos
+            for e in self.engine.entities
+            if e.team != subject.team and e.hp > 0 and e.pos is not None
+        }
         occupied_points = {
             e.pos
             for e in self.engine.entities
@@ -319,7 +326,7 @@ class Grid:
                 if 0 <= nx < self.width and 0 <= ny < self.height:
                     if (
                         not self.is_movement_blocked(current, n)
-                        and n not in occupied_points
+                        and n not in enemy_points
                     ):
                         neighbors.append(n)
 
@@ -337,6 +344,11 @@ class Grid:
             else:
                 break  # Can't get closer
 
+        while path:
+            if path[-1] in occupied_points:
+                path = path[:-1]
+            else:
+                break
         return path
 
     def get_line_of_sight(
