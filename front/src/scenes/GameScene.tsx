@@ -15,17 +15,17 @@ export class GameScene extends Phaser.Scene {
         this.overlaysGroup = new Phaser.GameObjects.Group(this);
     }
 
-    public updateEngineState(state: EngineState, action?: ActionState, messages?: string[]) {
+    public updateEngineState(state: EngineState, action?: ActionState) {
         if (this.entitiesGroup && this.overlaysGroup) {
-            this.drawState(state, action, messages);
+            this.drawState(state, action);
         } else {
             this.events.once(Phaser.Scenes.Events.CREATE, () => {
-                this.drawState(state, action, messages);
+                this.drawState(state, action);
             });
         }
     }
 
-    private drawState(state: EngineState, action?: ActionState, messages?: string[]) {
+    private drawState(state: EngineState, action?: ActionState) {
         this.entitiesGroup.clear(true, true);
         this.overlaysGroup.clear(true, true);
 
@@ -69,17 +69,7 @@ export class GameScene extends Phaser.Scene {
             1.0
         );
 
-        const turnOrder = state.entities
-            .filter(e => e.hp > 0)
-            .map(e => {
-                const teamName = e.team === 1 ? 'Red' : 'Blue';
-                const fullName = `${teamName} ${e.name} ${e.id}`;
-                return e.id === state.active_entity ? `> ${fullName} <` : fullName;
-            })
-            .join(' | ');
-
-        const messagesText = messages && messages.length > 0 ? `\nMessages:\n${messages.join('\n')}` : '';
-        const infoText = this.add.text(10, 10, `Round: ${state.round_num} | Current Team: ${state.current_team === 1 ? 'Red' : 'Blue'}\nTurn Order: ${turnOrder}${messagesText}`, {
+        const infoText = this.add.text(10, 10, `Round: ${state.round_num} | Current Team: ${state.current_team === 1 ? 'Red' : 'Blue'}`, {
             fontSize: '16px',
             color: '#000000',
             backgroundColor: '#ffffff',
