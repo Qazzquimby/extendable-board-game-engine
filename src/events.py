@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from modifiers import Modifier, Token
     from entities import Entity, Summon
     from point import Point
+    from grid import Direction
 
 
 class Event(abc.ABC):
@@ -117,32 +118,27 @@ class ChangeLocationEvent(Event):
         self.subject.pos = self.new_pos
 
 
-# class PushEvent(Event):
-#     def __init__(
-#         self,
-#
-#         subject: "Entity",
-#         distance: int,
-#         source: Optional["Entity"] = None,
-#     ):
-#         super().__init__(subject=subject)
-#         self.distance = ModInt(distance)
-#         self.source = source
-#
-#     def _resolve(self) -> None:
-#         # Pushing is calculated based on pathing away from the source
-#         if (
-#             getattr(self.subject, "pos", None) is not None
-#             and self.source
-#             and getattr(self.source, "pos", None) is not None
-#         ):
-#             dist = max(0, self.distance.value)
-#             if dist > 0:
-#                 path = self.subject.engine.grid.get_push_path(  # todo
-#                     start=self.subject.pos, target=None, push_from=self.source.pos
-#                 )
-#                 if path and len(path) >= dist:
-#                     self.subject.pos = path[dist - 1]
+class PushEvent(Event):
+    def __init__(self, subject: "Entity", distance: int, direction: "Direction"):
+        super().__init__(engine=subject.engine, subject=subject)
+        self.distance = ModInt(distance)
+        self.direction = direction
+
+    def _resolve(self) -> None:
+        if not getattr(self.subject, "pos", None):
+            return
+
+        dist = max(0, self.distance.value)
+        if dist > 0:
+            path = self.subject.engine.grid.get_push_path(
+                start=self.subject.pos,
+                direction=self.direction,
+                distance=dist,
+            )
+            if path:
+                log(f"Pushing {self.subject.name} to {path[-1]}")
+                for point in path:
+                    ChangeLocationEvent(self.subject, point).resolve()
 
 
 class PullEvent(Event):
@@ -159,12 +155,12 @@ class PullEvent(Event):
             path = self.subject.engine.grid.get_pull_path(
                 start=self.subject.pos,
                 pull_to=self.toward_point,
+                distance=dist,
             )
-            path = path[: self.distance]
-            log(f"Pulling {self.subject.name} to {path[-1]}")
-            for point in path:
-                ChangeLocationEvent(self.subject, point).resolve()
-        # todo test should pull as far as possible even if full path is impossible.
+            if path:
+                log(f"Pulling {self.subject.name} to {path[-1]}")
+                for point in path:
+                    ChangeLocationEvent(self.subject, point).resolve()
 
 
 class DeployEvent(Event):

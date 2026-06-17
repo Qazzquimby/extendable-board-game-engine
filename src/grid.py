@@ -1,9 +1,17 @@
 import math
 from typing import Tuple, Set, List, Optional, Callable
 from collections import deque
+from enum import Enum
 from point import Point
 
 Edge = Tuple[Point, Point]
+
+
+class Direction(Enum):
+    NORTH = Point(0, -1)
+    SOUTH = Point(0, 1)
+    EAST = Point(1, 0)
+    WEST = Point(-1, 0)
 
 
 class Grid:
@@ -179,26 +187,66 @@ class Grid:
                 f.write(self.visualize(start=start, target=target, path=None))
         return None
 
-    def get_push_path(self, start: Point, push_from: Point) -> Optional[List[Point]]:
-        """Finds a path where every step moves further away from the push_from point."""
+    def get_push_path(
+        self, start: Point, direction: Direction, distance: int
+    ) -> List[Point]:
+        """
+        Finds a path of valid positions for a push in a specific direction.
+        The path does not include the start point.
+        """
+        path = []
+        current = start
+        for _ in range(distance):
+            next_pos = current + direction.value
 
-        def is_away(curr: Point, nxt: Point) -> bool:
-            return self.get_range(nxt, push_from) > self.get_range(curr, push_from)
+            if not (0 <= next_pos.x < self.width and 0 <= next_pos.y < self.height):
+                break  # Out of bounds
 
-        return self.get_path(start, target, valid_step=is_away)
-        # todo, pushing needs direction, not target
+            if self.is_movement_blocked(current, next_pos):
+                break  # Movement blocked
+
+            path.append(next_pos)
+            current = next_pos
+
+        return path
 
     def get_pull_path(
-        self,
-        start: Point,
-        pull_to: Point,
-    ) -> Optional[List[Point]]:
-        """Finds a path where every step moves closer to the pull_to point."""
+        self, start: Point, pull_to: Point, distance: int
+    ) -> List[Point]:
+        """
+        Finds a path of valid positions towards a pull point.
+        The path does not include the start point.
+        """
+        path = []
+        current = start
+        for _ in range(distance):
+            if current == pull_to:
+                break
 
-        def is_toward(curr: Point, nxt: Point) -> bool:
-            return self.get_range(nxt, pull_to) < self.get_range(curr, pull_to)
+            neighbors = []
+            x, y = current
+            # Check orthogonal neighbors
+            for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
+                n = Point(nx, ny)
+                if 0 <= nx < self.width and 0 <= ny < self.height:
+                    if not self.is_movement_blocked(current, n):
+                        neighbors.append(n)
 
-        return self.get_path(start, pull_to, valid_step=is_toward)
+            if not neighbors:
+                break
+
+            # Move to neighbor closest to pull_to
+            neighbors.sort(key=lambda p: self.get_range(p, pull_to))
+            next_pos = neighbors[0]
+
+            # Only move if it's actually closer
+            if self.get_range(next_pos, pull_to) < self.get_range(current, pull_to):
+                path.append(next_pos)
+                current = next_pos
+            else:
+                break  # Can't get closer
+
+        return path
 
     def get_line_of_sight(
         self,
