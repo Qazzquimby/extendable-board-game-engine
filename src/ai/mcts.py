@@ -270,17 +270,22 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
 
             edge = current_node.edges[best_action_index]
             sim_env.step(best_action, action_idx=best_action_index)
+            if isinstance(best_action, PlausibleMoveAndAction):
+                sim_env.advance_to_next_activator()
+                # todo, does this imply no free action after normal action? Should be either I think.
 
             if not sim_env.rng.stochastic_flag and edge.child_node_key is not None:
                 next_key = edge.child_node_key
-                sim_env.next_turn()
-                while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                if sim_env.active_entity is None:
+                    sim_env.next_turn()
+                while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
                     if sim_env.is_done:
                         break
                     sim_env.next_turn()
             else:
-                sim_env.next_turn()
-                while sim_env.current_hero and sim_env.current_hero.hp <= 0:
+                if sim_env.active_entity is None:  # todo deduplicate
+                    sim_env.next_turn()
+                while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
                     if sim_env.is_done:
                         break
                     sim_env.next_turn()
@@ -302,7 +307,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
 
             path.add(
                 node=next_node, action_leading_to_node=best_action_index
-            )  # FIX TYPE
+            )  # TODO FIX TYPE
             current_node = next_node
 
         # Reached a terminal state
@@ -442,9 +447,12 @@ class RandomRolloutEvaluation(EvaluationStrategy):
             action = legal_actions[action_idx]
 
             env.step(action, action_idx=action_idx)
-            if type(action).__name__ == "PlausibleMoveAndAction":
+            if isinstance(action, PlausibleMoveAndAction):
+                env.advance_to_next_activator()
+
+            if env.active_entity is None:
                 env.next_turn()
-                while env.current_hero and env.current_hero.hp <= 0:
+                while env.current_turn_hero and env.current_turn_hero.hp <= 0:
                     if env.is_done:
                         break
                     env.next_turn()
