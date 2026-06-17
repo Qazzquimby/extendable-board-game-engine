@@ -1,8 +1,13 @@
 import math
-from typing import Tuple, Set, List, Optional, Callable
+from typing import Tuple, Set, List, Optional, Callable, TYPE_CHECKING
 from collections import deque
 from enum import Enum
 from point import Point
+
+if TYPE_CHECKING:
+    from engine import Engine
+    from entities import Entity
+
 
 Edge = Tuple[Point, Point]
 
@@ -20,6 +25,7 @@ class Grid:
         self.height = height
         self.walls: Set[Point] = set()
         self.edge_walls: Set[Edge] = set()
+        self.engine: Optional["Engine"] = None
 
     def add_wall(self, p: Point) -> None:
         self.walls.add(p)
@@ -97,14 +103,24 @@ class Grid:
 
     def get_movable_spaces(
         self,
-        start: Point,
+        actor: "Entity",
         max_movement: int,
-        enemy_points: Set[Point],
-        ally_points: Set[Point],
     ) -> Set[Point]:
-        """Finds all points reachable within max_movement using orthogonal steps, respecting walls and enemy spaces. Cannot end on ally spaces."""
+        """Finds all points reachable within max_movement using orthogonal steps. Path is blocked by enemies. Cannot end on any occupied space."""
+        start = actor.pos
         if max_movement < 0:
             return set()
+
+        enemy_points = {
+            e.pos
+            for e in self.engine.entities
+            if e.team != actor.team and e.hp > 0 and e.pos is not None
+        }
+        occupied_points = {
+            e.pos
+            for e in self.engine.entities
+            if e.hp > 0 and e.pos is not None and e is not actor
+        }
 
         visited = {start: 0}
         queue = deque([(start, 0)])
@@ -119,14 +135,15 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if not self.is_movement_blocked(curr, n, enemy_points):
+                    if not self.is_movement_blocked(
+                        curr, n
+                    ) and n not in enemy_points:
                         if n not in visited or visited[n] > cost + 1:
                             visited[n] = cost + 1
                             queue.append((n, cost + 1))
 
-        reachable_points = {
-            p for p in visited.keys() if p not in ally_points and p not in enemy_points
-        }
+        # Cannot end on occupied spaces
+        reachable_points = {p for p in visited.keys() if p not in occupied_points}
         reachable_points.add(start)  # Can always stay where we are
         return reachable_points
 
@@ -134,12 +151,9 @@ class Grid:
         self,
         current: Point,
         next_pos: Point,
-        blocked_points: Optional[Set[Point]] = None,
     ) -> bool:
-        """Checks if movement between two adjacent spaces is blocked."""
+        """Checks if movement between two adjacent spaces is blocked by walls."""
         if next_pos in self.walls:
-            return True
-        if blocked_points and next_pos in blocked_points:
             return True
         edge = tuple(sorted([current, next_pos]))
         if edge in self.edge_walls:
@@ -150,6 +164,7 @@ class Grid:
         self,
         start: Point,
         target: Point,
+        actor: "Entity",
         visualize_file: Optional[str] = None,
         valid_step: Optional[Callable[[Point, Point], bool]] = None,
     ) -> Optional[List[Point]]:
@@ -159,6 +174,12 @@ class Grid:
                 with open(visualize_file, "w") as f:
                     f.write(self.visualize(start=start, target=target, path=[start]))
             return [start]
+
+        enemy_points = {
+            e.pos
+            for e in self.engine.entities
+            if e.team != actor.team and e.hp > 0 and e.pos is not None
+        }
 
         queue: deque[List[Point]] = deque([[start]])
         visited: Set[Point] = {start}
@@ -177,7 +198,11 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if n not in visited and not self.is_movement_blocked(curr, n):
+                    if (
+                        n not in visited
+                        and not self.is_movement_blocked(curr, n)
+                        and n not in enemy_points
+                    ):
                         if valid_step is None or valid_step(curr, n):
                             visited.add(n)
                             queue.append(path + [n])
@@ -188,21 +213,27 @@ class Grid:
         return None
 
     def get_push_path(
-        self, start: Point, direction: Direction, distance: int
+        self, subject: "Entity", direction: Direction, distance: int
     ) -> List[Point]:
         """
         Finds a path of valid positions for a push in a specific direction.
         The path does not include the start point.
         """
+        occupied_points = {
+            e.pos
+            for e in self.engine.entities
+            if e.hp > 0 and e.pos is not None and e is not subject
+        }
+
         path = []
-        current = start
+        current = subject.pos
         for _ in range(distance):
             next_pos = current + direction.value
 
             if not (0 <= next_pos.x < self.width and 0 <= next_pos.y < self.height):
                 break  # Out of bounds
 
-            if self.is_movement_blocked(current, next_pos):
+            if self.is_movement_blocked(current, next_pos) or next_pos in occupied_points:
                 break  # Movement blocked
 
             path.append(next_pos)
@@ -211,14 +242,20 @@ class Grid:
         return path
 
     def get_pull_path(
-        self, start: Point, pull_to: Point, distance: int
+        self, subject: "Entity", pull_to: Point, distance: int
     ) -> List[Point]:
         """
         Finds a path of valid positions towards a pull point.
         The path does not include the start point.
         """
+        occupied_points = {
+            e.pos
+            for e in self.engine.entities
+            if e.hp > 0 and e.pos is not None and e is not subject
+        }
+
         path = []
-        current = start
+        current = subject.pos
         for _ in range(distance):
             if current == pull_to:
                 break
@@ -229,7 +266,7 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if not self.is_movement_blocked(current, n):
+                    if not self.is_movement_blocked(current, n) and n not in occupied_points:
                         neighbors.append(n)
 
             if not neighbors:

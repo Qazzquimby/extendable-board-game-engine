@@ -548,6 +548,8 @@ class MCTSAgent(Agent):
                     action = legal[action_idx]
                     replay_env.step(action, action_idx=action_idx)
                     actions_to_replay.append(action)
+                else:
+                    assert False
 
             # sims
             for _ in range(self.num_simulations):

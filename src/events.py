@@ -131,7 +131,7 @@ class PushEvent(Event):
         dist = max(0, self.distance.value)
         if dist > 0:
             path = self.subject.engine.grid.get_push_path(
-                start=self.subject.pos,
+                subject=self.subject,
                 direction=self.direction,
                 distance=dist,
             )
@@ -153,7 +153,7 @@ class PullEvent(Event):
         dist = max(0, self.distance.value)
         if dist > 0:
             path = self.subject.engine.grid.get_pull_path(
-                start=self.subject.pos,
+                subject=self.subject,
                 pull_to=self.toward_point,
                 distance=dist,
             )

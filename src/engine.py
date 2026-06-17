@@ -103,6 +103,8 @@ class Engine:
         self.current_hero_row_index = 0
 
         self.grid: Grid = grid
+        if self.grid:
+            self.grid.engine = self
         self.current_turn_hero: Optional["Entity"] = None
         self.active_entity: Optional["Entity"] = None
         self.activation_queue: List["Entity"] = []

@@ -117,10 +117,12 @@ class Ability:
     @property
     def valence(self):
         has_good = any(
-            instruction.valence == Valence.GOOD for instruction in self.instructions
+            instruction.valence in (Valence.GOOD, Valence.MIXED)
+            for instruction in self.instructions
         )
         has_bad = any(
-            instruction.valence == Valence.BAD for instruction in self.instructions
+            instruction.valence in (Valence.BAD, Valence.MIXED)
+            for instruction in self.instructions
         )
         if has_good and has_bad:
             return Valence.MIXED

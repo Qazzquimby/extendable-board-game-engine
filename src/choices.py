@@ -41,13 +41,7 @@ class PlausibleMoveAndAction(Choice):
         self.ability = ability
         self.movement_name = movement_name
         self.aiming_result = aiming_result
-
-        features = {}  # (
-        #     self._compute_features(actor, engine, feature_evaluator)
-        #     if engine and actor and aiming_result
-        #     else {}
-        # )
-        super().__init__(features=features)
+        super().__init__(features={})
 
     def _compute_features(
         self,
@@ -96,18 +90,14 @@ def get_plausible_move_and_actions(
 def get_plausible_movements(
     actor: "Entity",
     engine: "Engine",
-):
+) -> Dict[Point, str]:
     enemies = [e for e in engine.entities if e.team != actor.team and e.hp > 0]
     allies = [
         e for e in engine.entities if e.team == actor.team and e != actor and e.hp > 0
     ]
-    enemy_points = {e.pos for e in enemies if e.pos is not None}
-    ally_points = {e.pos for e in allies if e.pos is not None}
     reachable_points = engine.grid.get_movable_spaces(
-        start=actor.pos,
+        actor=actor,
         max_movement=QuerySpeed(actor).resolve().value,
-        enemy_points=enemy_points,
-        ally_points=ally_points,
     )
     reachable_points.add(actor.pos)
 
@@ -379,7 +369,7 @@ def get_plausible_uses_of_ability_after_movement(
     if move_pos == actor.pos:
         move_path = []
     else:
-        move_path = engine.grid.get_path(start=actor.pos, target=move_pos)
+        move_path = engine.grid.get_path(start=actor.pos, target=move_pos, actor=actor)
 
     return _get_plausible_uses_of_ability_at_pos(
         actor=actor,
