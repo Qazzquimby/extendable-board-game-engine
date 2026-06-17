@@ -150,7 +150,7 @@ class Entity:
             subject=self, attack_source=attack_source, ability=ability, result=0
         )
         self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result.value
+        return int(q.result)
 
     def get_crit(self, subject: "Entity", ability: Optional["Ability"] = None) -> int:
         q = QueryCrit(
@@ -160,7 +160,7 @@ class Entity:
             result=ability.crit_chance,
         )
         self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result.value
+        return int(q.result)
 
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])

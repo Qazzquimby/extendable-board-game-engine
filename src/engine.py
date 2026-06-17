@@ -184,10 +184,10 @@ class Engine:
         self.next_turn()
 
         while not self.is_done:
-            if self.active_entity is None:
-                self.next_turn()
-                if self.is_done or self.active_entity is None:
-                    break
+            if self.is_done:
+                break
+            while self.active_entity is None:
+                self.next_turn()  # todo unsure. Fragile.
 
             entity = self.active_entity
             pbar.update()
@@ -231,12 +231,8 @@ class Engine:
             # Check win condition
             is_done = self.is_done
             if is_done:
-                team_0_living_members = [
-                    e for e in self.living_entities if e.team == 0
-                ]
-                team_1_living_members = [
-                    e for e in self.living_entities if e.team == 1
-                ]
+                team_0_living_members = [e for e in self.living_entities if e.team == 0]
+                team_1_living_members = [e for e in self.living_entities if e.team == 1]
                 if len(team_0_living_members) > len(team_1_living_members):
                     winner_team = 0
                 elif len(team_1_living_members) > len(team_0_living_members):
@@ -259,7 +255,6 @@ class Engine:
             )
             logs.append(log_entry)
             reset_logs()
-            before_state = after_state
 
             if is_done:
                 break

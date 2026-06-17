@@ -18,17 +18,30 @@ class ModInt:
         self._caps: List[Union[int, Callable[[int], int]]] = []
         self.is_irreducible: bool = False
 
-    def add(self, val: Union[int, Callable[[], int]]) -> None:
+    def __int__(self):
+        return self.value
+
+    def __add__(self, other):
+        return self.add(int(other))
+
+    def __mul__(self, other):
+        return self.mult(int(other))
+
+    def add(self, val: Union[int, Callable[[], int]]) -> "ModInt":
         self._adds.append(val)
+        return self
 
-    def mult(self, val: Union[float, Callable[[], float]]) -> None:
+    def mult(self, val: Union[float, Callable[[], float]]) -> "ModInt":
         self._mults.append(val)
+        return self
 
-    def add_resistance(self, val: Union[bool, Callable[[], bool]] = True) -> None:
+    def add_resistance(self, val: Union[bool, Callable[[], bool]] = True) -> "ModInt":
         self._resistances.append(val)
+        return self
 
-    def cap(self, val: Union[int, Callable[[int], int]]) -> None:
+    def cap(self, val: Union[int, Callable[[int], int]]) -> "ModInt":
         self._caps.append(val)
+        return self
 
     @property
     def value(self) -> int:
