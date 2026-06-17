@@ -53,6 +53,9 @@ class Entity:
         self.engine.add_entity(self)
         self.pos = pos  # runs setter
 
+    def __str__(self):
+        return self.name
+
     def __deepcopy__(self, memo):
         if id(self) in memo:
             return memo[id(self)]
