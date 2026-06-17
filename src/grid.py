@@ -135,9 +135,7 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if not self.is_movement_blocked(
-                        curr, n
-                    ) and n not in enemy_points:
+                    if not self.is_movement_blocked(curr, n) and n not in enemy_points:
                         if n not in visited or visited[n] > cost + 1:
                             visited[n] = cost + 1
                             queue.append((n, cost + 1))
@@ -155,9 +153,10 @@ class Grid:
         """Checks if movement between two adjacent spaces is blocked by walls."""
         if next_pos in self.walls:
             return True
-        edge = tuple(sorted([current, next_pos]))
-        if edge in self.edge_walls:
-            return True
+        if self.edge_walls:
+            edge = tuple(sorted([current, next_pos]))
+            if edge in self.edge_walls:
+                return True
         return False
 
     def get_path(
@@ -165,14 +164,10 @@ class Grid:
         start: Point,
         target: Point,
         actor: "Entity",
-        visualize_file: Optional[str] = None,
         valid_step: Optional[Callable[[Point, Point], bool]] = None,
     ) -> Optional[List[Point]]:
         """Finds the shortest path using BFS, respecting walls and edge walls."""
         if start == target:
-            if visualize_file:
-                with open(visualize_file, "w") as f:
-                    f.write(self.visualize(start=start, target=target, path=[start]))
             return [start]
 
         enemy_points = {
@@ -189,9 +184,6 @@ class Grid:
             curr = path[-1]
 
             if curr == target:
-                if visualize_file:
-                    with open(visualize_file, "w") as f:
-                        f.write(self.visualize(start=start, target=target, path=path))
                 return path
 
             x, y = curr
@@ -206,10 +198,6 @@ class Grid:
                         if valid_step is None or valid_step(curr, n):
                             visited.add(n)
                             queue.append(path + [n])
-
-        if visualize_file:
-            with open(visualize_file, "w") as f:
-                f.write(self.visualize(start=start, target=target, path=None))
         return None
 
     def get_push_path(
@@ -233,7 +221,10 @@ class Grid:
             if not (0 <= next_pos.x < self.width and 0 <= next_pos.y < self.height):
                 break  # Out of bounds
 
-            if self.is_movement_blocked(current, next_pos) or next_pos in occupied_points:
+            if (
+                self.is_movement_blocked(current, next_pos)
+                or next_pos in occupied_points
+            ):
                 break  # Movement blocked
 
             path.append(next_pos)
@@ -266,7 +257,10 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if not self.is_movement_blocked(current, n) and n not in occupied_points:
+                    if (
+                        not self.is_movement_blocked(current, n)
+                        and n not in occupied_points
+                    ):
                         neighbors.append(n)
 
             if not neighbors:
