@@ -41,6 +41,7 @@ class Entity:
 
         self._pos: Optional[Point] = None
         self.team = team
+        self.activator: Optional["Entity"] = None
 
         self.modifiers: List["Modifier"] = []
         self.abilities: List["Ability"] = []
@@ -195,6 +196,7 @@ class Hero(Entity):
         super().__init__(
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
         )
+        self.activator = self
         self.abilities.append(
             Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
         )
@@ -215,6 +217,7 @@ class Summon(Entity):
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
         )
         self.summoner = summoner
+        self.activator = summoner.activator
         SummonEvent(summoner=self.summoner, subject=self).resolve()
 
 

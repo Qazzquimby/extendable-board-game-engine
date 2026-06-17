@@ -180,7 +180,7 @@ class TurnStartEvent(Event):
         super().__init__(engine=subject.engine, subject=subject)
 
     def _resolve(self) -> None:
-        self.subject.engine.current_hero.start_turn()
+        self.subject.engine.current_turn_hero.start_turn()
 
 
 class TurnEndEvent(Event):

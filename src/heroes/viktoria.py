@@ -38,12 +38,13 @@ class OnFirstTurnSpawnOtherViktoria(Modifier):
                 ]
                 if open_spaces:
                     target_space = open_spaces[0]
-                    Viktoria(
+                    v = Viktoria(
                         engine=event.engine,
                         pos=target_space,
                         team=event.subject.team,
                         is_original=False,
                     )
+                    v.activator = event.subject.activator
                     log(f"New Viktoria spawned at {target_space}")
 
 

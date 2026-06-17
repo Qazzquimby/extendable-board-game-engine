@@ -103,7 +103,8 @@ class Engine:
         self.current_hero_row_index = 0
 
         self.grid: Grid = grid
-        self.current_hero: Optional["Entity"] = None
+        self.current_turn_hero: Optional["Entity"] = None
+        self.active_entity: Optional["Entity"] = None
         self._next_id: int = 1
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
@@ -117,19 +118,19 @@ class Engine:
         return len(alive_teams) <= 1
 
     def get_legal_actions(self) -> List[Choice]:
-        if self.is_done or not self.current_hero or self.current_hero.hp <= 0:
+        entity = self.active_entity
+        if self.is_done or not entity or entity.hp <= 0:
             return []
-        agent = self.agents.get(self.current_hero.team)
+        agent = self.agents.get(entity.team)
         feature_evaluator = getattr(agent, "feature_evaluator", None) if agent else None
-        moves = get_plausible_move_and_actions(
-            self.current_hero, self, feature_evaluator
-        )
-        frees = get_plausible_free_actions(self.current_hero, self, feature_evaluator)
+        moves = get_plausible_move_and_actions(entity, self, feature_evaluator)
+        frees = get_plausible_free_actions(entity, self, feature_evaluator)
         return moves + frees
 
     def finalize_setup(self):
         self.team_heroes = [
-            [e for e in self.entities if e.team == team] for team in range(NUM_TEAMS)
+            [e for e in self.entities if e.team == team and e.activator == e]
+            for team in range(NUM_TEAMS)
         ]
         self.num_hero_rows = max([len(team) for team in self.team_heroes])
         for entity in self.entities:
@@ -181,76 +182,99 @@ class Engine:
         while self.round_num <= NUM_ROUNDS:
             pbar.update()
             self.next_turn()
+
+            if self.current_turn_hero is None:
+                break
+
+            self.active_entity = self.current_turn_hero
             if after_state:
                 before_state = after_state
             else:
                 before_state = self.to_model()
 
-            if self.current_hero.hp <= 0:
+            if self.current_turn_hero.hp <= 0:
                 continue  # skip this turn, they're dead.
 
-            # agent = self.agents[self.current_hero.team]
-            # feature_evaluator = getattr(agent, "feature_evaluator", None)
-            chosen_action: PlausibleMoveAndAction = None
-            turn_over = False
-            while not turn_over:
-                all_choices = self.get_legal_actions()
-                if not all_choices:
-                    turn_over = True  # eg stunned
+            entities_to_activate = [self.current_turn_hero] + [
+                e
+                for e in self.entities
+                if e.activator == self.current_turn_hero and e != self.current_turn_hero
+            ]
+
+            for entity in entities_to_activate:
+                self.active_entity = entity
+                if entity.hp <= 0:
                     continue
 
-                action_index = self.get_choice_index(
-                    team=self.current_hero.team, choices=all_choices
+                chosen_action: PlausibleMoveAndAction = None
+                turn_over = False
+                while not turn_over:
+                    all_choices = self.get_legal_actions()
+                    if not all_choices:
+                        turn_over = True  # eg stunned
+                        continue
+
+                    action_index = self.get_choice_index(
+                        team=entity.team, choices=all_choices
+                    )
+                    action_choice = all_choices[action_index]
+
+                    if isinstance(action_choice, PlausibleMoveAndAction):
+                        self.step(
+                            actor=entity,
+                            action=action_choice,
+                            action_idx=action_index,
+                        )
+                        chosen_action = action_choice
+                        turn_over = True
+                    elif isinstance(action_choice, PlausibleFreeAction):
+                        self.step(
+                            actor=entity,
+                            action=action_choice,
+                            action_idx=action_index,
+                        )
+
+                if not chosen_action:
+                    continue
+
+                # Check win condition
+                is_done = self.is_done
+                if is_done:
+                    team_0_living_members = [
+                        e for e in self.living_entities if e.team == 0
+                    ]
+                    team_1_living_members = [
+                        e for e in self.living_entities if e.team == 1
+                    ]
+                    if len(team_0_living_members) > len(team_1_living_members):
+                        winner_team = 0
+                    elif len(team_1_living_members) > len(team_0_living_members):
+                        winner_team = 1
+
+                action_state = ActionState(
+                    actor=entity.id,
+                    target=chosen_action.target.id if chosen_action.target else None,
+                    ability=chosen_action.ability.name,
+                    move_path=chosen_action.move_path,
+                    movement_name=chosen_action.movement_name,
                 )
-                action_choice = all_choices[action_index]
+                after_state = self.to_model()
+                log_entry = LogEntry(
+                    before_state=before_state,
+                    action=action_state,
+                    after_state=after_state,
+                    done=is_done,
+                    messages=get_logs(),
+                )
+                logs.append(log_entry)
+                reset_logs()
+                before_state = after_state
 
-                if isinstance(action_choice, PlausibleMoveAndAction):
-                    self.step(
-                        actor=self.current_hero,
-                        action=action_choice,
-                        action_idx=action_index,
-                    )
-                    chosen_action = action_choice
-                    turn_over = True
-                elif isinstance(action_choice, PlausibleFreeAction):
-                    self.step(
-                        actor=self.current_hero,
-                        action=action_choice,
-                        action_idx=action_index,
-                    )
+                if is_done:
+                    break
+            self.active_entity = None
 
-            if not chosen_action:
-                continue
-
-            # Check win condition
-            is_done = self.is_done
-            if is_done:
-                team_0_living_members = [e for e in self.living_entities if e.team == 0]
-                team_1_living_members = [e for e in self.living_entities if e.team == 1]
-                if len(team_0_living_members) > len(team_1_living_members):
-                    winner_team = 0
-                elif len(team_1_living_members) > len(team_0_living_members):
-                    winner_team = 1
-
-            action_state = ActionState(
-                actor=self.current_hero.id,
-                target=chosen_action.target.id if chosen_action.target else None,
-                ability=chosen_action.ability.name,
-                move_path=chosen_action.move_path,
-                movement_name=chosen_action.movement_name,
-            )
-            after_state = self.to_model()
-            log_entry = LogEntry(
-                before_state=before_state,
-                action=action_state,
-                after_state=after_state,
-                done=is_done,
-                messages=get_logs(),
-            )
-            logs.append(log_entry)
-            reset_logs()
-
-            if is_done:
+            if self.is_done:
                 break
 
         pbar.close()
@@ -265,7 +289,7 @@ class Engine:
         self.action_history.append(action_idx)
 
         if actor is None:
-            actor = self.current_hero
+            actor = self.current_turn_hero
 
         target_str = f" on {action.target.name}" if action.target else ""
 
@@ -295,22 +319,22 @@ class Engine:
 
     def next_turn(self) -> None:
         self.action_history.append(-1)  # end turn
-        will_be_first_turn = self.current_hero is None
+        will_be_first_turn = self.current_turn_hero is None
 
         if not will_be_first_turn:
-            TurnEndEvent(self.current_hero).resolve()
+            TurnEndEvent(self.current_turn_hero).resolve()
             self._advance_hero_indices()
 
         for i in range(99):
-            new_current_hero = self._get_current_hero()
-            if new_current_hero is None:
+            new_current_activator = self._get_current_activator()
+            if new_current_activator is None:
                 self._advance_hero_indices()
             else:
-                self.current_hero = new_current_hero
-                TurnStartEvent(self.current_hero).resolve()
+                self.current_turn_hero = new_current_activator
+                TurnStartEvent(self.current_turn_hero).resolve()
                 return
 
-    def _get_current_hero(self) -> Optional["Entity"]:
+    def _get_current_activator(self) -> Optional["Entity"]:
         try:
             return self.team_heroes[self.current_team][self.current_hero_row_index]
         except IndexError:
@@ -324,7 +348,7 @@ class Engine:
         return EngineState(
             round_num=self.round_num,
             current_team=self.current_team,
-            active_entity=self.current_hero.id if self.current_hero else None,
+            active_entity=self.active_entity.id if self.active_entity else None,
             entities=[e.to_model() for e in self.entities],
         )
 
@@ -377,7 +401,7 @@ class Engine:
                 self.round_num,
                 self.current_hero_row_index,
                 self.current_team,
-                self.current_hero.id if self.current_hero else None,
+                self.current_turn_hero.id if self.current_turn_hero else None,
                 frozenset(entity_states),
                 marker_states,
             )

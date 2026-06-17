@@ -403,9 +403,8 @@ class UniformExpansion(ExpansionStrategy):
     def expand(self, node: MCTSNode, env_at_node: Engine) -> None:
         if node.is_expanded or env_at_node.is_done:
             return
-
+        # todo, pretty sure this will have to be reworked to allow for mid-turn choices
         legal_actions = env_at_node.get_legal_actions()
-        assert legal_actions
         assert not node.edges
         node.actions = legal_actions
         for action_index, action in enumerate(legal_actions):
