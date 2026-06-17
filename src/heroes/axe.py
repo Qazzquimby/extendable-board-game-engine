@@ -35,7 +35,8 @@ class DamageOverTimeToken(Token):
 
     @before(TurnEndEvent)
     def take_damage(self, event: TurnEndEvent) -> None:
-        DamageEvent(source=None, subject=self.owner, amount=self.amount).resolve()
+        with self.log_trigger(event):
+            DamageEvent(source=None, subject=self.owner, amount=self.amount).resolve()
 
 
 class BattleHungerToken(Token):
@@ -44,8 +45,9 @@ class BattleHungerToken(Token):
     @after(DeathEvent)
     def on_kill_clear_this_and_DoT(self, event: DeathEvent) -> None:
         if event.killer == self.owner and isinstance(event.subject, Hero):
-            self.owner.remove_token(BattleHungerToken)
-            self.owner.remove_token(DamageOverTimeToken, amount=99)
+            with self.log_trigger(event):
+                self.owner.remove_token(BattleHungerToken)
+                self.owner.remove_token(DamageOverTimeToken, amount=99)
 
 
 @dataclass

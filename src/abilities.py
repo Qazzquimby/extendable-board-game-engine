@@ -12,6 +12,7 @@ from ai.feature_definitions import (
     NEW_LOCATION,
     Feature,
 )
+from logger import log
 from valence import Valence
 from modifiers import Modifier, Token
 
@@ -222,8 +223,15 @@ class Ability:
                     roll = engine.rng.randint(1, 6)  # todo rolling should be an event
                     if roll > defense:
                         hit_target_points.add(target_point)
-                    if roll >= 7 - crit_chance:
-                        crit_target_points.add(target_point)
+                        if roll >= 7 - crit_chance:
+                            crit_target_points.add(target_point)
+                            log(
+                                f"Crit {target} with a roll of {roll} on crit chance {crit_chance}"
+                            )
+                    else:
+                        log(
+                            f"Missed {target} with a roll of {roll} less than defense {defense}"
+                        )
                 else:
                     # No roll means auto hits
                     hit_target_points.add(target_point)
