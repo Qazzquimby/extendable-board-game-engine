@@ -1,4 +1,6 @@
 import math
+from heapq import heappush, heappop
+from itertools import count
 from typing import Tuple, Set, List, Optional, Callable, TYPE_CHECKING
 from collections import deque
 from enum import Enum
@@ -17,6 +19,14 @@ class Direction(Enum):
     SOUTH = Point(0, 1)
     EAST = Point(1, 0)
     WEST = Point(-1, 0)
+
+
+_NEIGHBORS = (
+    (1, 0),
+    (-1, 0),
+    (0, 1),
+    (0, -1),
+)
 
 
 class Grid:
@@ -164,9 +174,8 @@ class Grid:
         start: Point,
         target: Point,
         actor: "Entity",
-        valid_step: Optional[Callable[[Point, Point], bool]] = None,
+        valid_step=None,
     ) -> Optional[List[Point]]:
-        """Finds the shortest path using BFS, respecting walls and edge walls."""
         if start == target:
             return [start]
 
@@ -176,28 +185,79 @@ class Grid:
             if e.team != actor.team and e.hp > 0 and e.pos is not None
         }
 
-        queue: deque[List[Point]] = deque([[start]])
-        visited: Set[Point] = {start}
+        width = self.width
+        height = self.height
+        is_blocked = self.is_movement_blocked
 
-        while queue:
-            path = queue.popleft()
-            curr = path[-1]
+        tx = target.x
+        ty = target.y
+
+        def heuristic(x: int, y: int) -> int:
+            return abs(x - tx) + abs(y - ty)
+
+        open_heap = []
+        tie_breaker = count()
+
+        g_score = {start: 0}
+        parent = {start: None}
+
+        heappush(
+            open_heap,
+            (
+                heuristic(start.x, start.y),
+                next(tie_breaker),
+                start,
+            ),
+        )
+
+        closed = set()
+
+        while open_heap:
+            _, _, curr = heappop(open_heap)
+
+            if curr in closed:
+                continue
 
             if curr == target:
+                path = []
+                while curr is not None:
+                    path.append(curr)
+                    curr = parent[curr]
+                path.reverse()
                 return path
 
-            x, y = curr
-            for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
+            closed.add(curr)
+
+            x = curr.x
+            y = curr.y
+            curr_g = g_score[curr]
+
+            for dx, dy in _NEIGHBORS:
+                nx = x + dx
+                ny = y + dy
+
+                if nx < 0 or nx >= width or ny < 0 or ny >= height:
+                    continue
                 n = Point(nx, ny)
-                if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if (
-                        n not in visited
-                        and not self.is_movement_blocked(curr, n)
-                        and n not in enemy_points
-                    ):
-                        if valid_step is None or valid_step(curr, n):
-                            visited.add(n)
-                            queue.append(path + [n])
+                if n in closed or n in enemy_points or is_blocked(curr, n):
+                    continue
+                if valid_step is not None and not valid_step(curr, n):
+                    continue
+
+                tentative_g = curr_g + 1
+
+                if tentative_g < g_score.get(n, float("inf")):
+                    g_score[n] = tentative_g
+                    parent[n] = curr
+                    heappush(
+                        open_heap,
+                        (
+                            tentative_g + heuristic(nx, ny),
+                            next(tie_breaker),
+                            n,
+                        ),
+                    )
+
         return None
 
     def get_push_path(
