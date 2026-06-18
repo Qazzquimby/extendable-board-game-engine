@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
 class ActionCost(Enum):
     FREE = "free"
+    INSTANT = "instant"
     STANDARD = "standard"
     MOVE = "move"
     MOVE_AND_STANDARD = "move_and_standard"
@@ -108,6 +109,7 @@ class Ability:
     owner: Optional["Entity"] = None
     is_default: bool = False
     action_cost: ActionCost = ActionCost.STANDARD
+    instant_speed: int = 0
 
     modifiers: List["Modifier"] = field(default_factory=list)
 
@@ -137,6 +139,7 @@ class Ability:
         result.owner = copy.deepcopy(self.owner, memo)
         result.is_default = self.is_default
         result.action_cost = self.action_cost
+        result.instant_speed = self.instant_speed
         result.modifiers = copy.deepcopy(self.modifiers, memo)
         result.taps = self.taps
         result.is_tapped = self.is_tapped

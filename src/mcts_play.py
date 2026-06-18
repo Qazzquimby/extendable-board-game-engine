@@ -1,9 +1,4 @@
 import json
-from pathlib import Path
-
-from tqdm import tqdm
-
-from ai.feature_agent import get_example_feature_agent
 from ai.mcts import MCTSAgent
 from game_setup import GameSetup
 from heroes import MeleeHero, RangedHero

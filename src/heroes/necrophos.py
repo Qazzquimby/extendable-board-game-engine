@@ -1,10 +1,8 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from aimings import (
     TargetEntity,
     TargetSelf,
-    MultipleAiming,
     IncludeArea,
     is_enemy_aim_condition,
 )
@@ -13,7 +11,7 @@ from engine import (
     Engine,
     Hero,
 )
-from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor, SlowToken
+from modifiers import Modifier, Token
 from events import (
     TurnEndEvent,
     DamageEvent,
@@ -24,19 +22,17 @@ from events import (
     HealEvent,
     AddTokenEvent,
     query,
+    ChangeLocationEvent,
 )
 from abilities import (
     Ability,
-    DamageInstruction,
-    AddTokenInstruction,
-    RefreshAbilityInstruction,
     ActionCost,
     Instruction,
     ActionContext,
     UseAnAbilityInstruction,
     AddModifierInstruction,
 )
-from mod_value import div, ModInt
+from mod_value import ModInt
 from point import Point
 from queries import QueryLegalAimings
 from valence import Valence
@@ -99,7 +95,7 @@ class NecroGetKillCounter(Modifier):
 
 
 @dataclass(kw_only=True)
-class NecroGhostShroud(Token):
+class NecroGhostShroud(Modifier):
     text = """\
     Until the end of your next turn:
      You cannot be affected by default abilities.
@@ -145,6 +141,18 @@ class DeathPulse(Instruction):
                 DamageEvent(source=ctx.source, subject=entity, amount=1)
 
 
+@dataclass
+class NecroTeleportAdjacentInstruction(Instruction):
+    valence = Valence.MIXED
+
+    def execute(self, ctx: ActionContext) -> None:
+        points_adjacent = ctx.engine.grid.get_points_in_range(
+            start=ctx.target.pos, max_range=1
+        )
+        if points_adjacent:
+            ChangeLocationEvent(subject=ctx.source)
+
+
 class Necrophos(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -167,7 +175,7 @@ class Necrophos(Hero):
 
         self.abilities.append(
             Ability(
-                name="Ghost Shroad",
+                name="Ghost Shroud",
                 text="""\
         1/Game, Instant +3
 Until the end of your next turn:
@@ -177,30 +185,28 @@ Until the end of your next turn:
                 aiming=TargetSelf(),
                 instructions=[
                     AddModifierInstruction(
-                        aiming_name="self_target", modifier_class=GhostShroudToken
+                        aiming_name="self_target", modifier_class=NecroGhostShroud
                     ),
                 ],
                 owner=self,
-                action_cost=ActionCost.FREE,
+                action_cost=ActionCost.INSTANT,
+                instant_speed=3,
+                max_charges=1,
             )
         )
 
         self.abilities.append(
             Ability(
-                name="Battle Hunger",
+                name="Death Seeker",
                 text="""\
-                1/Game:
-        Range 3, give the 2 DoT and a Battle Hunger token:
-          When they kill a unit, they lose the token and clear all DoT.
+               1/Game
+Teleport to a space adjacent to an enemy in range 3.
+Use a default ability.
                 """,
-                aiming=TargetEntity(in_range=3),
+                aiming=TargetEntity(in_range=3, condition=is_enemy_aim_condition),
                 instructions=[
-                    AddTokenInstruction(token_class=SlowToken),
-                    AddTokenInstruction(
-                        token_class=DamageOverTimeToken,
-                        amount=2,
-                    ),
-                    AddTokenInstruction(token_class=BattleHungerToken),
+                    NecroTeleportAdjacentInstruction(),
+                    UseAnAbilityInstruction(default_only=True),
                 ],
                 max_charges=1,
                 owner=self,
