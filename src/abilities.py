@@ -113,8 +113,8 @@ class Instruction:
 @dataclass
 class RollResult:
     roll: Optional[int]
-    hit_points: Set[Point]
-    crit_points: Set[Point]
+    hit_points: Set["Point"]
+    crit_points: Set["Point"]
 
 
 @dataclass
@@ -211,9 +211,20 @@ class Ability:
             self.is_tapped = True
             self.tapped_this_turn = True
 
-        engine.resolve_ability_with_reactions(
-            ability=self, source=source, aiming_result=aiming_result
-        )
+        if self.action_cost in (ActionCost.FREE, ActionCost.INSTANT):
+            roll_result = self.get_roll_result(
+                aiming_result=aiming_result, engine=engine, source=source
+            )
+            self.execute_instructions(
+                engine=engine,
+                source=source,
+                aiming_result=aiming_result,
+                roll_result=roll_result,
+            )
+        else:
+            engine.resolve_ability_with_reactions(
+                ability=self, source=source, aiming_result=aiming_result
+            )
 
     def execute_instructions(
         self,

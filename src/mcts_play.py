@@ -3,13 +3,14 @@ from ai.mcts import MCTSAgent
 from game_setup import GameSetup
 from heroes import MeleeHero, RangedHero
 from heroes.axe import Axe
+from heroes.necrophos import Necrophos
 from heroes.viktoria import Viktoria
 
 if __name__ == "__main__":
     agent = MCTSAgent()
 
     game_setup = GameSetup(
-        team0_classes=[Axe, RangedHero],
+        team0_classes=[Axe, Necrophos],
         team1_classes=[MeleeHero, Viktoria],
         grid_size=5,
     )

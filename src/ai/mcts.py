@@ -17,7 +17,7 @@ from logger import log
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
-NUM_SIMS = 10_000
+NUM_SIMS = 10  # _000
 
 
 @dataclass

@@ -377,9 +377,10 @@ class Engine:
         roll_result = ability.get_roll_result(
             aiming_result=aiming_result, engine=self, source=source
         )
-        self.handle_reactions(
+        while self.handle_reactions(
             triggering_ability=ability, roll_result=roll_result, phase="before"
-        )
+        ):
+            pass
 
         ability.execute_instructions(
             engine=self,
@@ -388,81 +389,75 @@ class Engine:
             roll_result=roll_result,
         )
 
-        self.handle_reactions(
+        while self.handle_reactions(
             triggering_ability=ability, roll_result=roll_result, phase="after"
-        )
+        ):
+            pass
 
-    def handle_reactions(self, triggering_ability, roll_result: "RollResult", phase):
+    def handle_reactions(
+        self, triggering_ability, roll_result: "RollResult", phase
+    ) -> bool:
+        """
+        Checks all entities for a single reaction and executes it if chosen.
+        Returns True if a reaction occurred, False otherwise.
+        """
         # todo consider just using event system to watch for ability use.
 
-        # This is complex because reactions can trigger other reactions.
-        # We loop until a full pass over all entities results in no reactions.
-        keep_checking_for_reactions = True
-        while keep_checking_for_reactions:
-            keep_checking_for_reactions = False
+        # Check entities in a deterministic order.
+        for entity in self.entities:
+            if entity.hp <= 0:
+                continue
 
-            # Check entities in a deterministic order.
-            for entity in self.entities:
-                if entity.hp <= 0:
-                    continue
+            entity_reactions = []
+            for ability in entity.abilities:
+                if ability.action_cost == ActionCost.INSTANT and ability.is_available():
+                    is_after = False
+                    if ability.instant_speed > 0:
+                        if (
+                            roll_result.roll is not None
+                            and roll_result.roll > ability.instant_speed
+                        ):
+                            is_after = True
+                    reaction_phase = "after" if is_after else "before"
 
-                entity_reactions = []
-                for ability in entity.abilities:
-                    if (
-                        ability.action_cost == ActionCost.INSTANT
-                        and ability.is_available()
-                    ):
-                        is_after = False
-                        if ability.instant_speed > 0:
-                            if (
-                                roll_result.roll is not None
-                                and roll_result.roll > ability.instant_speed
-                            ):
-                                is_after = True
-                        reaction_phase = "after" if is_after else "before"
-
-                        if reaction_phase == phase:
-                            agent = self.agents.get(entity.team)
-                            feature_evaluator = (
-                                getattr(agent, "feature_evaluator", None)
-                                if agent
-                                else None
-                            )
-                            plausible_uses = _get_plausible_uses_of_ability_at_pos(
-                                actor=entity,
-                                engine=self,
-                                pos=entity.pos,
-                                ability=ability,
-                                feature_evaluator=feature_evaluator,
-                                choice_class=PlausibleFreeAction,
-                            )
-                            entity_reactions.extend(plausible_uses.values())
-
-                if entity_reactions:
-                    # Agent can choose to not react
-                    pass_choice = Choice(features={"pass_reaction": 1})
-                    choices = entity_reactions + [pass_choice]
-
-                    choice_idx = self.get_choice_index(
-                        team=entity.team, choices=choices
-                    )
-                    chosen_action = choices[choice_idx]
-
-                    if chosen_action is pass_choice:
-                        continue  # This entity passes, check next entity.
-
-                    # An action was chosen. Execute it. This will recurse into
-                    # resolve_ability_with_reactions, allowing for chained reactions.
-                    with log(f"Reaction from {entity.name}:"):
-                        chosen_action.ability.execute(
-                            engine=self,
-                            source=entity,
-                            aiming_result=chosen_action.aiming_result,
+                    if reaction_phase == phase:
+                        agent = self.agents.get(entity.team)
+                        feature_evaluator = (
+                            getattr(agent, "feature_evaluator", None) if agent else None
                         )
+                        plausible_uses = _get_plausible_uses_of_ability_at_pos(
+                            actor=entity,
+                            engine=self,
+                            pos=entity.pos,
+                            ability=ability,
+                            feature_evaluator=feature_evaluator,
+                            choice_class=PlausibleFreeAction,
+                        )
+                        entity_reactions.extend(plausible_uses.values())
 
-                    # An action happened, so we need to re-evaluate reactions for everyone.
-                    keep_checking_for_reactions = True
-                    break  # break from entity loop and restart from the beginning
+            if entity_reactions:
+                # Agent can choose to not react
+                pass_choice = Choice(features={"pass_reaction": 1})
+                choices = entity_reactions + [pass_choice]
+
+                choice_idx = self.get_choice_index(team=entity.team, choices=choices)
+                chosen_action = choices[choice_idx]
+
+                if chosen_action is pass_choice:
+                    continue  # This entity passes, check next entity.
+
+                # An action was chosen. Execute it. This will recurse into
+                # resolve_ability_with_reactions, allowing for chained reactions.
+                with log(f"Reaction from {entity.name}:"):
+                    chosen_action.ability.execute(
+                        engine=self,
+                        source=entity,
+                        aiming_result=chosen_action.aiming_result,
+                    )
+
+                # An action happened, so we need to re-evaluate reactions for everyone.
+                return True
+        return False
 
     def copy(self) -> "Engine":
         return copy.deepcopy(self)
