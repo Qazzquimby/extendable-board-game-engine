@@ -36,7 +36,7 @@ from abilities import (
 )
 from mod_value import ModInt
 from point import Point
-from queries import QueryLegalAimings
+from queries import QueryLegalAimings, QueryAvoidInclusion
 from valence import Valence
 
 
@@ -108,10 +108,15 @@ class NecroGhostShroud(Modifier):
     @query(QueryLegalAimings)
     def cannot_target_with_default(self, q: "QueryLegalAimings"):
         if q.ability.is_default:
-            q.result = False
+            legal_aimings = [
+                aiming
+                for aiming in q.result
+                if self.owner.pos not in aiming.target_points
+            ]
+            q.result = legal_aimings
 
-    @query(QueryLegalAimings)
-    def avoid_inclusion_in_default(self, q: "QueryLegalAimings"):
+    @query(QueryAvoidInclusion)
+    def avoid_inclusion_in_default(self, q: "QueryAvoidInclusion"):
         if q.ability.is_default:
             q.result = True
 
@@ -192,9 +197,7 @@ Until the end of your next turn:
   You receive +1 damage..""",
                 aiming=TargetSelf(),
                 instructions=[
-                    AddModifierInstruction(
-                        aiming_name="self_target", modifier_class=NecroGhostShroud
-                    ),
+                    AddModifierInstruction(modifier_class=NecroGhostShroud),
                 ],
                 owner=self,
                 action_cost=ActionCost.INSTANT,

@@ -41,7 +41,7 @@ class QueryHasArmor(Query[bool]):
         super().__init__(subject=subject, base_result=False)
 
 
-class QueryLegalAimings(Query["AimingResult"]):
+class QueryLegalAimings(Query[List["AimingResult"]]):
     def __init__(
         self,
         subject: "Entity",
@@ -108,7 +108,7 @@ class GetTokenCountQuery(Query[int]):
         self.token_class = token_class
 
         base_result = 0
-        for modifier in self.subject.modifiers:
+        for modifier in subject.modifiers:
             if isinstance(modifier, self.token_class):
                 modifier: "Token"
                 base_result = modifier.amount
