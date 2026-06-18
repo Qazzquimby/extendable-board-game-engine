@@ -298,10 +298,14 @@ class AddTokenEvent(Event):
         subject: "Entity",
         token_class: Type["Token"],
         amount: int = 1,
+        token_kwargs: Optional[dict] = None,
     ):
         super().__init__(engine=subject.engine, subject=subject)
         self.token_class = token_class
         self.amount = amount
+        if not token_kwargs:
+            token_kwargs = {}
+        self.token_kwargs = token_kwargs
 
     def _resolve(self):
         log(f"{self.subject.name} gained {self.amount} {self.token_class.__name__}.")
@@ -309,7 +313,7 @@ class AddTokenEvent(Event):
             if isinstance(modifier, self.token_class):
                 modifier.add(self.amount)
                 return
-        new_token = self.token_class(self.amount)
+        new_token = self.token_class(self.amount, **self.token_kwargs)
         self.subject.add_modifier(new_token)
 
 

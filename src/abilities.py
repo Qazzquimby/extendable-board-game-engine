@@ -433,6 +433,7 @@ class RemoveModifierInstruction(Instruction):
 class AddTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
+    token_kwargs: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.valence = self.token_class.valence
@@ -445,6 +446,7 @@ class AddTokenInstruction(Instruction):
                 subject=subject,
                 token_class=self.token_class,
                 amount=amount,
+                token_kwargs=self.token_kwargs,
             ).resolve()
 
 

@@ -11,7 +11,8 @@ from engine import (
     Engine,
     Hero,
 )
-from modifiers import Modifier, Token
+from entities import Entity
+from modifiers import Modifier, Token, ImmobileToken
 from events import (
     TurnEndEvent,
     DamageEvent,
@@ -31,6 +32,7 @@ from abilities import (
     ActionContext,
     UseAnAbilityInstruction,
     AddModifierInstruction,
+    AddTokenInstruction,
 )
 from mod_value import ModInt
 from point import Point
@@ -147,6 +149,18 @@ class NecroTeleportAdjacentInstruction(Instruction):
             ChangeLocationEvent(subject=ctx.source)
 
 
+@dataclass(kw_only=True)
+class ReapersScythe(Token):
+    source: "Entity"
+    text = """\
+    At the start of their next turn, the caster deals irreducible damage to you equal to your missing health. On kill, they gain 2 additional Kill counters."""
+    valence = Valence.BAD
+
+    @after(TurnStartEvent)
+    def trigger(self, q: "TurnStartEvent"):
+        pass
+
+
 class Necrophos(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -206,4 +220,24 @@ Use a default ability.
                 owner=self,
             )
         )
-        # todo the rest
+
+        self.abilities.append(
+            Ability(
+                name="Reaper's Scythe",
+                text="""\
+                1/Game
+Range 3, immobilize.
+At the start of your next turn, deal irreducible damage the target equal to their missing health.
+On kill, gain 2 additional Kill counters.
+                """,
+                aiming=TargetEntity(in_range=3),
+                instructions=[
+                    AddTokenInstruction(
+                        token_class=ImmobileToken,
+                    ),
+                    AddTokenInstruction(
+                        token_class=ReapersScythe, token_kwargs={"source": self}
+                    ),
+                ],
+            )
+        )
