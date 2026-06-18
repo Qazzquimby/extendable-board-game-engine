@@ -19,7 +19,7 @@ from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
 from abilities import (
     Ability,
     DamageInstruction,
-    GiveTokenInstruction,
+    AddTokenInstruction,
     RefreshAbilityInstruction,
     ActionCost,
     Instruction,

@@ -47,6 +47,16 @@ class QueryLegalAimings(Query["AimingResult"]):
         self.ability = ability
 
 
+class QueryAvoidInclusion(Query[bool]):
+    def __init__(
+        self,
+        subject: "Entity",
+        ability: "Ability",
+    ):
+        super().__init__(subject=subject, base_result=False)
+        self.ability = ability
+
+
 class QueryLegalActions(Query[List["Ability"]]):
     def __init__(self, subject: "Entity", base_result: List["Ability"]):
         super().__init__(subject=subject, base_result=base_result)

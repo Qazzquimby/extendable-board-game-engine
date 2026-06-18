@@ -18,7 +18,7 @@ from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
 from abilities import (
     Ability,
     DamageInstruction,
-    GiveTokenInstruction,
+    AddTokenInstruction,
     RefreshAbilityInstruction,
     ActionCost,
     Instruction,
@@ -154,13 +154,13 @@ class Axe(Hero):
                     }
                 ),
                 instructions=[
-                    GiveTokenInstruction(
+                    AddTokenInstruction(
                         aiming_name="self_target", token_class=ArmorToken
                     ),
                     UseAnAbilityInstruction(
                         aiming_name="nearby_enemies", default_only=True
                     ),
-                    GiveTokenInstruction(
+                    AddTokenInstruction(
                         aiming_name="nearby_enemies", token_class=StunnedToken
                     ),
                 ],
@@ -179,12 +179,12 @@ class Axe(Hero):
                 """,
                 aiming=TargetEntity(in_range=3),
                 instructions=[
-                    GiveTokenInstruction(token_class=SlowToken),
-                    GiveTokenInstruction(
+                    AddTokenInstruction(token_class=SlowToken),
+                    AddTokenInstruction(
                         token_class=DamageOverTimeToken,
                         amount=2,
                     ),
-                    GiveTokenInstruction(token_class=BattleHungerToken),
+                    AddTokenInstruction(token_class=BattleHungerToken),
                 ],
                 max_charges=1,
                 owner=self,

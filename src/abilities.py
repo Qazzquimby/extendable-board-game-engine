@@ -4,7 +4,16 @@ from enum import Enum
 from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from events import PullEvent, DamageEvent, HealEvent, AddTokenEvent, ChangeLocationEvent
+from events import (
+    PullEvent,
+    DamageEvent,
+    HealEvent,
+    AddTokenEvent,
+    ChangeLocationEvent,
+    AddModifierEvent,
+    RemoveTokenEvent,
+    RemoveModifierEvent,
+)
 from ai.feature_definitions import (
     DAMAGE_DEALT,
     FORCED_USE_ABILITY,
@@ -14,6 +23,7 @@ from ai.feature_definitions import (
     Feature,
 )
 from logger import log
+from queries import QueryAvoidInclusion
 from valence import Valence
 from modifiers import Modifier, Token
 
@@ -210,6 +220,12 @@ class Ability:
                 instruction.execute(ctx)
 
             for included_point in instruction_aiming_result.included_points:
+                is_avoided = QueryAvoidInclusion(
+                    subject=engine.entity_at(included_point),
+                    ability=self,
+                ).resolve()
+                if is_avoided:
+                    continue
                 ctx = ActionContext(
                     engine=engine,
                     source=source,
@@ -331,7 +347,46 @@ class HealInstruction(Instruction):
 
 
 @dataclass
-class GiveTokenInstruction(Instruction):
+class AddModifierInstruction(Instruction):
+    modifier_class: Type["Modifier"]
+    modifier_kwargs: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.valence = self.modifier_class.valence
+
+    def execute(self, ctx: ActionContext) -> None:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
+            AddModifierEvent(
+                subject=subject,
+                modifier_class=self.modifier_class,
+                modifier_kwargs=self.modifier_kwargs,
+            ).resolve()
+
+
+@dataclass
+class RemoveModifierInstruction(Instruction):
+    modifier_class: Type["Modifier"]
+    amount: DynamicInt = 1
+
+    def __post_init__(self):
+        if self.modifier_class.valence == Valence.GOOD:
+            self.valence = Valence.BAD
+        elif self.modifier_class.valence == Valence.BAD:
+            self.valence = Valence.GOOD
+        else:
+            self.valence = Valence.MIXED
+
+    def execute(self, ctx: ActionContext) -> None:
+        subject = ctx.engine.entity_at(ctx.subject_point)
+        if subject:
+            RemoveModifierEvent(
+                subject=ctx.target, modifier_class=self.modifier_class
+            ).resolve()
+
+
+@dataclass
+class AddTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
 
@@ -365,8 +420,9 @@ class RemoveTokenInstruction(Instruction):
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
-            amount = resolve_int(self.amount, ctx)
-            ctx.target.remove_token(self.token_class, amount=amount)
+            RemoveTokenEvent(
+                subject=ctx.target, token_class=self.token_class, amount=self.amount
+            ).resolve()
 
 
 # @dataclass

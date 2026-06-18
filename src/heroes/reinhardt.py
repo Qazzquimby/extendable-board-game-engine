@@ -6,7 +6,7 @@ from abilities import (
     Ability,
     DamageInstruction,
     ActionCost,
-    GiveTokenInstruction,
+    AddTokenInstruction,
 )
 from aimings import IncludeArea
 from areas import Square, PathArea, Line
@@ -80,7 +80,7 @@ class ChargeInstruction(Instruction):
                     amount=6,
                     ability=ctx.ability,
                 ).resolve()
-                GiveTokenInstruction(token_class=ImmobileToken).execute(ctx=ctx)
+                AddTokenInstruction(token_class=ImmobileToken).execute(ctx=ctx)
                 entity.pos = last_point
             else:
                 DamageEvent(

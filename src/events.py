@@ -259,6 +259,38 @@ class HealEvent(Event):
         log(f"{self.subject.name} healed {final_heal} HP.")
 
 
+class AddModifierEvent(Event):
+    def __init__(
+        self, subject: "Entity", modifier_class: Type["Modifier"], modifier_kwargs: dict
+    ):
+        super().__init__(engine=subject.engine, subject=subject)
+        self.modifier_class = modifier_class
+        self.modifier_kwargs = modifier_kwargs
+
+    def _resolve(self):
+        log(f"{self.subject.name} gained {self.modifier_class.__name__}.")
+        self.subject.add_modifier(modifier=self.modifier_class(**self.modifier_kwargs))
+
+
+class RemoveModifierEvent(Event):
+    def __init__(self, subject: "Entity", modifier_class: Type["Modifier"]):
+        super().__init__(engine=subject.engine, subject=subject)
+        self.modifier_class = modifier_class
+
+    def _resolve(self):
+        log(f"{self.subject.name} lost {self.modifier_class.__name__}.")
+        existing_modifier = next(
+            (
+                mod
+                for mod in self.subject.modifiers
+                if mod.name == self.modifier_class.__name__
+            ),
+            None,
+        )
+        if existing_modifier:
+            self.subject.remove_modifier(existing_modifier)
+
+
 ### TOKENS
 class AddTokenEvent(Event):
     def __init__(

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from abilities import (
     Ability,
     DamageInstruction,
-    GiveTokenInstruction,
+    AddTokenInstruction,
     TeleportInstruction,
 )
 from aimings import TargetEntity, MultipleAiming, TargetPoint
