@@ -11,6 +11,8 @@ from typing import (
 
 from tqdm import tqdm
 
+from abilities import Ability, RollResult
+from aimings import AimingResult
 from choices import (
     Choice,
     PlausibleFreeAction,
@@ -367,6 +369,30 @@ class Engine:
             active_entity=self.active_entity.id if self.active_entity else None,
             entities=[e.to_model() for e in self.entities],
         )
+
+    def resolve_ability_with_reactions(
+        self, ability: "Ability", source: "Entity", aiming_result: "AimingResult"
+    ):
+        roll_result = ability.get_roll_result(
+            aiming_result=aiming_result, engine=self, source=source
+        )
+        self.handle_reactions(
+            triggering_ability=ability, roll_result=roll_result, phase="before"
+        )
+
+        ability.execute_instructions(
+            engine=self,
+            source=source,
+            aiming_result=aiming_result,
+            roll_result=roll_result,
+        )
+
+        self.handle_reactions(
+            triggering_ability=ability, roll_result=roll_result, phase="after"
+        )
+
+    def handle_reactions(self, triggering_ability, roll_result: "RollResult", phase):
+        pass  # Todo
 
     def copy(self) -> "Engine":
         return copy.deepcopy(self)

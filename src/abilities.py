@@ -1,7 +1,17 @@
 import copy
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TYPE_CHECKING, Union, Type, Tuple, Set, Callable
+from typing import (
+    List,
+    Optional,
+    TYPE_CHECKING,
+    Union,
+    Type,
+    Tuple,
+    Set,
+    Callable,
+    Dict,
+)
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
 from events import (
@@ -23,7 +33,7 @@ from ai.feature_definitions import (
     Feature,
 )
 from logger import log
-from queries import QueryAvoidInclusion
+from queries import QueryAvoidInclusion, QueryRoll
 from valence import Valence
 from modifiers import Modifier, Token
 
@@ -98,6 +108,13 @@ class Instruction:
 
     def get_feature_templates(self) -> List["Feature"]:
         return []
+
+
+@dataclass
+class RollResult:
+    roll: Optional[int]
+    hit_points: Set[Point]
+    crit_points: Set[Point]
 
 
 @dataclass
@@ -194,10 +211,17 @@ class Ability:
             self.is_tapped = True
             self.tapped_this_turn = True
 
-        hit_target_points, crit_target_points = self._get_hit_and_crit_target_points(
-            aiming_result=aiming_result, engine=engine, source=source
+        engine.resolve_ability_with_reactions(
+            ability=self, source=source, aiming_result=aiming_result
         )
 
+    def execute_instructions(
+        self,
+        engine: "Engine",
+        source: "Entity",
+        aiming_result: Union[AimingResult, MultipleAimingResults],
+        roll_result: "RollResult",
+    ):
         for instruction in self.instructions:
             if instruction.aiming_name:
                 instruction_aiming_result = aiming_result.sub_aimings[
@@ -207,8 +231,8 @@ class Ability:
                 instruction_aiming_result = aiming_result
 
             for target_point in instruction_aiming_result.target_points:
-                is_hit = target_point in hit_target_points
-                is_crit = target_point in crit_target_points
+                is_hit = target_point in roll_result.hit_points
+                is_crit = target_point in roll_result.crit_points
 
                 ctx = ActionContext(
                     engine=engine,
@@ -248,12 +272,12 @@ class Ability:
         hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
         return float(hash_int % 10000) / 100.0
 
-    def _get_hit_and_crit_target_points(
+    def get_roll_result(
         self,
         aiming_result: Union[AimingResult, MultipleAimingResults],
         engine: "Engine",
         source: "Entity",
-    ) -> Tuple[Set["Point"], Set["Point"]]:
+    ) -> RollResult:
         if isinstance(aiming_result, dict):
             all_target_points = set()
             for aiming_result_set in aiming_result.values():
@@ -262,6 +286,8 @@ class Ability:
             all_target_points = aiming_result.target_points
         hit_target_points = set()
         crit_target_points = set()
+
+        roll = None
         for target_point in all_target_points:
             target = engine.entity_at(target_point)
             if target:
@@ -270,7 +296,9 @@ class Ability:
                 crit_chance = source.get_crit(subject=target, ability=self)
 
                 if defense > 0 or crit_chance > 0:
-                    roll = engine.rng.randint(1, 6)  # todo rolling should be an event
+                    if not roll:
+                        roll = QueryRoll(subject=source).resolve()
+
                     if roll > defense:
                         hit_target_points.add(target_point)
                         if roll >= 7 - crit_chance:
@@ -286,7 +314,9 @@ class Ability:
                     # No roll means auto hits
                     hit_target_points.add(target_point)
 
-        return hit_target_points, crit_target_points
+        return RollResult(
+            roll=roll, hit_points=hit_target_points, crit_points=crit_target_points
+        )
 
 
 @dataclass

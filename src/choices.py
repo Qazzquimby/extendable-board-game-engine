@@ -342,7 +342,10 @@ def get_plausible_free_actions(
 ) -> List[PlausibleFreeAction]:
     plausible_actions = {}
     for ability in actor.abilities:
-        if ability.action_cost != ActionCost.FREE or not ability.is_available():
+        if (
+            ability.action_cost not in (ActionCost.FREE, ActionCost.INSTANT)
+            or not ability.is_available()
+        ):
             continue
 
         plausible_uses = _get_plausible_uses_of_ability_at_pos(

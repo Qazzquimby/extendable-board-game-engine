@@ -31,6 +31,11 @@ class QueryIsAlive(Query[bool]):
         )
 
 
+class QueryRoll(Query[int]):
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject, base_result=subject.engine.rng.randint(1, 6))
+
+
 class QueryHasArmor(Query[bool]):
     def __init__(self, subject: "Entity"):
         super().__init__(subject=subject, base_result=False)

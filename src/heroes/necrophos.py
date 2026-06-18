@@ -119,13 +119,7 @@ class NecroGhostShroud(Modifier):
 
     @before(DamageEvent)
     def take_1_more_damage(self, event: "DamageEvent"):
-        event.amount += 1
-
-    @after(DeathEvent, only_self=False)
-    def gain_kill_counter(self, event: "DeathEvent") -> None:
-        if event.killer == self.owner and event.subject.max_hp >= 4:
-            with self.log_trigger(event):
-                AddTokenEvent(subject=self.owner, token_class=KillCounter).resolve()
+        event.amount.add(1)  # seems like a query
 
 
 @dataclass
@@ -212,21 +206,4 @@ Use a default ability.
                 owner=self,
             )
         )
-        self.abilities.append(
-            Ability(
-                name="Culling Blade",
-                text="""\
-                1/Game
-        Range 1, 3dmg irreducible
-        On kill:
-          The target does not trigger any on-death reactions.
-          Refresh this.
-          If the kill was a hero, for the rest of the game you have Armor.
-                """,
-                aiming=TargetEntity(in_range=1),
-                instructions=[CullingBladeInstruction()],
-                is_ultimate=True,
-                max_charges=1,
-                owner=self,
-            )
-        )
+        # todo the rest
