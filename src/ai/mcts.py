@@ -14,6 +14,18 @@ from choices import Choice, PlausibleMoveAndAction
 from engine import Agent, Engine
 from logger import log
 
+
+class ChoiceRequest(Exception):
+    def __init__(self, choices: List[Choice]):
+        self.choices = choices
+        super().__init__("A choice is required to continue the simulation.")
+
+
+class InterruptAgent(Agent):
+    def choose(self, choices: List["Choice"]) -> int:
+        raise ChoiceRequest(choices)
+
+
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
@@ -26,7 +38,7 @@ class PathStep:
 
     node: "MCTSNode"
     # None iff first node
-    action_taken_to_reach_this_node: Optional[Choice]
+    action_index_taken_to_reach_this_node: Optional[int]
 
 
 class SearchPath:
@@ -35,11 +47,16 @@ class SearchPath:
     def __init__(self, initial_node: "MCTSNode"):
         self._steps: List[PathStep] = []
         self._visited_keys: set[int] = set()
-        self.add(node=initial_node, action_leading_to_node=None)
+        self.add(node=initial_node, action_index_leading_to_node=None)
 
-    def add(self, node: "MCTSNode", action_leading_to_node: Optional[Choice]):
+    def add(self, node: "MCTSNode", action_index_leading_to_node: Optional[int]):
         self._visited_keys.add(node.key)
-        self._steps.append(PathStep(node, action_leading_to_node))
+        self._steps.append(
+            PathStep(
+                node=node,
+                action_index_taken_to_reach_this_node=action_index_leading_to_node,
+            )
+        )
 
     def has_visited_key(self, key: int) -> bool:
         return key in self._visited_keys
@@ -58,13 +75,13 @@ class SearchPath:
 
     def get_step_details(
         self, steps_from_end: int
-    ) -> Tuple["MCTSNode", Optional[Choice], Optional["MCTSNode"]]:
+    ) -> Tuple["MCTSNode", Optional[int], Optional["MCTSNode"]]:
         """
         Helper for backpropagation. Gets current node, action that led to it, and its parent.
         steps_from_end=0 is the leaf, index_from_end=1 is its parent, etc.
-        Returns: (current_node, action_to_current, parent_node_of_current)
+        Returns: (current_node, action_index_to_current, parent_node_of_current)
         Parent is None if current_node is root.
-        Action is None if current_node is root.
+        Action index is None if current_node is root.
         """
         actual_index = len(self._steps) - 1 - steps_from_end
         if actual_index < 0:
@@ -72,7 +89,7 @@ class SearchPath:
 
         current_step = self._steps[actual_index]
         current_node = current_step.node
-        action_to_current = current_step.action_taken_to_reach_this_node
+        action_to_current = current_step.action_index_taken_to_reach_this_node
 
         parent_node = None
         if actual_index > 0:  # If not the root node
@@ -163,7 +180,8 @@ class SelectionResult:
 
     path: SearchPath
     leaf_env: Engine
-    # todo worried these may be large and waste memory. Not needed?
+    pending_choices: Optional[List[Choice]] = None
+    # todo worried leaf_env may be large and waste memory. Not needed?
 
     @property
     def leaf_node(self):
@@ -186,6 +204,8 @@ class ExpansionStrategy(abc.ABC):
     def expand(
         self,
         node: "MCTSNode",
+        env_at_node: Engine,
+        pending_choices: Optional[List[Choice]] = None,
     ) -> None:
         """
         Expand a leaf node by adding children based on legal actions.
@@ -269,7 +289,26 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             sim_env.rng.stochastic_flag = False
 
             edge = current_node.edges[best_action_index]
-            sim_env.step(best_action, action_idx=best_action_index)
+            try:
+                sim_env.step(best_action, action_idx=best_action_index)
+            except ChoiceRequest as e:
+                # We took an action, and it led to a mid-turn choice point.
+                # The sim_env is now at this new state. This state is our new leaf node.
+                next_key = sim_env.hash()
+                if path.has_visited_key(next_key):  # cycle
+                    return SelectionResult(path=path, leaf_env=sim_env)
+
+                next_node = cache.get_matching_node(key=next_key)
+                if not next_node:
+                    next_node = MCTSNode(
+                        key=next_key, current_player_index=sim_env.get_current_player()
+                    )
+                    cache.cache_node(key=next_key, node=next_node)
+
+                path.add(node=next_node, action_index_leading_to_node=best_action_index)
+                return SelectionResult(
+                    path=path, leaf_env=sim_env, pending_choices=e.choices
+                )
             if isinstance(best_action, PlausibleMoveAndAction):
                 sim_env.advance_to_next_activator()
                 # todo, does this imply no free action after normal action? Should be either I think.
@@ -305,9 +344,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 )
                 cache.cache_node(key=next_key, node=next_node)
 
-            path.add(
-                node=next_node, action_leading_to_node=best_action_index
-            )  # TODO FIX TYPE
+            path.add(node=next_node, action_index_leading_to_node=best_action_index)
             current_node = next_node
 
         # Reached a terminal state
@@ -405,11 +442,20 @@ class PUCTSelection(MCTSSelectionStrategyBase):
 class UniformExpansion(ExpansionStrategy):
     """Expands a node by creating children for all legal actions with uniform priors."""
 
-    def expand(self, node: MCTSNode, env_at_node: Engine) -> None:
+    def expand(
+        self,
+        node: MCTSNode,
+        env_at_node: Engine,
+        pending_choices: Optional[List[Choice]] = None,
+    ) -> None:
         if node.is_expanded or env_at_node.is_done:
             return
-        # todo, pretty sure this will have to be reworked to allow for mid-turn choices
-        legal_actions = env_at_node.get_legal_actions()
+
+        if pending_choices is not None:
+            legal_actions = pending_choices
+        else:
+            legal_actions = env_at_node.get_legal_actions()
+
         assert not node.edges
         node.actions = legal_actions
         for action_index, action in enumerate(legal_actions):
@@ -510,22 +556,16 @@ class StandardBackpropagation(BackpropagationStrategy):
         self, path: SearchPath, player_to_value: Dict[int, float]
     ) -> None:
         for i in range(len(path)):
-            node, action_to_node, parent_of_node = path.get_step_details(
+            node, action_index_to_node, parent_of_node = path.get_step_details(
                 steps_from_end=i
             )
 
             node.num_visits += 1
             node.total_value += player_to_value.get(node.current_player_index, 0.0)
 
-            if parent_of_node and action_to_node is not None:
+            if parent_of_node and action_index_to_node is not None:
                 # not start of path
-                action_key = (
-                    tuple(action_to_node)
-                    if isinstance(action_to_node, list)
-                    else action_to_node
-                )
-
-                edge_to_update = parent_of_node.edges[action_key]
+                edge_to_update = parent_of_node.edges[action_index_to_node]
                 edge_to_update.num_visits += 1
 
                 value = player_to_value.get(parent_of_node.current_player_index)
@@ -559,10 +599,14 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
+        interrupt_agent = InterruptAgent()
         log.enabled = False
         try:
             for _ in range(self.num_simulations):
                 sim_env = env.copy()
+                sim_env.agents = {
+                    team: interrupt_agent for team in sim_env.agents.keys()
+                }
                 sim_env.rng.stochastic_flag = False
 
                 result = self.selection.select(
@@ -570,7 +614,9 @@ class MCTSAgent(Agent):
                 )
 
                 if not result.leaf_env.is_done:
-                    self.expansion.expand(result.leaf_node, result.leaf_env)
+                    self.expansion.expand(
+                        result.leaf_node, result.leaf_env, result.pending_choices
+                    )
                     val = self.evaluation.evaluate(result.leaf_node, result.leaf_env)
                 else:
                     winner = result.leaf_env.get_winning_player()
