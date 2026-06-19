@@ -280,10 +280,20 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             try:
                 sim_env.rng.stochastic_flag = False
                 sim_env.step(best_action, action_idx=best_action_index)
+                if isinstance(best_action, PlausibleMoveAndAction):
+                    sim_env.advance_to_next_activator()
+
+                if sim_env.active_entity is None:
+                    sim_env.next_turn()
+                while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
+                    if sim_env.is_done:
+                        break
+                    sim_env.next_turn()
             except ChoiceRequest as e:
-                # todo split into function.
                 # We took an action, and it led to a mid-turn choice point.
                 # The sim_env is now at this new state. This state is our new leaf node.
+                # todo this is skipping steps
+
                 next_key = sim_env.hash()
                 if path.has_visited_key(next_key):  # cycle, stop path
                     return SelectionResult(path=path, leaf_env=sim_env)
@@ -293,23 +303,12 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                     next_node = MCTSNode(key=next_key, current_player_index=e.team)
                     cache.cache_node(key=next_key, node=next_node)
                 path.add(node=next_node, action_index_leading_to_node=best_action_index)
-                return SelectionResult(
+                return SelectionResult(  # todo set acting team e.team
                     path=path, leaf_env=sim_env, pending_choices=e.choices
                 )
 
-            if isinstance(best_action, PlausibleMoveAndAction):
-                sim_env.advance_to_next_activator()
-
             child_is_known = not sim_env.rng.stochastic_flag and edge.child_node_keys
             assert len(edge.child_node_keys) == 1
-
-            if sim_env.active_entity is None:
-                sim_env.next_turn()
-            while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
-                if sim_env.is_done:
-                    break
-                sim_env.next_turn()
-
             if child_is_known:
                 next_key = next(iter(edge.child_node_keys))
             else:
@@ -535,11 +534,12 @@ class MCTSAgent(Agent):
                 result = self.selection.select(
                     root_node, sim_env, self.cache, self.num_simulations, None
                 )
-                # todo when a mid-turn choice is detected, and the hashed state is already found, we get a result with no new node in the path. Leads to exploring root node over and over.
 
                 if not result.leaf_env.is_done:
                     self.expansion.expand(
-                        result.leaf_node, result.leaf_env, result.pending_choices
+                        node=result.leaf_node,
+                        env_at_node=result.leaf_env,
+                        pending_choices=result.pending_choices,
                     )
                     val = self.evaluation.evaluate(result.leaf_node, result.leaf_env)
                 else:
