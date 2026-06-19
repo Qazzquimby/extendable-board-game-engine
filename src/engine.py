@@ -574,7 +574,7 @@ class Engine:
             self.current_team,
             self.current_turn_hero.id if self.current_turn_hero else None,
             self.active_entity.id if self.active_entity else None,
-            self._current_choices,
+            frozenset(self._current_choices),
             frozenset(entity_states),
             marker_states,
             tuple(frozenset(s) for s in self._reaction_declined_sets),

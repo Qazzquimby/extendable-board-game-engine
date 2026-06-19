@@ -578,8 +578,6 @@ class MCTSAgent(Agent):
                 best_visits = edge.num_visits
                 best_idx = action_idx
 
-        # CRASH EARLY: Do not hide mismatched state boundaries.
-        # If the MCTS logic tracks an index outside the bounds of the provided choices, the simulation is desynced.
         assert 0 <= best_idx < len(choices), (
             f"Crash: MCTS selected an invalid index: {best_idx} for {len(choices)} choices. "
             "Action bounds are corrupted."
