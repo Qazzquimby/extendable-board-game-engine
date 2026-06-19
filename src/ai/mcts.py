@@ -247,7 +247,6 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
     """
 
     def _score_edge(self, edge: Edge, parent_node_num_visits: int) -> float:
-        """Abstract method to calculate the score for a single edge."""
         raise NotImplementedError
 
     def _step_simulation(
@@ -255,8 +254,6 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
     ) -> Optional[ChoiceRequest]:
         """Steps the simulation, returns ChoiceRequest if one is raised."""
         try:
-            # When we take an action from a node, we clear any pending choices
-            # that were used to define the state of that node.
             sim_env._current_choices = []
             sim_env.rng.stochastic_flag = False
             sim_env.step(action, action_idx=action_idx)
@@ -304,47 +301,39 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 sim_env, best_action, best_action_index
             )
 
-            if choice_request:
-                # Mid-turn choice point. This is a new leaf.
-                next_key = sim_env.hash()
-                if path.has_visited_key(next_key):  # cycle
-                    return SelectionResult(path=path, leaf_env=sim_env)
+            next_key = sim_env.hash()
+            assert next_key != current_node.key, (
+                f"Crash: Simulation step did not change the environment hash! "
+                f"Action taken: {best_action}"
+            )
 
-                next_node = cache.get_matching_node(key=next_key)
-                if not next_node:
-                    next_node = MCTSNode(
-                        key=next_key, current_player_index=choice_request.team
-                    )
-                    cache.cache_node(key=next_key, node=next_node)
-
-                path.add(
-                    node=next_node, action_index_leading_to_node=best_action_index
+            edge.child_node_keys.add(next_key)
+            if path.has_visited_key(next_key):  # cycle detected
+                return SelectionResult(
+                    path=path,
+                    leaf_env=sim_env,
+                    pending_choices=choice_request.choices if choice_request else None,
                 )
+
+            next_node = cache.get_matching_node(key=next_key)
+            if not next_node:
+                # Determine who is playing at this new node
+                current_player = (
+                    choice_request.team
+                    if choice_request
+                    else sim_env.get_current_player()
+                )
+                next_node = MCTSNode(key=next_key, current_player_index=current_player)
+                cache.cache_node(key=next_key, node=next_node)
+
+            path.add(node=next_node, action_index_leading_to_node=best_action_index)
+
+            if choice_request:
+                # Mid-turn choice. This acts as a leaf for the current traversal.
                 return SelectionResult(
                     path=path, leaf_env=sim_env, pending_choices=choice_request.choices
                 )
 
-            # --- Regular state transition ---
-            child_is_known = not sim_env.rng.stochastic_flag and edge.child_node_keys
-            if child_is_known:
-                assert len(edge.child_node_keys) == 1
-                next_key = next(iter(edge.child_node_keys))
-            else:
-                next_key = sim_env.hash()
-
-            edge.child_node_keys.add(next_key)
-
-            if path.has_visited_key(next_key):  # cycle, stop
-                return SelectionResult(path=path, leaf_env=sim_env)
-
-            next_node = cache.get_matching_node(key=next_key)
-            if not next_node:
-                next_node = MCTSNode(
-                    key=next_key, current_player_index=sim_env.get_current_player()
-                )
-                cache.cache_node(key=next_key, node=next_node)
-
-            path.add(node=next_node, action_index_leading_to_node=best_action_index)
             current_node = next_node
 
         # Reached a terminal state
@@ -356,7 +345,6 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
         start_node: MCTSNode,
         contender_actions: Optional[set],
     ) -> int:
-        """Helper to find the action index with the maximum score using the abstract _score_edge."""
         edges_to_consider = current_node.edges
         if current_node is start_node and contender_actions is not None:
             edges_to_consider = {
@@ -372,13 +360,14 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
         parent_visits = current_node.num_visits if current_node.num_visits > 0 else 1
 
         for action_index, edge in edges_to_consider.items():
-            # Calls the specific _score_edge implemented in child classes (PUCT or UCB1)
             score = self._score_edge(edge=edge, parent_node_num_visits=parent_visits)
             if score > best_score:
                 best_score = score
                 best_action_index = action_index
 
-        assert best_action_index is not None
+        assert (
+            best_action_index is not None
+        ), "Crash: No valid action index found during selection."
         return best_action_index
 
 
@@ -540,6 +529,13 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
+        # Fix: Expand the root node immediately with the exact choices provided by the engine.
+        # This prevents mid-turn reactive abilities from being overwritten by standard legal actions.
+        if not root_node.is_expanded:
+            self.expansion.expand(
+                node=root_node, env_at_node=env, pending_choices=choices
+            )
+
         agents = {0: InterruptAgent(0), 1: InterruptAgent(1)}
         log.enabled = False
         try:
@@ -582,9 +578,12 @@ class MCTSAgent(Agent):
                 best_visits = edge.num_visits
                 best_idx = action_idx
 
-        # In case the best index tracked by MCTS logic isn't aligned with choices bounds
-        if best_idx >= len(choices):
-            best_idx = 0
+        # CRASH EARLY: Do not hide mismatched state boundaries.
+        # If the MCTS logic tracks an index outside the bounds of the provided choices, the simulation is desynced.
+        assert 0 <= best_idx < len(choices), (
+            f"Crash: MCTS selected an invalid index: {best_idx} for {len(choices)} choices. "
+            "Action bounds are corrupted."
+        )
 
         return best_idx
 
