@@ -115,6 +115,7 @@ class Engine:
         self._next_id: int = 1
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
+        self._reaction_declined_sets: List[set] = []
 
     @property
     def is_done(self):
@@ -377,10 +378,12 @@ class Engine:
         roll_result = ability.get_roll_result(
             aiming_result=aiming_result, engine=self, source=source
         )
+        self._reaction_declined_sets.append(set())
         while self.handle_reactions(
             triggering_ability=ability, roll_result=roll_result, phase="before"
         ):
-            pass
+            self._reaction_declined_sets[-1].clear()
+        self._reaction_declined_sets.pop()
 
         ability.execute_instructions(
             engine=self,
@@ -389,10 +392,12 @@ class Engine:
             roll_result=roll_result,
         )
 
+        self._reaction_declined_sets.append(set())
         while self.handle_reactions(
             triggering_ability=ability, roll_result=roll_result, phase="after"
         ):
-            pass
+            self._reaction_declined_sets[-1].clear()
+        self._reaction_declined_sets.pop()
 
     def handle_reactions(
         self, triggering_ability, roll_result: "RollResult", phase
@@ -406,6 +411,18 @@ class Engine:
         # Check entities in a deterministic order.
         for entity in self.entities:
             if entity.hp <= 0:
+                continue
+
+            reaction_key = (
+                entity.id,
+                phase,
+                triggering_ability.get_hash(),
+                hash(roll_result),
+            )
+            if (
+                self._reaction_declined_sets
+                and reaction_key in self._reaction_declined_sets[-1]
+            ):
                 continue
 
             entity_reactions = []
@@ -444,6 +461,8 @@ class Engine:
                 chosen_action = choices[choice_idx]
 
                 if chosen_action is pass_choice:
+                    if self._reaction_declined_sets:
+                        self._reaction_declined_sets[-1].add(reaction_key)
                     continue  # This entity passes, check next entity.
 
                 # An action was chosen. Execute it. This will recurse into
@@ -499,6 +518,9 @@ class Engine:
         result.current_turn_hero = copy.deepcopy(self.current_turn_hero, memo)
         result.active_entity = copy.deepcopy(self.active_entity, memo)
         result.activation_queue = copy.deepcopy(self.activation_queue, memo)
+        result._reaction_declined_sets = copy.deepcopy(
+            self._reaction_declined_sets, memo
+        )
 
         return result
 
@@ -548,8 +570,10 @@ class Engine:
             self.current_hero_row_index,
             self.current_team,
             self.current_turn_hero.id if self.current_turn_hero else None,
+            self.active_entity.id if self.active_entity else None,
             frozenset(entity_states),
             marker_states,
+            tuple(frozenset(s) for s in self._reaction_declined_sets),
         )
 
     def hash(self) -> int:

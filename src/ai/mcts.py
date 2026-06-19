@@ -11,7 +11,7 @@ import abc
 from dataclasses import dataclass
 
 from choices import Choice, PlausibleMoveAndAction
-from engine import Agent, Engine
+from engine import Agent, Engine, RandomAgent
 from logger import log
 
 
@@ -28,8 +28,8 @@ class InterruptAgent(Agent):
 
 DEBUG = True
 
-EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 50
-NUM_SIMS = 10  # _000
+EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 100
+NUM_SIMS = 100
 
 
 @dataclass
@@ -129,8 +129,7 @@ class DeterministicEdge(Edge):
         total_value: float = 0.0,  # from perspective of player taking the action
     ):
         super().__init__(prior=prior, num_visits=num_visits, total_value=total_value)
-        self.child_node_key: Optional[int] = None
-        # todo how could a 1 child edge have no child..? Fix if wrong
+        self.child_node_key: Optional[int] = None  # none until simulated
 
 
 class MCTSNode:
@@ -292,16 +291,25 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             try:
                 sim_env.step(best_action, action_idx=best_action_index)
             except ChoiceRequest as e:
+                # todo split into function.
+
                 # We took an action, and it led to a mid-turn choice point.
                 # The sim_env is now at this new state. This state is our new leaf node.
+                # Temporarily set active entity to get a unique hash for this choice point
+                original_active_entity = sim_env.active_entity
+                reacting_entity = e.choices[0].ability.owner
+                sim_env.active_entity = reacting_entity
+                # doesn't cover if they react multiple times..?
                 next_key = sim_env.hash()
+                sim_env.active_entity = original_active_entity
+
                 if path.has_visited_key(next_key):  # cycle
                     return SelectionResult(path=path, leaf_env=sim_env)
 
                 next_node = cache.get_matching_node(key=next_key)
                 if not next_node:
                     next_node = MCTSNode(
-                        key=next_key, current_player_index=sim_env.get_current_player()
+                        key=next_key, current_player_index=reacting_entity.team
                     )
                     cache.cache_node(key=next_key, node=next_node)
 
@@ -311,9 +319,9 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 )
             if isinstance(best_action, PlausibleMoveAndAction):
                 sim_env.advance_to_next_activator()
-                # todo, does this imply no free action after normal action? Should be either I think.
 
             if not sim_env.rng.stochastic_flag and edge.child_node_key is not None:
+                # Next node is deterministic and already known
                 next_key = edge.child_node_key
                 if sim_env.active_entity is None:
                     sim_env.next_turn()
@@ -463,61 +471,6 @@ class UniformExpansion(ExpansionStrategy):
         node.is_expanded = True
 
 
-class RandomRolloutEvaluation(EvaluationStrategy):
-    """Evaluates a node by performing a random rollout simulation."""
-
-    def __init__(self, max_rollout_depth: int = 50, discount_factor: float = 1.0):
-        self.max_rollout_depth = max_rollout_depth
-        self.discount_factor = discount_factor  # Usually 1.0 for MCTS terminal rewards
-
-    def evaluate(self, node: MCTSNode, env: Engine) -> float:
-        """Simulate game from the given environment state using random policy."""
-        player_at_start = env.get_current_player()
-
-        if env.is_done:
-            winner = env.get_winning_player()
-            if winner is None:
-                return 0.0
-            return 1.0 if winner == player_at_start else -1.0
-
-        current_step = 0
-
-        while current_step < self.max_rollout_depth:
-            if env.is_done:
-                break
-
-            legal_actions = env.get_legal_actions()  # can avoid recomputing these?
-            if not legal_actions:
-                break
-            action_idx = random.randrange(len(legal_actions))
-            action = legal_actions[action_idx]
-
-            env.step(action, action_idx=action_idx)
-            if isinstance(action, PlausibleMoveAndAction):
-                env.advance_to_next_activator()
-
-            if env.active_entity is None:
-                env.next_turn()
-                while env.current_turn_hero and env.current_turn_hero.hp <= 0:
-                    if env.is_done:
-                        break
-                    env.next_turn()
-
-            current_step += 1
-
-        if current_step >= self.max_rollout_depth:
-            return 0.0
-
-        winner = env.get_winning_player()
-        value = 0.0
-        if winner is not None:
-            value = 1.0 if winner == player_at_start else -1.0
-
-        value *= self.discount_factor**current_step
-
-        return value
-
-
 class HeuristicEvaluation(EvaluationStrategy):
     """Evaluates a node by a health-based heuristic."""
 
@@ -612,6 +565,7 @@ class MCTSAgent(Agent):
                 result = self.selection.select(
                     root_node, sim_env, self.cache, self.num_simulations, None
                 )
+                # todo when a mid-turn choice is detected, and the hashed state is already found, we get a result with no new node in the path. Leads to exploring root node over and over.
 
                 if not result.leaf_env.is_done:
                     self.expansion.expand(

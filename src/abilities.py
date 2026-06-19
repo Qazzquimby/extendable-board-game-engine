@@ -116,6 +116,13 @@ class RollResult:
     hit_points: Set["Point"]
     crit_points: Set["Point"]
 
+    def __hash__(self):
+        return (
+            hash(self.roll)
+            + hash(frozenset(self.hit_points))
+            + hash(frozenset(self.crit_points))
+        )
+
 
 @dataclass
 class Ability:
