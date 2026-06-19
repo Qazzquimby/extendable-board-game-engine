@@ -15,14 +15,18 @@ from logger import log
 
 
 class ChoiceRequest(Exception):
-    def __init__(self, choices: List[Choice]):
+    def __init__(self, choices: List[Choice], team: int):
         self.choices = choices
+        self.team=team
         super().__init__("A choice is required to continue the simulation.")
 
 
 class InterruptAgent(Agent):
+    def __init__(self, team: int):
+        self.team = team
+
     def choose(self, choices: List["Choice"]) -> int:
-        raise ChoiceRequest(choices)
+        raise ChoiceRequest(choices=choices, team=self.team)
 
 
 DEBUG = True
@@ -272,38 +276,29 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             )
             best_action = current_node.actions[best_action_index]
 
-            sim_env.rng.stochastic_flag = False
-
             edge = current_node.edges[best_action_index]
             try:
+                sim_env.rng.stochastic_flag = False
                 sim_env.step(best_action, action_idx=best_action_index)
             except ChoiceRequest as e:
                 # todo split into function.
-
                 # We took an action, and it led to a mid-turn choice point.
                 # The sim_env is now at this new state. This state is our new leaf node.
-                # Temporarily set active entity to get a unique hash for this choice point
-                original_active_entity = sim_env.active_entity
-                reacting_entity = e.choices[0].ability.owner
-                sim_env.active_entity = reacting_entity
-                # doesn't cover if they react multiple times..?
                 next_key = sim_env.hash()
-                sim_env.active_entity = original_active_entity
-
-                if path.has_visited_key(next_key):  # cycle
+                if path.has_visited_key(next_key):  # cycle, stop path
                     return SelectionResult(path=path, leaf_env=sim_env)
 
                 next_node = cache.get_matching_node(key=next_key)
                 if not next_node:
                     next_node = MCTSNode(
-                        key=next_key, current_player_index=reacting_entity.team
+                        key=next_key, current_player_index=e.team
                     )
                     cache.cache_node(key=next_key, node=next_node)
-
                 path.add(node=next_node, action_index_leading_to_node=best_action_index)
                 return SelectionResult(
                     path=path, leaf_env=sim_env, pending_choices=e.choices
                 )
+
             if isinstance(best_action, PlausibleMoveAndAction):
                 sim_env.advance_to_next_activator()
 
@@ -322,13 +317,10 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             else:
                 next_key = sim_env.hash()
 
-            if not sim_env.rng.stochastic_flag:
-                edge.child_node_keys.add(next_key)
+            # if not sim_env.rng.stochastic_flag:
+            edge.child_node_keys.add(next_key)
 
-            #######
-
-            if path.has_visited_key(next_key):
-                # Cycle detected
+            if path.has_visited_key(next_key): # cycle, stop
                 return SelectionResult(path=path, leaf_env=sim_env)
 
             next_node = cache.get_matching_node(key=next_key)
@@ -534,14 +526,15 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
-        interrupt_agent = InterruptAgent()
+        agents = {
+            0: InterruptAgent(0),
+            1: InterruptAgent(1)
+        }
         log.enabled = False
         try:
             for _ in range(self.num_simulations):
                 sim_env = env.copy()
-                sim_env.agents = {
-                    team: interrupt_agent for team in sim_env.agents.keys()
-                }
+                sim_env.agents = agents
                 sim_env.rng.stochastic_flag = False
 
                 result = self.selection.select(
