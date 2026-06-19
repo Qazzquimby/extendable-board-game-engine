@@ -1,5 +1,4 @@
 import math
-import random
 from typing import (
     List,
     Tuple,
@@ -11,7 +10,7 @@ import abc
 from dataclasses import dataclass
 
 from choices import Choice, PlausibleMoveAndAction
-from engine import Agent, Engine, RandomAgent
+from engine import Agent, Engine
 from logger import log
 
 
@@ -112,24 +111,14 @@ class Edge:
         self.num_visits = num_visits
         self.total_value = total_value
 
+        # populated when simulated.One if deterministic.
+        self.child_node_keys: set[int] = set()
+
     @property
     def value(self) -> float:
         if self.num_visits == 0:
             return 0.0
         return self.total_value / self.num_visits
-
-
-class DeterministicEdge(Edge):
-    """Edge with only one child node"""
-
-    def __init__(
-        self,
-        prior: float,
-        num_visits: int = 0,
-        total_value: float = 0.0,  # from perspective of player taking the action
-    ):
-        super().__init__(prior=prior, num_visits=num_visits, total_value=total_value)
-        self.child_node_key: Optional[int] = None  # none until simulated
 
 
 class MCTSNode:
@@ -140,7 +129,7 @@ class MCTSNode:
     ):
         self.key = key
         self.player_idx = current_player_index
-        self.edges: Dict[int, DeterministicEdge] = {}
+        self.edges: Dict[int, Edge] = {}
         self.actions: List[Choice] = []
         self.is_expanded = False
 
@@ -254,7 +243,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
     """
 
     def _score_edge(
-        self, edge: DeterministicEdge, parent_node_num_visits: int
+        self, edge: Edge, parent_node_num_visits: int
     ) -> float:
         """Abstract method to calculate the score for a single edge."""
         raise NotImplementedError
@@ -320,26 +309,27 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             if isinstance(best_action, PlausibleMoveAndAction):
                 sim_env.advance_to_next_activator()
 
-            if not sim_env.rng.stochastic_flag and edge.child_node_key is not None:
-                # Next node is deterministic and already known
-                next_key = edge.child_node_key
-                if sim_env.active_entity is None:
-                    sim_env.next_turn()
-                while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
-                    if sim_env.is_done:
-                        break
-                    sim_env.next_turn()
+            child_is_known = (
+                not sim_env.rng.stochastic_flag and edge.child_node_keys
+            )
+            assert len(edge.child_node_keys) == 1
+
+            if sim_env.active_entity is None:
+                sim_env.next_turn()
+            while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
+                if sim_env.is_done:
+                    break
+                sim_env.next_turn()
+
+            if child_is_known:
+                next_key = next(iter(edge.child_node_keys))
             else:
-                if sim_env.active_entity is None:  # todo deduplicate
-                    sim_env.next_turn()
-                while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
-                    if sim_env.is_done:
-                        break
-                    sim_env.next_turn()
                 next_key = sim_env.hash()
 
-                if not sim_env.rng.stochastic_flag:
-                    edge.child_node_key = next_key
+            if not sim_env.rng.stochastic_flag:
+                edge.child_node_keys.add(next_key)
+
+            #######
 
             if path.has_visited_key(next_key):
                 # Cycle detected
@@ -399,7 +389,7 @@ class UCB1Selection(MCTSSelectionStrategyBase):
         self.exploration_constant = exploration_constant
 
     def _score_edge(
-        self, edge: DeterministicEdge, parent_node_num_visits: int
+        self, edge: Edge, parent_node_num_visits: int
     ) -> float:
         """Calculates the UCB1 score for a child node."""
 
@@ -428,7 +418,7 @@ class PUCTSelection(MCTSSelectionStrategyBase):
         self.exploration_constant = exploration_constant
 
     def _score_edge(
-        self, edge: DeterministicEdge, parent_node_num_visits: int
+        self, edge: Edge, parent_node_num_visits: int
     ) -> float:
         """Calculates the PUCT score for a child edge."""
         # It's the same as UCB1 except it doesn't force explore every option
@@ -467,7 +457,7 @@ class UniformExpansion(ExpansionStrategy):
         assert not node.edges
         node.actions = legal_actions
         for action_index, action in enumerate(legal_actions):
-            node.edges[action_index] = DeterministicEdge(prior=1.0)
+            node.edges[action_index] = Edge(prior=1.0)
         node.is_expanded = True
 
 
