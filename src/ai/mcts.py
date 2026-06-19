@@ -250,6 +250,29 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
         """Abstract method to calculate the score for a single edge."""
         raise NotImplementedError
 
+    def _step_simulation(
+        self, sim_env: Engine, action: Choice, action_idx: int
+    ) -> Optional[ChoiceRequest]:
+        """Steps the simulation, returns ChoiceRequest if one is raised."""
+        try:
+            # When we take an action from a node, we clear any pending choices
+            # that were used to define the state of that node.
+            sim_env._current_choices = []
+            sim_env.rng.stochastic_flag = False
+            sim_env.step(action, action_idx=action_idx)
+            if isinstance(action, PlausibleMoveAndAction):
+                sim_env.advance_to_next_activator()
+
+            if sim_env.active_entity is None:
+                sim_env.next_turn()
+            while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
+                if sim_env.is_done:
+                    break
+                sim_env.next_turn()
+            return None
+        except ChoiceRequest as e:
+            return e
+
     def select(
         self,
         node: MCTSNode,
@@ -275,46 +298,40 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
                 contender_actions=contender_actions,
             )
             best_action = current_node.actions[best_action_index]
-
             edge = current_node.edges[best_action_index]
-            try:
-                sim_env.rng.stochastic_flag = False
-                sim_env.step(best_action, action_idx=best_action_index)
-                if isinstance(best_action, PlausibleMoveAndAction):
-                    sim_env.advance_to_next_activator()
 
-                if sim_env.active_entity is None:
-                    sim_env.next_turn()
-                while sim_env.current_turn_hero and sim_env.current_turn_hero.hp <= 0:
-                    if sim_env.is_done:
-                        break
-                    sim_env.next_turn()
-            except ChoiceRequest as e:
-                # We took an action, and it led to a mid-turn choice point.
-                # The sim_env is now at this new state. This state is our new leaf node.
-                # todo this is skipping steps
+            choice_request = self._step_simulation(
+                sim_env, best_action, best_action_index
+            )
 
+            if choice_request:
+                # Mid-turn choice point. This is a new leaf.
                 next_key = sim_env.hash()
-                if path.has_visited_key(next_key):  # cycle, stop path
+                if path.has_visited_key(next_key):  # cycle
                     return SelectionResult(path=path, leaf_env=sim_env)
 
                 next_node = cache.get_matching_node(key=next_key)
                 if not next_node:
-                    next_node = MCTSNode(key=next_key, current_player_index=e.team)
+                    next_node = MCTSNode(
+                        key=next_key, current_player_index=choice_request.team
+                    )
                     cache.cache_node(key=next_key, node=next_node)
-                path.add(node=next_node, action_index_leading_to_node=best_action_index)
-                return SelectionResult(  # todo set acting team e.team
-                    path=path, leaf_env=sim_env, pending_choices=e.choices
+
+                path.add(
+                    node=next_node, action_index_leading_to_node=best_action_index
+                )
+                return SelectionResult(
+                    path=path, leaf_env=sim_env, pending_choices=choice_request.choices
                 )
 
+            # --- Regular state transition ---
             child_is_known = not sim_env.rng.stochastic_flag and edge.child_node_keys
-            assert len(edge.child_node_keys) == 1
             if child_is_known:
+                assert len(edge.child_node_keys) == 1
                 next_key = next(iter(edge.child_node_keys))
             else:
                 next_key = sim_env.hash()
 
-            # if not sim_env.rng.stochastic_flag:
             edge.child_node_keys.add(next_key)
 
             if path.has_visited_key(next_key):  # cycle, stop
