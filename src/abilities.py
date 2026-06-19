@@ -258,12 +258,14 @@ class Ability:
                 instruction.execute(ctx)
 
             for included_point in instruction_aiming_result.included_points:
-                is_avoided = QueryAvoidInclusion(
-                    subject=engine.entity_at(included_point),
-                    ability=self,
-                ).resolve()
-                if is_avoided:
-                    continue
+                entity = engine.entity_at(included_point)
+                if entity:
+                    is_avoided = QueryAvoidInclusion(
+                        subject=entity,
+                        ability=self,
+                    ).resolve()
+                    if is_avoided:
+                        continue
                 ctx = ActionContext(
                     engine=engine,
                     source=source,

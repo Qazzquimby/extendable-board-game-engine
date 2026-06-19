@@ -35,9 +35,9 @@ class SummonModifier(Modifier):
     valence: Valence = Valence.GOOD
 
 
+@dataclass(kw_only=True)
 class Token(Modifier):
-    def __init__(self, amount: int = 1):
-        self.amount = amount
+    amount: int = 1
 
     def add(self, amount: int) -> None:
         self.amount += amount

@@ -136,10 +136,11 @@ class DeathPulse(Instruction):
     def execute(self, ctx: ActionContext) -> None:
         for point in ctx.included_points:
             entity = ctx.engine.entity_at(point)
-            if entity.team == ctx.source.team:
-                HealEvent(subject=entity, amount=1)
-            else:
-                DamageEvent(source=ctx.source, subject=entity, amount=1)
+            if entity:
+                if entity.team == ctx.source.team:
+                    HealEvent(subject=entity, amount=1)
+                else:
+                    DamageEvent(source=ctx.source, subject=entity, amount=1)
 
 
 @dataclass
@@ -151,7 +152,7 @@ class NecroTeleportAdjacentInstruction(Instruction):
             start=ctx.target.pos, max_range=1
         )
         if points_adjacent:
-            ChangeLocationEvent(subject=ctx.source)
+            ChangeLocationEvent(subject=ctx.source, new_pos=list(points_adjacent)[0])
 
 
 @dataclass(kw_only=True)

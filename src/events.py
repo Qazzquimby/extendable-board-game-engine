@@ -313,7 +313,7 @@ class AddTokenEvent(Event):
             if isinstance(modifier, self.token_class):
                 modifier.add(self.amount)
                 return
-        new_token = self.token_class(self.amount, **self.token_kwargs)
+        new_token = self.token_class(amount=self.amount, **self.token_kwargs)
         self.subject.add_modifier(new_token)
 
 
