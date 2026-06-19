@@ -150,7 +150,7 @@ class Engine:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
             return 0
-        self._current_choices = choices # for state hashing
+        self._current_choices = choices  # for state hashing
         index = self.agents[team].choose(choices)
         self._current_choices = []
         return index

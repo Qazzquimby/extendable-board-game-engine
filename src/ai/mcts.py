@@ -17,7 +17,7 @@ from logger import log
 class ChoiceRequest(Exception):
     def __init__(self, choices: List[Choice], team: int):
         self.choices = choices
-        self.team=team
+        self.team = team
         super().__init__("A choice is required to continue the simulation.")
 
 
@@ -290,9 +290,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
 
                 next_node = cache.get_matching_node(key=next_key)
                 if not next_node:
-                    next_node = MCTSNode(
-                        key=next_key, current_player_index=e.team
-                    )
+                    next_node = MCTSNode(key=next_key, current_player_index=e.team)
                     cache.cache_node(key=next_key, node=next_node)
                 path.add(node=next_node, action_index_leading_to_node=best_action_index)
                 return SelectionResult(
@@ -320,7 +318,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             # if not sim_env.rng.stochastic_flag:
             edge.child_node_keys.add(next_key)
 
-            if path.has_visited_key(next_key): # cycle, stop
+            if path.has_visited_key(next_key):  # cycle, stop
                 return SelectionResult(path=path, leaf_env=sim_env)
 
             next_node = cache.get_matching_node(key=next_key)
@@ -526,10 +524,7 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
-        agents = {
-            0: InterruptAgent(0),
-            1: InterruptAgent(1)
-        }
+        agents = {0: InterruptAgent(0), 1: InterruptAgent(1)}
         log.enabled = False
         try:
             for _ in range(self.num_simulations):
