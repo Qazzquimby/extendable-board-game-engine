@@ -242,9 +242,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
     Contains the generic MCTS traversal logic.
     """
 
-    def _score_edge(
-        self, edge: Edge, parent_node_num_visits: int
-    ) -> float:
+    def _score_edge(self, edge: Edge, parent_node_num_visits: int) -> float:
         """Abstract method to calculate the score for a single edge."""
         raise NotImplementedError
 
@@ -309,9 +307,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
             if isinstance(best_action, PlausibleMoveAndAction):
                 sim_env.advance_to_next_activator()
 
-            child_is_known = (
-                not sim_env.rng.stochastic_flag and edge.child_node_keys
-            )
+            child_is_known = not sim_env.rng.stochastic_flag and edge.child_node_keys
             assert len(edge.child_node_keys) == 1
 
             if sim_env.active_entity is None:
@@ -388,9 +384,7 @@ class UCB1Selection(MCTSSelectionStrategyBase):
             raise ValueError("Exploration constant cannot be negative.")
         self.exploration_constant = exploration_constant
 
-    def _score_edge(
-        self, edge: Edge, parent_node_num_visits: int
-    ) -> float:
+    def _score_edge(self, edge: Edge, parent_node_num_visits: int) -> float:
         """Calculates the UCB1 score for a child node."""
 
         # UCB Score = Avg_Reward + C * sqrt(log(N(parent)) / N(child))
@@ -417,9 +411,7 @@ class PUCTSelection(MCTSSelectionStrategyBase):
             raise ValueError("Exploration constant cannot be negative.")
         self.exploration_constant = exploration_constant
 
-    def _score_edge(
-        self, edge: Edge, parent_node_num_visits: int
-    ) -> float:
+    def _score_edge(self, edge: Edge, parent_node_num_visits: int) -> float:
         """Calculates the PUCT score for a child edge."""
         # It's the same as UCB1 except it doesn't force explore every option
         # and it avoids div0 on unexplored options.
