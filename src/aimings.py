@@ -54,6 +54,19 @@ class AimingResult:
     included_points: List[Point] = field(default_factory=list)
     sub_aimings: Optional[Dict[str, "AimingResult"]] = None
 
+    def __hash__(self):
+        if self.sub_aimings:
+            sub_aimings = self.sub_aimings
+        else:
+            sub_aimings = ()
+        return hash(
+            (
+                (p for p in self.target_points),
+                (p for p in self.included_points),
+                (hash(sub) for sub in sub_aimings),
+            )
+        )
+
 
 MultipleAimingResults = Dict[str, AimingResult]
 

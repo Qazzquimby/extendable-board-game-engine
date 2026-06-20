@@ -43,6 +43,9 @@ class PlausibleMoveAndAction(Choice):
         self.aiming_result = aiming_result
         super().__init__(features={})
 
+    def __hash__(self):
+        return hash((self.ability.name, self.movement_name, self.aiming_result))
+
     def _compute_features(
         self,
         actor: "Entity",

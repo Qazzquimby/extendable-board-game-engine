@@ -567,6 +567,10 @@ class Engine:
                     modifiers_state,
                 )
             )
+        if self._current_choices:
+            choices = frozenset((choice for choice in self._current_choices))
+        else:
+            choices = None
         marker_states = frozenset((m.id, m.name, m.pos, m.team) for m in self.markers)
         return (
             self.round_num,
@@ -574,10 +578,10 @@ class Engine:
             self.current_team,
             self.current_turn_hero.id if self.current_turn_hero else None,
             self.active_entity.id if self.active_entity else None,
-            frozenset(self._current_choices),
+            choices, # seems to never get collision
             frozenset(entity_states),
             marker_states,
-            tuple(frozenset(s) for s in self._reaction_declined_sets),
+            # tuple(frozenset(s) for s in self._reaction_declined_sets),
         )
 
     def hash(self) -> int:
