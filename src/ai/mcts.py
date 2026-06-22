@@ -254,7 +254,7 @@ class MCTSSelectionStrategyBase(SelectionStrategy):
     ) -> Optional[ChoiceRequest]:
         """Steps the simulation, returns ChoiceRequest if one is raised."""
         try:
-            sim_env._current_choices = []
+            sim_env.current_choices = []
             sim_env.rng.stochastic_flag = False
             sim_env.step(action, action_idx=action_idx)
             if isinstance(action, PlausibleMoveAndAction):

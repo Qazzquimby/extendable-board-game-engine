@@ -17,6 +17,17 @@ class Choice:
     def __init__(self, features: Dict[str, Any]):
         self.features = features
 
+    def __hash__(self):
+        try:
+            return hash(frozenset(self.features.items()))
+        except TypeError:
+            return id(self)
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.features == other.features
+
 
 class PlausibleMoveAndAction(Choice):
     def __init__(
@@ -45,6 +56,15 @@ class PlausibleMoveAndAction(Choice):
 
     def __hash__(self):
         return hash((self.ability.name, self.movement_name, self.aiming_result))
+
+    def __eq__(self, other):
+        if not isinstance(other, PlausibleMoveAndAction):
+            return False
+        return (self.ability.name, self.movement_name, self.aiming_result) == (
+            other.ability.name,
+            other.movement_name,
+            other.aiming_result,
+        )
 
     def _compute_features(
         self,
@@ -313,6 +333,17 @@ class PlausibleFreeAction(Choice):
 
         features = {}  # self._compute_features(actor, engine, feature_evaluator)
         super().__init__(features=features)
+
+    def __hash__(self):
+        return hash((self.ability.name, self.aiming_result))
+
+    def __eq__(self, other):
+        if not isinstance(other, PlausibleFreeAction):
+            return False
+        return (self.ability.name, self.aiming_result) == (
+            other.ability.name,
+            other.aiming_result,
+        )
 
     @property
     def ends_turn(self) -> bool:

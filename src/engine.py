@@ -116,7 +116,7 @@ class Engine:
         self._entity_by_pos: Dict[Point, "Entity"] = {}
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
         self._reaction_declined_sets: List[set] = []
-        self._current_choices = None
+        self.current_choices = None
 
     @property
     def is_done(self):
@@ -150,9 +150,9 @@ class Engine:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
             return 0
-        self._current_choices = choices  # for state hashing
+        self.current_choices = choices  # for state hashing
         index = self.agents[team].choose(choices)
-        self._current_choices = []
+        self.current_choices = []
         return index
 
     def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
@@ -198,7 +198,7 @@ class Engine:
             while self.active_entity is None:
                 self.next_turn()  # todo unsure. Fragile.
 
-            entity = self.active_entity
+            entity: "Entity" = self.active_entity
             pbar.update()
             if after_state:
                 before_state = after_state
@@ -567,8 +567,8 @@ class Engine:
                     modifiers_state,
                 )
             )
-        if self._current_choices:
-            choices = frozenset((choice for choice in self._current_choices))
+        if self.current_choices:
+            choices = frozenset((choice for choice in self.current_choices))
         else:
             choices = None
         marker_states = frozenset((m.id, m.name, m.pos, m.team) for m in self.markers)
@@ -578,7 +578,7 @@ class Engine:
             self.current_team,
             self.current_turn_hero.id if self.current_turn_hero else None,
             self.active_entity.id if self.active_entity else None,
-            choices, # seems to never get collision
+            choices,
             frozenset(entity_states),
             marker_states,
             # tuple(frozenset(s) for s in self._reaction_declined_sets),
