@@ -332,11 +332,14 @@ class Engine:
     def next_turn(self) -> None:
         self.action_history.append(-1)  # end turn
 
-        if self.current_turn_hero is not None:
+        if self.current_turn_hero is None:
+            # First turn
+            pass
+        else:
             TurnEndEvent(self.current_turn_hero).resolve()
+            self._advance_hero_indices()
 
         while not self.is_done:
-            self._advance_hero_indices()
             new_current_activator = self._get_current_activator()
             if new_current_activator is None:
                 continue
@@ -353,6 +356,7 @@ class Engine:
             # This hero's turn has no one to act (e.g. they and their summons are dead),
             # so end the turn and find the next.
             TurnEndEvent(self.current_turn_hero).resolve()
+            self._advance_hero_indices()
 
         # Game is done.
         self.active_entity = None
@@ -436,7 +440,7 @@ class Engine:
                         if (
                             roll_result.roll is not None
                             and roll_result.roll > ability.instant_speed
-                        ):
+                        ):  # todo they need to declare reactions before the roll
                             is_after = True
                     reaction_phase = "after" if is_after else "before"
 
