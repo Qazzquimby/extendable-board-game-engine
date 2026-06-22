@@ -58,14 +58,34 @@ class AimingResult:
         if self.sub_aimings:
             sub_aimings = self.sub_aimings
         else:
-            sub_aimings = ()
+            sub_aimings = dict
         return hash(
             (
-                (p for p in self.target_points),
-                (p for p in self.included_points),
-                (hash(sub) for sub in sub_aimings),
+                frozenset(self.target_points),
+                frozenset(self.included_points),
+                frozenset((k, hash(v)) for k, v in sub_aimings.items()),
             )
         )
+
+    def __eq__(self, other):
+        if self is None or other is None:
+            return self is other
+
+        if self.sub_aimings or other.sub_aimings:
+            if not (self.sub_aimings and other.sub_aimings) or set(
+                self.sub_aimings.keys()
+            ) != set(other.sub_aimings.keys()):
+                return False
+            return all(
+                (self.sub_aimings[k] == other.sub_aiming[k]) for k in self.sub_aimings
+            )
+
+        a_targets = set(getattr(self, "target_points", []))
+        b_targets = set(getattr(other, "target_points", []))
+        a_included = set(getattr(self, "included_points", []))
+        b_included = set(getattr(other, "included_points", []))
+
+        return a_targets == b_targets and a_included == b_included
 
 
 MultipleAimingResults = Dict[str, AimingResult]
