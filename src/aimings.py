@@ -58,7 +58,7 @@ class AimingResult:
         if self.sub_aimings:
             sub_aimings = self.sub_aimings
         else:
-            sub_aimings = dict
+            sub_aimings = dict()
         return hash(
             (
                 frozenset(self.target_points),
