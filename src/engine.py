@@ -46,12 +46,12 @@ NUM_ROUNDS = 6
 
 class Agent(abc.ABC):
     @abc.abstractmethod
-    def choose(self, choices: List["Choice"]) -> int:
+    def choose(self, choices: List["Choice"], engine: Optional["Engine"] = None) -> int:
         pass
 
 
 class RandomAgent(Agent):
-    def choose(self, choices: List["Choice"]) -> int:
+    def choose(self, choices: List["Choice"], engine: Optional["Engine"] = None) -> int:
         return random.randint(0, len(choices) - 1)
 
 
@@ -117,6 +117,7 @@ class Engine:
         self._markers_by_pos: Dict[Point, List["Marker"]] = {}
         self._reaction_declined_sets: List[set] = []
         self.current_choices = None
+        self.is_resolving_action = False
 
     @property
     def is_done(self):
@@ -151,7 +152,7 @@ class Engine:
         if len(choices) == 1:
             return 0
         self.current_choices = choices  # for state hashing
-        index = self.agents[team].choose(choices)
+        index = self.agents[team].choose(choices, engine=self)
         self.current_choices = []
         return index
 
@@ -279,25 +280,31 @@ class Engine:
     ) -> None:
         self.action_history.append(action_idx)
 
-        if actor is None:
-            actor = self.current_turn_hero
+        was_resolving = getattr(self, "is_resolving_action", False)
+        self.is_resolving_action = True
 
-        target_str = f" on {action.target.name}" if action.target else ""
+        try:
+            if actor is None:
+                actor = self.current_turn_hero
 
-        if isinstance(action, PlausibleMoveAndAction):
-            for point in action.move_path:
-                ChangeLocationEvent(actor, point).resolve()
+            target_str = f" on {action.target.name}" if action.target else ""
 
-        # todo cover included entities. Make aiming_result __str__
-        with log(f"{actor.name} used {action.ability.name}{target_str}."):
-            # current_ability = next(
-            #     (a for a in actor.abilities if a.name == action.ability.name),
-            #     action.ability,
-            # )  # todo why not use action.ability
-            # assert action.ability.name == current_ability.name
-            action.ability.execute(
-                engine=self, source=actor, aiming_result=action.aiming_result
-            )
+            if isinstance(action, PlausibleMoveAndAction):
+                for point in action.move_path:
+                    ChangeLocationEvent(actor, point).resolve()
+
+            # todo cover included entities. Make aiming_result __str__
+            with log(f"{actor.name} used {action.ability.name}{target_str}."):
+                # current_ability = next(
+                #     (a for a in actor.abilities if a.name == action.ability.name),
+                #     action.ability,
+                # )  # todo why not use action.ability
+                # assert action.ability.name == current_ability.name
+                action.ability.execute(
+                    engine=self, source=actor, aiming_result=action.aiming_result
+                )
+        finally:
+            self.is_resolving_action = was_resolving
 
     def setup_activation_queue(self):
         self.activation_queue = [self.current_turn_hero] + [
@@ -511,6 +518,7 @@ class Engine:
         result.current_team = self.current_team
         result.current_hero_row_index = self.current_hero_row_index
         result.activation_index = self.activation_index
+        result.is_resolving_action = getattr(self, "is_resolving_action", False)
         result._next_id = self._next_id
         result._entity_by_pos = {}
         result._markers_by_pos = {}
