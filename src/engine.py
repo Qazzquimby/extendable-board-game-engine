@@ -528,6 +528,7 @@ class Engine:
         result._reaction_declined_sets = copy.deepcopy(
             self._reaction_declined_sets, memo
         )
+        result.current_choices = copy.deepcopy(self.current_choices, memo)
 
         return result
 

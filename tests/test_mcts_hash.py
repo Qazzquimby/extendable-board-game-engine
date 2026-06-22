@@ -2,8 +2,9 @@ from engine import Engine
 from entities import Entity
 from grid import Grid
 from point import Point
-from abilities import Ability, ActionCost, DamageInstruction, HealInstruction
+from abilities import Ability, ActionCost, HealInstruction
 from aimings import TargetSelf
+from ai.mcts import InterruptAgent, ChoiceRequest
 
 
 def test_deterministic_step_same_hash():
@@ -50,14 +51,23 @@ def test_deterministic_step_same_hash():
     action_to_take = actions1[0]
     action_idx = 0
 
+    engine1.agents = {0: InterruptAgent(0), 1: InterruptAgent(1)}
+    engine2.agents = {0: InterruptAgent(0), 1: InterruptAgent(1)}
+
     engine1.rng.stochastic_flag = False
-    engine1.step(action_to_take, action_idx=action_idx)
+    try:
+        engine1.step(action_to_take, action_idx=action_idx)
+    except ChoiceRequest:
+        pass
 
     actions2 = engine2.get_legal_actions()
     action2_to_take = actions2[action_idx]
 
     engine2.rng.stochastic_flag = False
-    engine2.step(action2_to_take, action_idx=action_idx)
+    try:
+        engine2.step(action2_to_take, action_idx=action_idx)
+    except ChoiceRequest:
+        pass
 
     assert engine1._get_hash_info() == engine2._get_hash_info()
     assert engine1.hash() == engine2.hash()
@@ -93,27 +103,25 @@ def test_reaction_choice_same_hash():
     engine1.finalize_setup()
     engine1.next_turn()
 
-    class MockAgent:
-        def __init__(self):
-            self.choices_seen = []
-
-        def choose(self, choices):
-            self.choices_seen.append(choices)
-            return 0
-
-    engine1.agents = {0: MockAgent(), 1: MockAgent()}
+    engine1.agents = {0: InterruptAgent(0), 1: InterruptAgent(1)}
     engine2 = engine1.copy()
-    engine2.agents = {0: MockAgent(), 1: MockAgent()}
+    engine2.agents = {0: InterruptAgent(0), 1: InterruptAgent(1)}
 
     actions1 = engine1.get_legal_actions()
     strike_action = next(a for a in actions1 if a.ability.name == "Heal")
     strike_idx = actions1.index(strike_action)
 
-    engine1.step(strike_action, action_idx=strike_idx)
+    try:
+        engine1.step(strike_action, action_idx=strike_idx)
+    except ChoiceRequest:
+        pass
 
     actions2 = engine2.get_legal_actions()
     strike_action2 = actions2[strike_idx]
-    engine2.step(strike_action2, action_idx=strike_idx)
+    try:
+        engine2.step(strike_action2, action_idx=strike_idx)
+    except ChoiceRequest:
+        pass
 
     assert engine1._get_hash_info() == engine2._get_hash_info()
     assert engine1.hash() == engine2.hash()
