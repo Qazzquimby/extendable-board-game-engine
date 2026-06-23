@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 100
-NUM_SIMS = 100
+NUM_SIMS = 1000
 
 
 @dataclass
@@ -342,12 +342,18 @@ class SimulationComplete(Exception):
 
 class TreeSearchAgent(Agent):
     def __init__(
-        self, mcts: "MCTSAgent", sim_env: Engine, path: "SearchPath", team: int
+        self,
+        mcts: "MCTSAgent",
+        sim_env: Engine,
+        path: "SearchPath",
+        team: int,
+        root_node: Optional[MCTSNode] = None,
     ):
         self.mcts = mcts
         self.sim_env = sim_env
         self.path = path
         self.team = team
+        self.root_node = root_node
 
     def choose(self, choices: List[Choice], engine: Optional[Engine] = None) -> int:
         if len(choices) <= 1:
@@ -355,16 +361,29 @@ class TreeSearchAgent(Agent):
 
         key = self.sim_env.hash()
 
+        if not self.path.steps and self.root_node is not None:
+            node = self.root_node
+            key = node.key
+        else:
+            node = self.mcts.cache.get_matching_node(key)
+            if not node:
+                node = MCTSNode(key=key, current_player_index=self.team, env=engine)
+                self.mcts.cache.cache_node(key, node)
+
+        assert len(node.env.current_choices) == len(choices)
+
+        if self.path.steps:
+            last_step = self.path.steps[-1]
+            if last_step.action_taken is not None:
+                last_node = last_step.node
+                edge = last_node.edges[last_step.action_taken]
+                edge.child_node_keys.add(key)
+
         if self.path.has_visited_key(key):
             # Cycle detected, abort simulation
             player_to_value = {0: 0.0, 1: 0.0}
             self.mcts.backprop.backpropagate(self.path, player_to_value)
             raise SimulationComplete()
-
-        node = self.mcts.cache.get_matching_node(key)
-        if not node:
-            node = MCTSNode(key=key, current_player_index=self.team, env=None)
-            self.mcts.cache.cache_node(key, node)
 
         self.path.add_node(node)
 
@@ -382,7 +401,7 @@ class TreeSearchAgent(Agent):
         best_action_index = self.mcts.selection._select_action_index_from_edges(
             current_node=node, start_node=None, contender_actions=None
         )
-
+        assert len(node.edges) == len(choices) == len(node.env.current_choices)
         self.path.set_action_for_last_node(best_action_index)
         return best_action_index
 
@@ -398,6 +417,65 @@ class MCTSAgent(Agent):
         self.backprop = StandardBackpropagation()
         self.cache = MCTSNodeCache()
 
+    def _run_simulation(self, env: Engine, root_node: MCTSNode) -> None:
+        sim_env = env.copy()
+        sim_env.rng.stochastic_flag = False
+
+        path = SearchPath()
+        agent0 = TreeSearchAgent(self, sim_env, path, team=0, root_node=root_node)
+        agent1 = TreeSearchAgent(self, sim_env, path, team=1, root_node=root_node)
+        sim_env.agents = {0: agent0, 1: agent1}
+
+        try:
+            while not sim_env.is_done:
+                while sim_env.active_entity is None:  # todo 'get_active_entity'
+                    sim_env.next_turn()
+                    if sim_env.is_done:
+                        break
+                if sim_env.is_done:
+                    break
+
+                entity: "Entity" = sim_env.active_entity
+                if entity.hp <= 0:
+                    sim_env.advance_to_next_activator()
+                    continue
+
+                all_choices = sim_env.get_legal_actions()
+                if not all_choices:
+                    sim_env.advance_to_next_activator()
+                    continue
+
+                action_index = sim_env.get_choice_index(
+                    team=entity.team, choices=all_choices
+                )
+                action_choice = all_choices[action_index]
+
+                sim_env.step(
+                    actor=entity,
+                    action=action_choice,
+                    action_idx=action_index,
+                )
+
+                if isinstance(action_choice, PlausibleMoveAndAction):
+                    sim_env.advance_to_next_activator()
+
+            # If we reach here, the game finished without hitting an unexpanded node
+            if path.steps:
+                winner = sim_env.get_winning_player()
+                curr_player = path.last_node.current_player_index
+                if winner is None:
+                    val = 0.0
+                else:
+                    val = 1.0 if winner == curr_player else -1.0
+
+                player_to_value = {
+                    curr_player: val,
+                    1 - curr_player: -val,
+                }
+                self.backprop.backpropagate(path, player_to_value)
+        except SimulationComplete:
+            pass
+
     def choose(self, choices: List[Choice], engine: Optional[Engine] = None) -> int:
         if len(choices) <= 1:
             return 0
@@ -410,7 +488,7 @@ class MCTSAgent(Agent):
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(
-                key=root_key, current_player_index=env.get_current_player()
+                key=root_key, current_player_index=env.get_current_player(), env=engine
             )
             self.cache.cache_node(root_key, root_node)
 
@@ -425,63 +503,7 @@ class MCTSAgent(Agent):
             log.enabled = False
             try:
                 for _ in range(self.num_simulations):
-                    sim_env = env.copy()
-                    sim_env.rng.stochastic_flag = False
-
-                    path = SearchPath()
-                    agent0 = TreeSearchAgent(self, sim_env, path, team=0)
-                    agent1 = TreeSearchAgent(self, sim_env, path, team=1)
-                    sim_env.agents = {0: agent0, 1: agent1}
-
-                    try:
-                        while not sim_env.is_done:
-                            while sim_env.active_entity is None:
-                                sim_env.next_turn()
-                                if sim_env.is_done:
-                                    break
-                            if sim_env.is_done:
-                                break
-
-                            entity: "Entity" = sim_env.active_entity
-                            if entity.hp <= 0:
-                                sim_env.advance_to_next_activator()
-                                continue
-
-                            all_choices = sim_env.get_legal_actions()
-                            if not all_choices:
-                                sim_env.advance_to_next_activator()
-                                continue
-
-                            action_index = sim_env.get_choice_index(
-                                team=entity.team, choices=all_choices
-                            )
-                            action_choice = all_choices[action_index]
-
-                            sim_env.step(
-                                actor=entity,
-                                action=action_choice,
-                                action_idx=action_index,
-                            )
-
-                            if isinstance(action_choice, PlausibleMoveAndAction):
-                                sim_env.advance_to_next_activator()
-
-                        # If we reach here, the game finished without hitting an unexpanded node
-                        if path.steps:
-                            winner = sim_env.get_winning_player()
-                            curr_player = path.last_node.current_player_index
-                            if winner is None:
-                                val = 0.0
-                            else:
-                                val = 1.0 if winner == curr_player else -1.0
-
-                            player_to_value = {
-                                curr_player: val,
-                                1 - curr_player: -val,
-                            }
-                            self.backprop.backpropagate(path, player_to_value)
-                    except SimulationComplete:
-                        pass
+                    self._run_simulation(env, root_node)
             finally:
                 log.enabled = True
 

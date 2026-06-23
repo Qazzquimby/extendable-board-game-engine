@@ -154,6 +154,7 @@ class Engine:
         self.current_choices = choices  # for state hashing
         index = self.agents[team].choose(choices, engine=self)
         self.current_choices = []
+        assert 0 <= index < len(choices)
         return index
 
     def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
