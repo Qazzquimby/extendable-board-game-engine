@@ -1,10 +1,11 @@
 import math
 from heapq import heappush, heappop
 from itertools import count
-from typing import Tuple, Set, List, Optional, Callable, TYPE_CHECKING
+from typing import Tuple, Set, List, Optional, TYPE_CHECKING
 from collections import deque
 from enum import Enum
 from point import Point
+from util import UniqueTuple
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -115,11 +116,11 @@ class Grid:
         self,
         actor: "Entity",
         max_movement: int,
-    ) -> Set[Point]:
+    ) -> UniqueTuple[Point]:
         """Finds all points reachable within max_movement using orthogonal steps. Path is blocked by enemies. Cannot end on any occupied space."""
         start = actor.pos
         if max_movement < 0:
-            return set()
+            return UniqueTuple()
 
         enemy_points = {
             e.pos
@@ -151,9 +152,9 @@ class Grid:
                             queue.append((n, cost + 1))
 
         # Cannot end on occupied spaces
-        reachable_points = {p for p in visited.keys() if p not in occupied_points}
-        reachable_points.add(start)  # Can always stay where we are
-        return reachable_points
+        reachable_points = [p for p in visited.keys() if p not in occupied_points]
+        reachable_points.append(start)  # Can always stay where we are
+        return UniqueTuple(reachable_points)
 
     def is_movement_blocked(
         self,

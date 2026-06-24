@@ -37,6 +37,7 @@ from logger import reset_logs, get_logs, log
 from point import Point
 from queries import QueryIsAlive, Query
 from schemas import EngineState, GameLog, LogEntry, ActionState
+from util import UniqueTuple
 
 ChoiceT = TypeVar("ChoiceT", bound="Choice")
 
@@ -46,16 +47,13 @@ NUM_ROUNDS = 6
 
 class Agent(abc.ABC):
     @abc.abstractmethod
-    def choose(
-        self, choices: tuple["Choice"], env: "Engine"
-    ) -> int:
+    def choose(self, env: "Engine") -> int:
         pass
 
 
 class RandomAgent(Agent):
-    def choose(
-        self, choices: tuple["Choice"], engine: Optional["Engine"] = None
-    ) -> int:
+    def choose(self, env: Optional["Engine"]) -> int:
+        choices = env.current_choices
         return random.randint(0, len(choices) - 1)
 
 
@@ -156,18 +154,18 @@ class Engine:
         for entity in self.entities:
             DeployEvent(entity).resolve()
 
-    def get_choice_index(self, team: int, choices: tuple[ChoiceT]) -> int:
+    def get_choice_index(self, team: int, choices: UniqueTuple[ChoiceT]) -> int:
         if not choices:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
             return 0
         self.current_choices = choices
-        index = self.agents[team].choose(choices, engine=self)
+        index = self.agents[team].choose(env=self)
         self.current_choices = []
         assert 0 <= index < len(choices)
         return index
 
-    def get_choice(self, team: int, choices: List[ChoiceT]) -> ChoiceT:
+    def get_choice(self, team: int, choices: UniqueTuple[ChoiceT]) -> ChoiceT:
         index = self.get_choice_index(team=team, choices=choices)
         return choices[index]
 

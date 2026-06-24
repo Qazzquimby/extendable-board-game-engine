@@ -107,7 +107,6 @@ def get_plausible_movements(
         actor=actor,
         max_movement=QuerySpeed(actor).resolve().value,
     )
-    reachable_points.add(actor.pos)
 
     proposed_moves = {actor.pos: "Stay"}
     if reachable_points:

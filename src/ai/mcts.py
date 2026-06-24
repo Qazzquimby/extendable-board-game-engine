@@ -355,8 +355,8 @@ class TreeSearchAgent(Agent):
         self.team = team
         self.root_node = root_node
 
-    def choose(self, choices: tuple[Choice], env: Engine) -> int:
-        assert choices == env.current_choices
+    def choose(self, env: Engine) -> int:
+        choices = env.current_choices
         if len(choices) <= 1:
             return 0
 
@@ -476,8 +476,8 @@ class MCTSAgent(Agent):
         except SimulationComplete:
             pass
 
-    def choose(self, choices: tuple[Choice], env: Engine) -> int:
-        assert choices == env.current_choices
+    def choose(self, env: Engine) -> int:
+        choices = env.current_choices
         if len(choices) <= 1:
             return 0
 

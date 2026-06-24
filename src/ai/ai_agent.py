@@ -9,7 +9,8 @@ class LinearWeightAgent(Agent):
         self.weights: dict[str, float] = weights
         self.default_weight = 0.0
 
-    def choose(self, choices: List[Choice]) -> int:
+    def choose(self, env: "Engine") -> int:
+        choices = env.current_choices
         if not choices:
             return 0
         if len(choices) == 1:

@@ -39,7 +39,8 @@ class FeatureWeightedAgent(Agent):
             weighted_features=self.weighted_features
         )
 
-    def choose(self, choices: List[Choice]) -> int:
+    def choose(self, env: "Engine") -> int:
+        choices = env.current_choices
         if not choices:
             return 0
 
