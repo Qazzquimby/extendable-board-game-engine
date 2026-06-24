@@ -355,18 +355,23 @@ class TreeSearchAgent(Agent):
         self.team = team
         self.root_node = root_node
 
-    def choose(self, choices: List[Choice], engine: Optional[Engine] = None) -> int:
+    def choose(self, choices: tuple[Choice], engine: Optional[Engine] = None) -> int:
         if len(choices) <= 1:
             return 0
 
         key = self.sim_env.hash()
 
+        using_root = False
+        matching_node = False
         if not self.path.steps and self.root_node is not None:
+            using_root = True
             node = self.root_node
-            key = node.key
+            assert key == node.key
+            # key = node.key
         else:
             node = self.mcts.cache.get_matching_node(key)
             if not node:
+                matching_node = False
                 node = MCTSNode(key=key, current_player_index=self.team, env=engine)
                 self.mcts.cache.cache_node(key, node)
 
@@ -490,7 +495,7 @@ class MCTSAgent(Agent):
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(
-                key=root_key, current_player_index=env.get_current_player()
+                key=root_key, current_player_index=env.get_current_player(), env=engine
             )
             self.cache.cache_node(root_key, root_node)
 

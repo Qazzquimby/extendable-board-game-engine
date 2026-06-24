@@ -9,6 +9,9 @@ class Point(NamedTuple):
         delta = self - other
         return abs(delta.x) + abs(delta.y)
 
+    def __str__(self):
+        return f"({self.x},{self.y})"
+
     def __add__(self, other: "Point") -> "Point":
         return Point(x=self.x + other.x, y=self.y + other.y)
 

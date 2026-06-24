@@ -137,7 +137,7 @@ def get_plausible_movements(
                         + point.get_distance(actor.pos),
                     )
                     proposed_moves[best_at_range] = (
-                        f"Range {attack_range} for {ability.name}"
+                        f"Range {attack_range} of {enemy.pos} for {ability.name}"
                     )
 
         # For each ally, find a good position to "guard" them from nearest enemy

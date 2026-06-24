@@ -46,12 +46,16 @@ NUM_ROUNDS = 6
 
 class Agent(abc.ABC):
     @abc.abstractmethod
-    def choose(self, choices: List["Choice"], engine: Optional["Engine"] = None) -> int:
+    def choose(
+        self, choices: tuple["Choice"], engine: Optional["Engine"] = None
+    ) -> int:
         pass
 
 
 class RandomAgent(Agent):
-    def choose(self, choices: List["Choice"], engine: Optional["Engine"] = None) -> int:
+    def choose(
+        self, choices: tuple["Choice"], engine: Optional["Engine"] = None
+    ) -> int:
         return random.randint(0, len(choices) - 1)
 
 
@@ -127,15 +131,17 @@ class Engine:
         alive_teams = {e.team for e in self.living_entities}
         return len(alive_teams) <= 1
 
-    def get_legal_actions(self) -> List[Choice]:
+    def get_legal_actions(self) -> tuple[Choice]:
         entity = self.active_entity
         if self.is_done or not entity or entity.hp <= 0:
-            return []
+            return tuple()
         agent = self.agents.get(entity.team)
         feature_evaluator = getattr(agent, "feature_evaluator", None) if agent else None
         moves = get_plausible_move_and_actions(entity, self, feature_evaluator)
         frees = get_plausible_free_actions(entity, self, feature_evaluator)
-        return moves + frees
+        all_actions = moves + frees
+        deduped = tuple(dict.fromkeys(all_actions))
+        return deduped
 
     def finalize_setup(self):
         self.team_heroes = [
@@ -146,7 +152,7 @@ class Engine:
         for entity in self.entities:
             DeployEvent(entity).resolve()
 
-    def get_choice_index(self, team: int, choices: List[ChoiceT]) -> int:
+    def get_choice_index(self, team: int, choices: tuple[ChoiceT]) -> int:
         if not choices:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
@@ -539,8 +545,7 @@ class Engine:
         )
         result.current_choices = copy.deepcopy(self.current_choices, memo)
         if result.current_choices:
-            # Doesn't fail
-            assert len(result.current_choices) == len(self.current_choices)
+            assert hash(result.current_choices) == hash(self.current_choices)
 
         return result
 
