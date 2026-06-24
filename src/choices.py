@@ -66,23 +66,6 @@ class PlausibleMoveAndAction(Choice):
             other.aiming_result,
         )
 
-    def _compute_features(
-        self,
-        actor: "Entity",
-        engine: "Engine",
-        feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
-    ) -> Dict[str, Any]:
-        base_features = {NEW_LOCATION(name=actor.name): self.move_pos}
-        return _compute_ability_features(
-            actor=actor,
-            engine=engine,
-            ability=self.ability,
-            aiming_result=self.aiming_result,
-            feature_evaluator=feature_evaluator,
-            base_features=base_features,
-            choice=self,
-        )
-
 
 def get_plausible_move_and_actions(
     actor: "Entity",

@@ -538,6 +538,9 @@ class Engine:
             self._reaction_declined_sets, memo
         )
         result.current_choices = copy.deepcopy(self.current_choices, memo)
+        if result.current_choices:
+            # Doesn't fail
+            assert len(result.current_choices) == len(self.current_choices)
 
         return result
 
@@ -582,7 +585,8 @@ class Engine:
                 )
             )
         if self.current_choices:
-            choices = frozenset((choice for choice in self.current_choices))
+            choices = frozenset(self.current_choices)
+            assert len(choices) == len(self.current_choices)
         else:
             choices = None
         marker_states = frozenset((m.id, m.name, m.pos, m.team) for m in self.markers)

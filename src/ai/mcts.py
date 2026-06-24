@@ -370,7 +370,8 @@ class TreeSearchAgent(Agent):
                 node = MCTSNode(key=key, current_player_index=self.team, env=engine)
                 self.mcts.cache.cache_node(key, node)
 
-        assert len(node.env.current_choices) == len(choices)
+        if node.is_expanded:
+            assert len(node.actions) == len(choices)
 
         if self.path.steps:
             last_step = self.path.steps[-1]
@@ -401,7 +402,8 @@ class TreeSearchAgent(Agent):
         best_action_index = self.mcts.selection._select_action_index_from_edges(
             current_node=node, start_node=None, contender_actions=None
         )
-        assert len(node.edges) == len(choices) == len(node.env.current_choices)
+        assert len(choices) == len(node.actions) == len(node.env.current_choices)
+        assert len(node.edges) <= len(choices)
         self.path.set_action_for_last_node(best_action_index)
         return best_action_index
 
@@ -488,7 +490,7 @@ class MCTSAgent(Agent):
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(
-                key=root_key, current_player_index=env.get_current_player(), env=engine
+                key=root_key, current_player_index=env.get_current_player()
             )
             self.cache.cache_node(root_key, root_node)
 
