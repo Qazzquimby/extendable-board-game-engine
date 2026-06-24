@@ -47,7 +47,7 @@ NUM_ROUNDS = 6
 class Agent(abc.ABC):
     @abc.abstractmethod
     def choose(
-        self, choices: tuple["Choice"], engine: Optional["Engine"] = None
+        self, choices: tuple["Choice"], env: "Engine"
     ) -> int:
         pass
 
@@ -517,7 +517,6 @@ class Engine:
         result.grid = self.grid
         if result.grid:
             result.grid.engine = result
-        result.router = Router()
 
         # Copy simple state
         result.initial_seed = self.initial_seed
@@ -548,6 +547,9 @@ class Engine:
         if result.current_choices:
             assert hash(result.current_choices) == hash(self.current_choices)
 
+        result.router = copy.deepcopy(self.router, memo)
+        assert len(result.router.subscribers) == len(self.router.subscribers)
+        # todo still missing pending events..?
         return result
 
     def get_current_player(self) -> int:

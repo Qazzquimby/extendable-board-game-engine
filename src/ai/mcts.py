@@ -269,7 +269,7 @@ class UniformExpansion(ExpansionStrategy):
         self,
         node: MCTSNode,
         env_at_node: Engine,
-        pending_choices: Optional[List[Choice]] = None,
+        pending_choices: Optional[tuple[Choice]] = None,
     ) -> None:
         if node.is_expanded or env_at_node.is_done:
             return
@@ -347,29 +347,30 @@ class TreeSearchAgent(Agent):
         sim_env: Engine,
         path: "SearchPath",
         team: int,
+        root_node: "MCTSNode",
     ):
         self.mcts = mcts
         self.sim_env = sim_env
         self.path = path
         self.team = team
-        self.root_node = None
+        self.root_node = root_node
 
-    def choose(self, choices: tuple[Choice], engine: Optional[Engine] = None) -> int:
-        assert choices == engine.current_choices
+    def choose(self, choices: tuple[Choice], env: Engine) -> int:
+        assert choices == env.current_choices
         if len(choices) <= 1:
             return 0
 
         key = self.sim_env.hash()
-
-        node_existed = False
         node = self.mcts.cache.get_matching_node(key)
+        matched = False
         if not node:
-            node_existed = True
-            node = MCTSNode(key=key, current_player_index=self.team, env=engine)
+            matched = True
+            node = MCTSNode(key=key, current_player_index=self.team, env=env)
             self.mcts.cache.cache_node(key, node)
 
         if not self.path.steps:
-            self.root_node = node
+            assert node.key == key
+            assert self.root_node.key == key
 
         if node.is_expanded:
             assert len(node.actions) == len(choices)
@@ -425,12 +426,17 @@ class MCTSAgent(Agent):
         sim_env.rng.stochastic_flag = False
 
         path = SearchPath()
-        agent0 = TreeSearchAgent(self, sim_env=sim_env, path=path, team=0)
-        agent1 = TreeSearchAgent(self, sim_env=sim_env, path=path, team=1)
+        agent0 = TreeSearchAgent(
+            self, sim_env=sim_env, path=path, team=0, root_node=root_node
+        )
+        agent1 = TreeSearchAgent(
+            self, sim_env=sim_env, path=path, team=1, root_node=root_node
+        )
         sim_env.agents = {0: agent0, 1: agent1}
 
         try:
             while not sim_env.is_done:
+                # todo this might desync the root node in agents?
                 entity = sim_env.advance_until_active_entity()
                 if sim_env.is_done:
                     break
@@ -470,25 +476,22 @@ class MCTSAgent(Agent):
         except SimulationComplete:
             pass
 
-    def choose(self, choices: List[Choice], engine: Optional[Engine] = None) -> int:
-        assert choices == engine.current_choices
+    def choose(self, choices: tuple[Choice], env: Engine) -> int:
+        assert choices == env.current_choices
         if len(choices) <= 1:
             return 0
-
-        env = engine
-        if env is None:
-            raise ValueError("MCTSAgent requires the engine to be passed to choose()")
 
         root_key = env.hash()
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(
-                key=root_key, current_player_index=env.get_current_player(), env=engine
+                key=root_key, current_player_index=env.get_current_player(), env=env
             )
             self.cache.cache_node(root_key, root_node)
 
         # Fix: Expand the root node immediately with the exact choices provided by the engine.
         # This prevents mid-turn reactive abilities from being overwritten by standard legal actions.
+        # todo could cause root node desync?
         if not root_node.is_expanded:
             self.expansion.expand(
                 node=root_node, env_at_node=env, pending_choices=choices
