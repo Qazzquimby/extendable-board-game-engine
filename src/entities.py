@@ -142,26 +142,27 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
-    def get_legal_actions(self) -> List[Ability]:
-        # Returns all abilities the entity has. Modifiers can alter this list.
-        # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.
-        legal = []
-        for ability in self.abilities:
-            if ability.is_tapped:
-                continue
-            if ability.charges is not None and ability.charges <= 0:
-                continue
-            if (
-                ability.is_ultimate
-                and ability.ultimate_turn is not None
-                and self.engine.round_num < ability.ultimate_turn
-            ):
-                continue
-            legal.append(ability)
-
-        q = QueryLegalActions(self, base_result=legal)
-        self.engine.router.publish(q, EventPhase.QUERY)
-        return q.result
+    # Seems not used now
+    # def get_legal_actions(self) -> List[Ability]:
+    #     # Returns all abilities the entity has. Modifiers can alter this list.
+    #     # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.
+    #     legal = []
+    #     for ability in self.abilities:
+    #         if ability.is_tapped:
+    #             continue
+    #         if ability.charges is not None and ability.charges <= 0:
+    #             continue
+    #         if (
+    #             ability.is_ultimate
+    #             and ability.ultimate_turn is not None
+    #             and self.engine.round_num < ability.ultimate_turn
+    #         ):
+    #             continue
+    #         legal.append(ability)
+    #
+    #     q = QueryLegalActions(self, base_result=legal)
+    #     self.engine.router.publish(q, EventPhase.QUERY)
+    #     return q.result
 
     def get_defense(
         self,

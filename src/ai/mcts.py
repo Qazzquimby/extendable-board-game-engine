@@ -347,13 +347,12 @@ class TreeSearchAgent(Agent):
         sim_env: Engine,
         path: "SearchPath",
         team: int,
-        root_node: Optional[MCTSNode] = None,
     ):
         self.mcts = mcts
         self.sim_env = sim_env
         self.path = path
         self.team = team
-        self.root_node = root_node
+        self.root_node = None
 
     def choose(self, choices: tuple[Choice], engine: Optional[Engine] = None) -> int:
         assert choices == engine.current_choices
@@ -362,19 +361,15 @@ class TreeSearchAgent(Agent):
 
         key = self.sim_env.hash()
 
-        using_root = False
-        matching_node = False
-        if not self.path.steps and self.root_node is not None:
-            using_root = True
-            node = self.root_node
-            assert key == node.key
-            # key = node.key
-        else:
-            node = self.mcts.cache.get_matching_node(key)
-            if not node:
-                matching_node = False
-                node = MCTSNode(key=key, current_player_index=self.team, env=engine)
-                self.mcts.cache.cache_node(key, node)
+        node_existed = False
+        node = self.mcts.cache.get_matching_node(key)
+        if not node:
+            node_existed = True
+            node = MCTSNode(key=key, current_player_index=self.team, env=engine)
+            self.mcts.cache.cache_node(key, node)
+
+        if not self.path.steps:
+            self.root_node = node
 
         if node.is_expanded:
             assert len(node.actions) == len(choices)
@@ -425,34 +420,25 @@ class MCTSAgent(Agent):
         self.backprop = StandardBackpropagation()
         self.cache = MCTSNodeCache()
 
-    def _run_simulation(self, env: Engine, root_node: MCTSNode) -> None:
-        sim_env = env.copy()
+    def _run_simulation(self, root_node: MCTSNode) -> None:
+        sim_env = root_node.env.copy()
         sim_env.rng.stochastic_flag = False
 
         path = SearchPath()
-        agent0 = TreeSearchAgent(self, sim_env, path, team=0, root_node=root_node)
-        agent1 = TreeSearchAgent(self, sim_env, path, team=1, root_node=root_node)
+        agent0 = TreeSearchAgent(self, sim_env=sim_env, path=path, team=0)
+        agent1 = TreeSearchAgent(self, sim_env=sim_env, path=path, team=1)
         sim_env.agents = {0: agent0, 1: agent1}
 
         try:
             while not sim_env.is_done:
-                while sim_env.active_entity is None:  # todo 'get_active_entity'
-                    sim_env.next_turn()
-                    if sim_env.is_done:
-                        break
+                entity = sim_env.advance_until_active_entity()
                 if sim_env.is_done:
                     break
-
-                entity: "Entity" = sim_env.active_entity
                 if entity.hp <= 0:
                     sim_env.advance_to_next_activator()
                     continue
 
                 all_choices = sim_env.get_legal_actions()
-                if not all_choices:
-                    sim_env.advance_to_next_activator()
-                    continue
-
                 action_index = sim_env.get_choice_index(
                     team=entity.team, choices=all_choices
                 )
@@ -512,7 +498,7 @@ class MCTSAgent(Agent):
             log.enabled = False
             try:
                 for _ in range(self.num_simulations):
-                    self._run_simulation(env=env, root_node=root_node)
+                    self._run_simulation(root_node=root_node)
             finally:
                 log.enabled = True
 

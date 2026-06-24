@@ -129,16 +129,22 @@ class Engine:
         alive_teams = {e.team for e in self.living_entities}
         return len(alive_teams) <= 1
 
+    def advance_until_active_entity(self) -> "Entity":
+        while self.active_entity is None:
+            self.next_turn()
+            if self.is_done:
+                break
+        return self.active_entity
+
     def get_legal_actions(self) -> tuple[Choice]:
         entity = self.active_entity
-        if self.is_done or not entity or entity.hp <= 0:
-            return tuple()
-        agent = self.agents.get(entity.team)
-        feature_evaluator = getattr(agent, "feature_evaluator", None) if agent else None
-        moves = get_plausible_move_and_actions(entity, self, feature_evaluator)
-        frees = get_plausible_free_actions(entity, self, feature_evaluator)
+        assert not self.is_done and entity and entity.hp > 0
+
+        moves = get_plausible_move_and_actions(entity, self)
+        frees = get_plausible_free_actions(entity, self)
         all_actions = moves + frees
         deduped = tuple(dict.fromkeys(all_actions))
+        assert deduped
         return deduped
 
     def finalize_setup(self):
@@ -201,12 +207,9 @@ class Engine:
         self.next_turn()
 
         while not self.is_done:
+            entity = self.advance_until_active_entity()
             if self.is_done:
                 break
-            while self.active_entity is None:
-                self.next_turn()  # todo unsure. Fragile.
-
-            entity: "Entity" = self.active_entity
             pbar.update()
             if after_state:
                 before_state = after_state
