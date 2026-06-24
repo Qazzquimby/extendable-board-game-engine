@@ -356,6 +356,7 @@ class TreeSearchAgent(Agent):
         self.root_node = root_node
 
     def choose(self, choices: tuple[Choice], engine: Optional[Engine] = None) -> int:
+        assert choices == engine.current_choices
         if len(choices) <= 1:
             return 0
 
@@ -484,6 +485,7 @@ class MCTSAgent(Agent):
             pass
 
     def choose(self, choices: List[Choice], engine: Optional[Engine] = None) -> int:
+        assert choices == engine.current_choices
         if len(choices) <= 1:
             return 0
 
@@ -510,7 +512,7 @@ class MCTSAgent(Agent):
             log.enabled = False
             try:
                 for _ in range(self.num_simulations):
-                    self._run_simulation(env, root_node)
+                    self._run_simulation(env=env, root_node=root_node)
             finally:
                 log.enabled = True
 

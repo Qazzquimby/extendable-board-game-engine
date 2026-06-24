@@ -54,7 +54,7 @@ class Entity:
         self.pos = pos  # runs setter
 
     def __str__(self):
-        return self.name
+        return f"{self.name}({self.id})"
 
     def __deepcopy__(self, memo):
         if id(self) in memo:
@@ -132,13 +132,6 @@ class Entity:
             free_actions=self.free_actions,
             modifiers=[str(modifier) for modifier in self.modifiers],
         )
-
-    def get_hash(self) -> float:
-        import hashlib
-
-        key = f"{self.set}__{self.name}"
-        hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
-        return float(hash_int % 10000) / 100.0
 
     # --- Engine Query Helpers ---
     def has_armor(self) -> bool:

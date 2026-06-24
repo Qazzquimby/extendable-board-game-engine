@@ -55,7 +55,9 @@ class PlausibleMoveAndAction(Choice):
         super().__init__(features={})
 
     def __hash__(self):
-        return hash((self.ability.name, self.movement_name, self.aiming_result))
+        return hash(
+            (self.ability.name, self.movement_name, self.move_pos, self.aiming_result)
+        )
 
     def __eq__(self, other):
         if not isinstance(other, PlausibleMoveAndAction):
@@ -137,7 +139,7 @@ def get_plausible_movements(
                         + point.get_distance(actor.pos),
                     )
                     proposed_moves[best_at_range] = (
-                        f"Range {attack_range} of {enemy.pos} for {ability.name}"
+                        f"Range {attack_range} of {enemy}{enemy.id} for {ability.name}"
                     )
 
         # For each ally, find a good position to "guard" them from nearest enemy
