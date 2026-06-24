@@ -74,8 +74,6 @@ class Entity:
         result.speed = self.speed
 
         result._pos = self._pos
-        if result._pos:
-            result.engine._entity_by_pos[result._pos] = result
         result.team = self.team
         result.activator = copy.deepcopy(self.activator, memo)
 
@@ -94,12 +92,8 @@ class Entity:
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
         assert isinstance(value, Point) or value is None
-        if self._pos is not None:
-            if self.engine.entity_at(self._pos) == self:
-                del self.engine._entity_by_pos[self._pos]
         self._pos = value
-        if value is not None:
-            self.engine._entity_by_pos[value] = self
+        # may want to check no one else is there but right now engine.entity_at is O(n)
 
     def start_turn(self) -> None:
         self.move_actions = 1
@@ -273,8 +267,6 @@ class Summon(Entity):
         result.speed = self.speed
 
         result._pos = self._pos
-        if result._pos:
-            result.engine._entity_by_pos[result._pos] = result
         result.team = self.team
         result.activator = copy.deepcopy(self.activator, memo)
 
@@ -333,8 +325,6 @@ class Marker:
         result.id = self.id
         result.name = self.name
         result._pos = self._pos
-        if result._pos:
-            result.engine._markers_by_pos.setdefault(result._pos, []).append(result)
 
         result.team = self.team
         result.modifiers = copy.deepcopy(self.modifiers, memo)
@@ -346,11 +336,4 @@ class Marker:
 
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
-        if self._pos is not None:
-            if self in self.engine._markers_by_pos.get(self._pos, []):
-                self.engine._markers_by_pos[self._pos].remove(self)
-                if not self.engine._markers_by_pos[self._pos]:
-                    del self.engine._markers_by_pos[self._pos]
         self._pos = value
-        if value is not None:
-            self.engine._markers_by_pos.setdefault(value, []).append(self)

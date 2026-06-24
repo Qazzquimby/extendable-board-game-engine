@@ -117,8 +117,6 @@ class Engine:
         self.activation_queue: List["Entity"] = []
         self.activation_index: int = -1
         self._next_id: int = 1
-        self._entity_by_pos: Dict[Point, "Entity"] = {}
-        self._markers_by_pos: Dict[Point, List["Marker"]] = {}
         self._reaction_declined_sets: List[set] = []
         self.current_choices = None
         self.is_resolving_action = False
@@ -168,10 +166,12 @@ class Engine:
         return choices[index]
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
-        return self._entity_by_pos.get(pos)
+        return next(
+            (entity for entity in self.living_entities if entity.pos == pos), None
+        )
 
     def markers_at(self, pos: Point) -> List["Marker"]:
-        return self._markers_by_pos.get(pos, [])
+        return [marker for marker in self.markers if marker.pos == pos]
 
     @property
     def living_entities(self) -> List["Entity"]:
@@ -527,8 +527,6 @@ class Engine:
         result.activation_index = self.activation_index
         result.is_resolving_action = getattr(self, "is_resolving_action", False)
         result._next_id = self._next_id
-        result._entity_by_pos = {}
-        result._markers_by_pos = {}
 
         # --- Deep copy object graph. This is order-dependent.
         # This will call __deepcopy__ on each entity and modifier, populating the memo.

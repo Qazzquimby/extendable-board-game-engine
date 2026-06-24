@@ -423,13 +423,6 @@ class _ActorMovedView:
             self._actor.pos = self._original_pos
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
-        if self._new_pos == self._original_pos:
-            return self._engine.entity_at(pos)
-
-        if pos == self._new_pos:
-            return self._actor
-        if pos == self._original_pos:
-            return None
         return self._engine.entity_at(pos)
 
     def __getattr__(self, name: str) -> Any:
@@ -443,7 +436,7 @@ def _get_plausible_uses_of_ability_at_pos(
     ability: "Ability",
     feature_evaluator: Optional["ChoiceFeatureEvaluator"],
     choice_class: type,
-    **choice_kwargs,  # todo get rid of kwargs. Gross
+    **choice_kwargs,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_uses = {}
     with _ActorMovedView(engine, actor, pos) as sim_engine:
