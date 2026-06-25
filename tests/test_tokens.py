@@ -1,7 +1,7 @@
 from aimings import TargetSelf, TargetEntity
 from modifiers import Token
 from queries import QueryLegalActions
-from events import TurnEndEvent, DamageEvent
+from event_library import TurnEndEvent, DamageEvent
 from engine import before, query
 from abilities import (
     Ability,

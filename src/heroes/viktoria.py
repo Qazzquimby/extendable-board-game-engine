@@ -10,7 +10,8 @@ from engine import (
 from logger import log
 from modifiers import Modifier
 from queries import QueryDefense
-from events import DeathEvent, after, HealEvent, DeployEvent, PullEvent, TurnStartEvent
+from events import after
+from event_library import PullEvent, DeployEvent, TurnStartEvent, DeathEvent, HealEvent
 from abilities import (
     Ability,
     DamageInstruction,

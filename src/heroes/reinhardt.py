@@ -20,7 +20,7 @@ from engine import (
     Instruction,
 )
 from modifiers import Modifier
-from events import PushEvent, PullEvent, DamageEvent
+from event_library import PushEvent, PullEvent, DamageEvent
 from grid import Grid
 from point import Point
 

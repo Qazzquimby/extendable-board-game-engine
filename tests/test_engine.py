@@ -8,7 +8,7 @@ from engine import (
 from modifiers import Modifier
 from entities import Entity
 from queries import QueryHasArmor
-from events import DamageEvent, HealEvent
+from event_library import DamageEvent, HealEvent
 from mod_value import ModInt
 from point import Point
 from heroes import MeleeHero

@@ -12,13 +12,15 @@ from typing import (
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
 from events import (
+    AddTokenEvent,
+    RemoveTokenEvent,
+)
+from event_library import (
+    ChangeLocationEvent,
     PullEvent,
     DamageEvent,
     HealEvent,
-    AddTokenEvent,
-    ChangeLocationEvent,
     AddModifierEvent,
-    RemoveTokenEvent,
     RemoveModifierEvent,
 )
 from logger import log

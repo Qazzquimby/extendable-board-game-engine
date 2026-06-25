@@ -23,14 +23,16 @@ from choices import (
 )
 from entities import Entity, Marker, Hero
 from events import (
-    TurnStartEvent,
-    TurnEndEvent,
     EventPhase,
     query,
     Router,
+)
+from event_library import (
     ChangeLocationEvent,
-    RoundStartEvent,
     DeployEvent,
+    TurnStartEvent,
+    TurnEndEvent,
+    RoundStartEvent,
 )
 from grid import Grid
 from logger import reset_logs, get_logs, log
@@ -118,6 +120,11 @@ class Engine:
         self._reaction_declined_sets: List[set] = []
         self.current_choices = None
         self.is_resolving_action = False
+        self.event_queue: List[tuple] = []
+        self.current_reaction_choices: Optional[tuple[Choice]] = None
+        self.current_reaction_team: Optional[int] = None
+        self.current_reaction_entity: Optional["Entity"] = None
+        self.current_reaction_key: Optional[tuple] = None
 
     @property
     def is_done(self):
@@ -135,14 +142,17 @@ class Engine:
         return self.active_entity
 
     def get_legal_actions(self) -> tuple[Choice]:
+        if self.current_reaction_choices is not None:
+            return self.current_reaction_choices
+
         entity = self.active_entity
-        assert not self.is_done and entity and entity.hp > 0
+        if not entity or entity.hp <= 0 or self.is_done:
+            return tuple()
 
         moves = get_plausible_move_and_actions(entity, self)
         frees = get_plausible_free_actions(entity, self)
         all_actions = moves + frees
         deduped = tuple(dict.fromkeys(all_actions))
-        assert deduped
         return deduped
 
     def finalize_setup(self):
@@ -205,6 +215,14 @@ class Engine:
         self.next_turn()
 
         while not self.is_done:
+            if self.advance_event_queue():
+                team = self.current_reaction_team
+                choices = self.current_reaction_choices
+                action_index = self.get_choice_index(team=team, choices=choices)
+                action_choice = choices[action_index]
+                self.step(action=action_choice, action_idx=action_index)
+                continue
+
             entity = self.advance_until_active_entity()
             if self.is_done:
                 break
@@ -216,37 +234,33 @@ class Engine:
 
             if entity.hp <= 0:
                 self.advance_to_next_activator()
-                continue  # skip this turn, they're dead.
-
-            chosen_action: PlausibleMoveAndAction = None
-            turn_over = False
-            while not turn_over:
-                all_choices = self.get_legal_actions()
-                if not all_choices:
-                    self.advance_to_next_activator()
-                    turn_over = True  # eg stunned
-                    continue
-
-                action_index = self.get_choice_index(
-                    team=entity.team, choices=all_choices
-                )
-                action_choice = all_choices[action_index]
-
-                self.step(
-                    actor=entity,
-                    action=action_choice,
-                    action_idx=action_index,
-                )
-
-                if isinstance(action_choice, PlausibleMoveAndAction):
-                    chosen_action = action_choice
-                    turn_over = True
-                    self.advance_to_next_activator()
-
-            if not chosen_action:
                 continue
 
-            # Check win condition
+            all_choices = self.get_legal_actions()
+            if not all_choices:
+                self.advance_to_next_activator()
+                continue
+
+            action_index = self.get_choice_index(team=entity.team, choices=all_choices)
+            action_choice = all_choices[action_index]
+
+            self.step(
+                actor=entity,
+                action=action_choice,
+                action_idx=action_index,
+            )
+
+            while self.event_queue:
+                if self.advance_event_queue():
+                    team = self.current_reaction_team
+                    choices = self.current_reaction_choices
+                    action_index = self.get_choice_index(team=team, choices=choices)
+                    action_choice_react = choices[action_index]
+                    self.step(action=action_choice_react, action_idx=action_index)
+
+            if isinstance(action_choice, PlausibleMoveAndAction):
+                self.advance_to_next_activator()
+
             is_done = self.is_done
             if is_done:
                 team_0_living_members = [e for e in self.living_entities if e.team == 0]
@@ -258,10 +272,18 @@ class Engine:
 
             action_state = ActionState(
                 actor=entity.id,
-                target=chosen_action.target.id if chosen_action.target else None,
-                ability=chosen_action.ability.name,
-                move_path=chosen_action.move_path,
-                movement_name=chosen_action.movement_name,
+                target=(
+                    action_choice.target.id
+                    if getattr(action_choice, "target", None)
+                    else None
+                ),
+                ability=(
+                    action_choice.ability.name
+                    if getattr(action_choice, "ability", None)
+                    else "Pass"
+                ),
+                move_path=getattr(action_choice, "move_path", None),
+                movement_name=getattr(action_choice, "movement_name", None),
             )
             after_state = self.to_model()
             log_entry = LogEntry(
@@ -274,19 +296,69 @@ class Engine:
             logs.append(log_entry)
             reset_logs()
 
-            if is_done:
-                break
-
         pbar.close()
         return GameLog(winner_team=winner_team, logs=logs)
 
     def step(
         self,
-        action: Union[PlausibleMoveAndAction, PlausibleFreeAction],
+        action: Union[PlausibleMoveAndAction, PlausibleFreeAction, Choice],
         action_idx: int,
         actor: Optional[Entity] = None,
     ) -> None:
         self.action_history.append(action_idx)
+
+        if self.current_reaction_choices is not None:
+            self.current_reaction_choices = None
+            self.current_reaction_team = None
+
+            if action.features.get("pass_reaction"):
+                self._reaction_declined_sets[-1].add(self.current_reaction_key)
+                event = self.event_queue.pop()
+                assert event[0] == "reaction_phase_wait"
+                _, ability, source, aiming_result, roll_result, phase, entity_idx = (
+                    event
+                )
+                self.event_queue.append(
+                    (
+                        "reaction_phase",
+                        ability,
+                        source,
+                        aiming_result,
+                        roll_result,
+                        phase,
+                        entity_idx + 1,
+                    )
+                )
+            else:
+                event = self.event_queue.pop()
+                assert event[0] == "reaction_phase_wait"
+                _, ability, source, aiming_result, roll_result, phase, entity_idx = (
+                    event
+                )
+
+                self._reaction_declined_sets[-1].clear()
+                self.event_queue.append(
+                    (
+                        "reaction_phase",
+                        ability,
+                        source,
+                        aiming_result,
+                        roll_result,
+                        phase,
+                        0,
+                    )
+                )
+
+                react_actor = self.current_reaction_entity
+                with log(f"Reaction from {react_actor.name}:"):
+                    action.ability.execute(
+                        engine=self,
+                        source=react_actor,
+                        aiming_result=action.aiming_result,
+                    )
+            self.current_reaction_entity = None
+            self.current_reaction_key = None
+            return
 
         was_resolving = self.is_resolving_action
         self.is_resolving_action = True
@@ -295,19 +367,15 @@ class Engine:
             if actor is None:
                 actor = self.current_turn_hero
 
-            target_str = f" on {action.target.name}" if action.target else ""
+            target_str = (
+                f" on {action.target.name}" if getattr(action, "target", None) else ""
+            )
 
             if isinstance(action, PlausibleMoveAndAction):
                 for point in action.move_path:
                     ChangeLocationEvent(actor, point).resolve()
 
-            # todo cover included entities. Make aiming_result __str__
             with log(f"{actor.name} used {action.ability.name}{target_str}."):
-                # current_ability = next(
-                #     (a for a in actor.abilities if a.name == action.ability.name),
-                #     action.ability,
-                # )  # todo why not use action.ability
-                # assert action.ability.name == current_ability.name
                 action.ability.execute(
                     engine=self, source=actor, aiming_result=action.aiming_result
                 )
@@ -401,103 +469,148 @@ class Engine:
             aiming_result=aiming_result, engine=self, source=source
         )
         self._reaction_declined_sets.append(set())
-        while self.handle_reactions(
-            triggering_ability=ability, roll_result=roll_result, phase="before"
-        ):
-            self._reaction_declined_sets[-1].clear()
-        self._reaction_declined_sets.pop()
 
-        ability.execute_instructions(
-            engine=self,
-            source=source,
-            aiming_result=aiming_result,
-            roll_result=roll_result,
+        self.event_queue.append(("pop_declined_set",))
+        self.event_queue.append(
+            ("reaction_phase", ability, source, aiming_result, roll_result, "after", 0)
+        )
+        self.event_queue.append(
+            ("execute_instructions", ability, source, aiming_result, roll_result)
+        )
+        self.event_queue.append(
+            ("reaction_phase", ability, source, aiming_result, roll_result, "before", 0)
         )
 
-        self._reaction_declined_sets.append(set())
-        while self.handle_reactions(
-            triggering_ability=ability, roll_result=roll_result, phase="after"
-        ):
-            self._reaction_declined_sets[-1].clear()
-        self._reaction_declined_sets.pop()
+    def advance_event_queue(self) -> bool:
+        """Processes events. Returns True if a choice is needed, False if queue is empty."""
+        from choices import (
+            Choice,
+            PlausibleFreeAction,
+            _get_plausible_uses_of_ability_at_pos,
+        )
+        from abilities import ActionCost
 
-    def handle_reactions(
-        self, triggering_ability, roll_result: "RollResult", phase
-    ) -> bool:
-        """
-        Checks all entities for a single reaction and executes it if chosen.
-        Returns True if a reaction occurred, False otherwise.
-        """
-        # todo consider just using event system to watch for ability use.
+        while self.event_queue:
+            event = self.event_queue.pop()
+            event_type = event[0]
 
-        # Check entities in a deterministic order.
-        for entity in self.entities:
-            if entity.hp <= 0:
-                continue
+            if event_type == "pop_declined_set":
+                self._reaction_declined_sets.pop()
 
-            reaction_key = (
-                entity.id,
-                phase,
-                triggering_ability.get_hash(),
-                hash(roll_result),
-            )
-            if (
-                self._reaction_declined_sets
-                and reaction_key in self._reaction_declined_sets[-1]
-            ):
-                continue
+            elif event_type == "execute_instructions":
+                _, ability, source, aiming_result, roll_result = event
+                ability.execute_instructions(
+                    engine=self,
+                    source=source,
+                    aiming_result=aiming_result,
+                    roll_result=roll_result,
+                )
 
-            entity_reactions = []
-            for ability in entity.abilities:
-                if ability.action_cost == ActionCost.INSTANT and ability.is_available():
-                    is_after = False
-                    if ability.instant_speed > 0:
-                        if (
-                            roll_result.roll is not None
-                            and roll_result.roll > ability.instant_speed
-                        ):  # todo they need to declare reactions before the roll
-                            is_after = True
-                    reaction_phase = "after" if is_after else "before"
+            elif event_type == "reaction_phase":
+                _, ability, source, aiming_result, roll_result, phase, entity_idx = (
+                    event
+                )
 
-                    if reaction_phase == phase:
-                        agent = self.agents.get(entity.team)
-                        feature_evaluator = (
-                            getattr(agent, "feature_evaluator", None) if agent else None
+                if entity_idx >= len(self.entities):
+                    continue
+
+                entity = self.entities[entity_idx]
+                if entity.hp <= 0:
+                    self.event_queue.append(
+                        (
+                            "reaction_phase",
+                            ability,
+                            source,
+                            aiming_result,
+                            roll_result,
+                            phase,
+                            entity_idx + 1,
                         )
-                        plausible_uses = _get_plausible_uses_of_ability_at_pos(
-                            actor=entity,
-                            engine=self,
-                            pos=entity.pos,
-                            ability=ability,
-                            feature_evaluator=feature_evaluator,
-                            choice_class=PlausibleFreeAction,
+                    )
+                    continue
+
+                reaction_key = (
+                    entity.id,
+                    phase,
+                    ability.get_hash(),
+                    hash(roll_result),
+                )
+                if (
+                    self._reaction_declined_sets
+                    and reaction_key in self._reaction_declined_sets[-1]
+                ):
+                    self.event_queue.append(
+                        (
+                            "reaction_phase",
+                            ability,
+                            source,
+                            aiming_result,
+                            roll_result,
+                            phase,
+                            entity_idx + 1,
                         )
-                        entity_reactions.extend(plausible_uses.values())
+                    )
+                    continue
 
-            if entity_reactions:
-                # Agent can choose to not react
-                pass_choice = Choice(features={"pass_reaction": 1})
-                choices = entity_reactions + [pass_choice]
+                entity_reactions = []
+                for react_ability in entity.abilities:
+                    if (
+                        react_ability.action_cost == ActionCost.INSTANT
+                        and react_ability.is_available()
+                    ):
+                        is_after = False
+                        if react_ability.instant_speed > 0:
+                            if (
+                                roll_result.roll is not None
+                                and roll_result.roll > react_ability.instant_speed
+                            ):
+                                is_after = True
+                        reaction_phase = "after" if is_after else "before"
 
-                choice_idx = self.get_choice_index(team=entity.team, choices=choices)
-                chosen_action = choices[choice_idx]
+                        if reaction_phase == phase:
+                            plausible_uses = _get_plausible_uses_of_ability_at_pos(
+                                actor=entity,
+                                engine=self,
+                                pos=entity.pos,
+                                ability=react_ability,
+                                choice_class=PlausibleFreeAction,
+                            )
+                            entity_reactions.extend(plausible_uses.values())
 
-                if chosen_action is pass_choice:
-                    if self._reaction_declined_sets:
-                        self._reaction_declined_sets[-1].add(reaction_key)
-                    continue  # This entity passes, check next entity.
+                if entity_reactions:
+                    pass_choice = Choice(features={"pass_reaction": 1})
+                    choices = tuple(entity_reactions + [pass_choice])
 
-                # An action was chosen. Execute it. This will recurse into
-                # resolve_ability_with_reactions, allowing for chained reactions.
-                with log(f"Reaction from {entity.name}:"):
-                    chosen_action.ability.execute(
-                        engine=self,
-                        source=entity,
-                        aiming_result=chosen_action.aiming_result,
+                    self.current_reaction_choices = choices
+                    self.current_reaction_team = entity.team
+                    self.current_reaction_entity = entity
+                    self.current_reaction_key = reaction_key
+
+                    self.event_queue.append(
+                        (
+                            "reaction_phase_wait",
+                            ability,
+                            source,
+                            aiming_result,
+                            roll_result,
+                            phase,
+                            entity_idx,
+                        )
+                    )
+                    return True
+                else:
+                    self.event_queue.append(
+                        (
+                            "reaction_phase",
+                            ability,
+                            source,
+                            aiming_result,
+                            roll_result,
+                            phase,
+                            entity_idx + 1,
+                        )
                     )
 
-                # An action happened, so we need to re-evaluate reactions for everyone.
-                return True
         return False
 
     def copy(self) -> "Engine":
@@ -542,6 +655,15 @@ class Engine:
             self._reaction_declined_sets, memo
         )
         result.current_choices = copy.deepcopy(self.current_choices, memo)
+        result.event_queue = copy.deepcopy(self.event_queue, memo)
+        result.current_reaction_choices = copy.deepcopy(
+            self.current_reaction_choices, memo
+        )
+        result.current_reaction_team = self.current_reaction_team
+        result.current_reaction_entity = copy.deepcopy(
+            self.current_reaction_entity, memo
+        )
+        result.current_reaction_key = copy.deepcopy(self.current_reaction_key, memo)
         if result.current_choices:
             assert hash(result.current_choices) == hash(self.current_choices)
 
@@ -551,6 +673,10 @@ class Engine:
         return result
 
     def get_current_player(self) -> int:
+        if self.current_reaction_team is not None:
+            return self.current_reaction_team
+        if self.active_entity:
+            return self.active_entity.team
         return self.current_team
 
     def _get_state(self):

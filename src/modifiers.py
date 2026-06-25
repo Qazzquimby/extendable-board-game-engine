@@ -1,7 +1,8 @@
 from dataclasses import field, dataclass
 from typing import TYPE_CHECKING
 
-from events import query, before, TurnEndEvent
+from events import query, before
+from event_library import TurnEndEvent
 from logger import log
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 from valence import Valence

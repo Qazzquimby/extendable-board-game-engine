@@ -333,80 +333,6 @@ class StandardBackpropagation(BackpropagationStrategy):
                 )
 
 
-class SimulationComplete(Exception):
-    pass
-
-
-class TreeSearchAgent(Agent):
-    def __init__(
-        self,
-        mcts: "MCTSAgent",
-        sim_env: Engine,
-        path: "SearchPath",
-        team: int,
-        root_node: "MCTSNode",
-    ):
-        self.mcts = mcts
-        self.sim_env = sim_env
-        self.path = path
-        self.team = team
-        self.root_node = root_node
-
-    def choose(self, env: Engine) -> int:
-        choices = env.current_choices
-        if len(choices) <= 1:
-            return 0
-
-        key = self.sim_env.hash()
-        node = self.mcts.cache.get_matching_node(key)
-        matched = True
-        if not node:
-            matched = False
-            node = MCTSNode(key=key, current_player_index=self.team, env=env)
-            self.mcts.cache.cache_node(key, node)
-
-        if not self.path.steps:
-            assert node.key == key
-            assert self.root_node.key == key
-
-        if node.is_expanded:
-            assert len(node.actions) == len(choices)
-
-        if self.path.steps:
-            last_step = self.path.steps[-1]
-            if last_step.action_taken is not None:
-                last_node = last_step.node
-                edge = last_node.edges[last_step.action_taken]
-                edge.child_node_keys.add(key)
-
-        if self.path.has_visited_key(key):
-            # Cycle detected, abort simulation
-            player_to_value = {0: 0.0, 1: 0.0}
-            self.mcts.backprop.backpropagate(self.path, player_to_value)
-            raise SimulationComplete()
-
-        self.path.add_node(node)
-
-        if not node.is_expanded:
-            self.mcts.expansion.expand(node, self.sim_env, pending_choices=choices)
-            val = self.mcts.evaluation.evaluate(node, self.sim_env)
-
-            player_to_value = {
-                node.current_player_index: val,
-                1 - node.current_player_index: -val,
-            }
-            self.mcts.backprop.backpropagate(self.path, player_to_value)
-            raise SimulationComplete()
-
-        best_action_index = self.mcts.selection._select_action_index_from_edges(
-            current_node=node, start_node=None, contender_actions=None
-        )
-        assert len(choices) == len(node.actions) == len(node.env.current_choices)
-        assert len(node.edges) <= len(choices)
-        self.path.set_action_for_last_node(best_action_index)
-        return best_action_index
-
-
 class MCTSAgent(Agent):
     """An agent that uses MCTS to select actions."""
 
@@ -417,72 +343,6 @@ class MCTSAgent(Agent):
         self.evaluation = HeuristicEvaluation()
         self.backprop = StandardBackpropagation()
         self.cache = MCTSNodeCache()
-
-    def _run_simulation(self, root_node: MCTSNode) -> None:
-        sim_env: "Engine" = root_node.env.copy()
-        sim_env.rng.stochastic_flag = False
-
-        path = SearchPath()
-        agent0 = TreeSearchAgent(
-            self, sim_env=sim_env, path=path, team=0, root_node=root_node
-        )
-        agent1 = TreeSearchAgent(
-            self, sim_env=sim_env, path=path, team=1, root_node=root_node
-        )
-        sim_env.agents = {0: agent0, 1: agent1}
-
-        try:
-            # Assume first choice is already ready at root node, no advancing
-            self._simulate_choices(
-                sim_env=sim_env,
-                actor=sim_env.active_entity,
-                choices=sim_env.current_choices,
-            )
-
-            while not sim_env.is_done:
-                entity = sim_env.advance_until_active_entity()
-                if sim_env.is_done:
-                    break
-                if entity.hp <= 0:
-                    sim_env.advance_to_next_activator()
-                    continue
-
-                choices = sim_env.get_legal_actions()
-                if not choices:
-                    sim_env.advance_to_next_activator()
-                    continue
-
-                self._simulate_choices(sim_env=sim_env, actor=entity, choices=choices)
-
-            # If we reach here, the game finished without hitting an unexpanded node
-            if path.steps:
-                winner = sim_env.get_winning_player()
-                curr_player = path.last_node.current_player_index
-                if winner is None:
-                    val = 0.0
-                else:
-                    val = 1.0 if winner == curr_player else -1.0
-
-                player_to_value = {
-                    curr_player: val,
-                    1 - curr_player: -val,
-                }
-                self.backprop.backpropagate(path, player_to_value)
-        except SimulationComplete:
-            pass
-
-    def _simulate_choices(
-        self, sim_env: "Engine", actor: "Entity", choices: tuple[Choice]
-    ):
-        action_index = sim_env.get_choice_index(team=actor.team, choices=choices)
-        action_choice = choices[action_index]
-        sim_env.step(
-            actor=actor,
-            action=action_choice,
-            action_idx=action_index,
-        )
-        if isinstance(action_choice, PlausibleMoveAndAction):
-            sim_env.advance_to_next_activator()
 
     def choose(self, env: Engine) -> int:
         choices = env.current_choices
@@ -497,23 +357,17 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
-        # Expand the root node immediately with the exact choices provided by the engine.
-        # This prevents mid-turn reactive abilities from being overwritten by standard legal actions.
         if not root_node.is_expanded:
             self.expansion.expand(
                 node=root_node, env_at_node=env, pending_choices=choices
             )
 
-        if not env.is_resolving_action:
-            log.enabled = False
-            try:
-                for _ in range(self.num_simulations):
-                    self._run_simulation(root_node=root_node)
-            finally:
-                log.enabled = True
-
-        # should actually equal sims but at least have some visits
-        assert sum([e.num_visits for e in root_node.edges.values()])
+        log.enabled = False
+        try:
+            for _ in range(self.num_simulations):
+                self._run_simulation(root_node=root_node)
+        finally:
+            log.enabled = True
 
         best_idx = 0
         best_visits = -1
@@ -528,6 +382,95 @@ class MCTSAgent(Agent):
         )
 
         return best_idx
+
+    def _run_simulation(self, root_node: MCTSNode) -> None:
+        sim_env: "Engine" = root_node.env.copy()
+        sim_env.rng.stochastic_flag = False
+
+        path = SearchPath()
+        path.add_node(root_node)
+
+        action_idx = self.selection._select_action_index_from_edges(
+            current_node=root_node, start_node=None, contender_actions=None
+        )
+        path.set_action_for_last_node(action_idx)
+        action = root_node.actions[action_idx]
+
+        self._advance_env_and_step(sim_env, action, action_idx)
+
+        while not sim_env.is_done:
+            key = sim_env.hash()
+            node = self.cache.get_matching_node(key)
+            if not node:
+                node = MCTSNode(key=key, current_player_index=sim_env.get_current_player(), env=sim_env)
+                self.cache.cache_node(key, node)
+
+            if path.has_visited_key(key):
+                break
+
+            path.add_node(node)
+
+            choices = sim_env.current_choices
+            if not node.is_expanded:
+                self.expansion.expand(node, sim_env, pending_choices=choices)
+                val = self.evaluation.evaluate(node, sim_env)
+                player_to_value = {
+                    node.current_player_index: val,
+                    1 - node.current_player_index: -val,
+                }
+                self.backprop.backpropagate(path, player_to_value)
+                return
+
+            action_idx = self.selection._select_action_index_from_edges(
+                current_node=node, start_node=None, contender_actions=None
+            )
+            path.set_action_for_last_node(action_idx)
+            action = node.actions[action_idx]
+
+            self._advance_env_and_step(sim_env, action, action_idx)
+
+        winner = sim_env.get_winning_player()
+        curr_player = path.last_node.current_player_index
+        if winner is None:
+            val = 0.0
+        else:
+            val = 1.0 if winner == curr_player else -1.0
+
+        player_to_value = {
+            curr_player: val,
+            1 - curr_player: -val,
+        }
+        self.backprop.backpropagate(path, player_to_value)
+
+    def _advance_env_and_step(self, sim_env: Engine, action, action_idx):
+        if sim_env.current_reaction_choices is not None:
+            sim_env.step(action=action, action_idx=action_idx)
+        else:
+            actor = sim_env.active_entity
+            sim_env.step(actor=actor, action=action, action_idx=action_idx)
+            if isinstance(action, PlausibleMoveAndAction):
+                sim_env.advance_to_next_activator()
+
+        while not sim_env.is_done:
+            if sim_env.advance_event_queue():
+                sim_env.current_choices = sim_env.current_reaction_choices
+                return
+
+            entity = sim_env.advance_until_active_entity()
+            if sim_env.is_done:
+                return
+
+            if entity.hp <= 0:
+                sim_env.advance_to_next_activator()
+                continue
+
+            choices = sim_env.get_legal_actions()
+            if not choices:
+                sim_env.advance_to_next_activator()
+                continue
+
+            sim_env.current_choices = choices
+            return
 
     def select_action(
         self, choices: List[Choice], engine: Optional[Engine] = None

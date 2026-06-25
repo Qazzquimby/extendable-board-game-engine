@@ -19,7 +19,7 @@ from engine import (
     Instruction,
 )
 from modifiers import Modifier, SummonModifier, Token
-from events import TurnStartEvent, TurnEndEvent, DamageEvent, SummonEvent
+from event_library import TurnStartEvent, TurnEndEvent, DamageEvent, SummonEvent
 from point import Point
 
 # region Photon Beam

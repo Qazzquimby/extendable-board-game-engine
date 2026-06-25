@@ -6,11 +6,10 @@ from aimings import TargetSelf
 
 from events import (
     EventPhase,
-    SummonEvent,
     AddTokenEvent,
     RemoveTokenEvent,
-    DeployEvent,
 )
+from event_library import DeployEvent, SummonEvent
 from point import Point
 from queries import (
     QueryHasArmor,

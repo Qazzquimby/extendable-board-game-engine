@@ -14,16 +14,18 @@ from engine import (
 from entities import Entity
 from modifiers import Modifier, Token, ImmobileToken
 from events import (
-    TurnEndEvent,
-    DamageEvent,
     after,
-    DeathEvent,
     before,
-    TurnStartEvent,
-    HealEvent,
     AddTokenEvent,
     query,
+)
+from event_library import (
     ChangeLocationEvent,
+    TurnStartEvent,
+    TurnEndEvent,
+    DamageEvent,
+    DeathEvent,
+    HealEvent,
 )
 from abilities import (
     Ability,

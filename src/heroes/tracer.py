@@ -15,7 +15,8 @@ from engine import (
 )
 from logger import log
 from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor, SlowToken
-from events import TurnEndEvent, DamageEvent, after, DeathEvent, before
+from events import after, before
+from event_library import TurnEndEvent, DamageEvent, DeathEvent
 from abilities import (
     Ability,
     DamageInstruction,
