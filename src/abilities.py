@@ -195,20 +195,10 @@ class Ability:
             self.is_tapped = True
             self.tapped_this_turn = True
 
-        if self.action_cost in (ActionCost.FREE, ActionCost.INSTANT):
-            roll_result = self.get_roll_result(
-                aiming_result=aiming_result, engine=engine, source=source
-            )
-            self.execute_instructions(
-                engine=engine,
-                source=source,
-                aiming_result=aiming_result,
-                roll_result=roll_result,
-            )
-        else:
-            engine.resolve_ability_with_reactions(  # todo
-                ability=self, source=source, aiming_result=aiming_result
-            )
+        from events import AbilityUseEvent
+        AbilityUseEvent(
+            source=source, ability=self, aiming_result=aiming_result
+        ).resolve()
 
     def execute_instructions(
         self,

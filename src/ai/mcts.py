@@ -443,34 +443,8 @@ class MCTSAgent(Agent):
         self.backprop.backpropagate(path, player_to_value)
 
     def _advance_env_and_step(self, sim_env: Engine, action, action_idx):
-        if sim_env.current_reaction_choices is not None:
-            sim_env.step(action=action, action_idx=action_idx)
-        else:
-            actor = sim_env.active_entity
-            sim_env.step(actor=actor, action=action, action_idx=action_idx)
-            if isinstance(action, PlausibleMoveAndAction):
-                sim_env.advance_to_next_activator()
-
-        while not sim_env.is_done:
-            if sim_env.advance_event_queue():
-                sim_env.current_choices = sim_env.current_reaction_choices
-                return
-
-            entity = sim_env.advance_until_active_entity()
-            if sim_env.is_done:
-                return
-
-            if entity.hp <= 0:
-                sim_env.advance_to_next_activator()
-                continue
-
-            choices = sim_env.get_legal_actions()
-            if not choices:
-                sim_env.advance_to_next_activator()
-                continue
-
-            sim_env.current_choices = choices
-            return
+        sim_env.step(action=action, action_idx=action_idx)
+        sim_env.advance_until_choice()
 
     def select_action(
         self, choices: List[Choice], engine: Optional[Engine] = None

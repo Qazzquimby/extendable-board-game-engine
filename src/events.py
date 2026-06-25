@@ -10,6 +10,28 @@ if TYPE_CHECKING:
     from entities import Entity
 
 
+class EventQueue:
+    def __init__(self):
+        self.queue: List['Event'] = []
+        self.is_processing = False
+
+    def enqueue(self, event: 'Event'):
+        if self.is_processing:
+            self.queue.insert(0, event)
+        else:
+            self.queue.append(event)
+
+    def process_one(self) -> None:
+        if not self.queue:
+            return
+        self.is_processing = True
+        try:
+            event = self.queue.pop(0)
+            event.process()
+        finally:
+            self.is_processing = False
+
+
 class Event(abc.ABC):
     def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
         self.engine = engine
@@ -18,16 +40,16 @@ class Event(abc.ABC):
         self.state = "BEFORE"
 
     def resolve(self) -> None:
-        self.engine.queue_event(self)
+        self.engine.event_queue.enqueue(self)
 
     def process(self) -> None:
         if self.state == "BEFORE":
             self.state = "RESOLVE"
-            self.engine.queue_event(self)
+            self.engine.event_queue.enqueue(self)
             self.engine.router.publish(self, EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
-            self.engine.queue_event(self)
+            self.engine.event_queue.enqueue(self)
             if not self.canceled:
                 self._resolve()
         elif self.state == "AFTER":
@@ -46,50 +68,49 @@ class ReactionOpportunityEvent(Event):
         self.entity_idx = 0
         self.declined_entities = set()
 
+    def get_choices(self) -> tuple:
+        while self.entity_idx < len(self.engine.entities):
+            entity = self.engine.entities[self.entity_idx]
+            if entity.id in self.declined_entities or entity.hp <= 0:
+                self.entity_idx += 1
+                continue
+
+            from choices import (
+                PlausibleFreeAction,
+                _get_plausible_uses_of_ability_at_pos,
+                Choice,
+            )
+            from abilities import ActionCost
+
+            entity_reactions = []
+            for react_ability in entity.abilities:
+                if (
+                    react_ability.action_cost == ActionCost.INSTANT
+                    and react_ability.is_available()
+                ):
+                    plausible_uses = _get_plausible_uses_of_ability_at_pos(
+                        actor=entity,
+                        engine=self.engine,
+                        pos=entity.pos,
+                        ability=react_ability,
+                        choice_class=PlausibleFreeAction,
+                    )
+                    entity_reactions.extend(plausible_uses.values())
+
+            if entity_reactions:
+                pass_choice = Choice(features={"pass_reaction": 1})
+                pass_choice.actor = entity
+                return tuple(entity_reactions + [pass_choice]), entity
+            else:
+                self.entity_idx += 1
+
+        return tuple(), None
+
     def process(self) -> None:
-        if self.entity_idx >= len(self.engine.entities):
-            return
+        pass
 
-        entity = self.engine.entities[self.entity_idx]
-
-        if entity.id in self.declined_entities or entity.hp <= 0:
-            self.entity_idx += 1
-            self.engine.queue_event(self)
-            return
-
-        from choices import (
-            PlausibleFreeAction,
-            _get_plausible_uses_of_ability_at_pos,
-            Choice,
-        )
-        from abilities import ActionCost
-
-        entity_reactions = []
-        for react_ability in entity.abilities:
-            if (
-                react_ability.action_cost == ActionCost.INSTANT
-                and react_ability.is_available()
-            ):
-                plausible_uses = _get_plausible_uses_of_ability_at_pos(
-                    actor=entity,
-                    engine=self.engine,
-                    pos=entity.pos,
-                    ability=react_ability,
-                    choice_class=PlausibleFreeAction,
-                )
-                entity_reactions.extend(plausible_uses.values())
-
-        if entity_reactions:
-            pass_choice = Choice(features={"pass_reaction": 1})
-            choices = tuple(entity_reactions + [pass_choice])
-
-            self.engine.current_reaction_choices = choices
-            self.engine.current_reaction_team = entity.team
-            self.engine.current_reaction_entity = entity
-            self.engine.queue_event(self)
-        else:
-            self.entity_idx += 1
-            self.engine.queue_event(self)
+    def _resolve(self) -> None:
+        pass
 
 
 class AbilityUseEvent(Event):
@@ -104,19 +125,19 @@ class AbilityUseEvent(Event):
     def process(self) -> None:
         if self.state == "BEFORE":
             self.state = "RESOLVE"
-            self.engine.queue_event(self)
-            self.engine.queue_event(
+            self.engine.event_queue.enqueue(self)
+            self.engine.event_queue.enqueue(
                 ReactionOpportunityEvent(self.engine, self, "before")
             )
             self.engine.router.publish(self, EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
-            self.engine.queue_event(self)
+            self.engine.event_queue.enqueue(self)
             if not self.canceled:
                 self._resolve()
         elif self.state == "AFTER":
             self.state = "DONE"
-            self.engine.queue_event(
+            self.engine.event_queue.enqueue(
                 ReactionOpportunityEvent(self.engine, self, "after")
             )
             self.engine.router.publish(self, EventPhase.AFTER)

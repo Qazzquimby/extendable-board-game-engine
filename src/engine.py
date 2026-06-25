@@ -24,6 +24,8 @@ from events import (
     EventPhase,
     query,
     Router,
+    EventQueue,
+    ReactionOpportunityEvent,
 )
 from event_library import (
     ChangeLocationEvent,
@@ -121,12 +123,7 @@ class Engine:
         self._next_id: int = 1
         self.current_choices = None
         self.is_resolving_action = False
-        self.event_queue: List["Event"] = []
-        self.is_processing_events = False
-
-        self.current_reaction_choices: Optional[tuple[Choice]] = None
-        self.current_reaction_team: Optional[int] = None
-        self.current_reaction_entity: Optional["Entity"] = None
+        self.event_queue = EventQueue()
 
     @property
     def is_done(self):
@@ -144,9 +141,6 @@ class Engine:
         return self.active_entity
 
     def get_legal_actions(self) -> tuple[Choice]:
-        if self.current_reaction_choices is not None:
-            return self.current_reaction_choices
-
         entity = self.active_entity
         if not entity or entity.hp <= 0 or self.is_done:
             return tuple()
@@ -207,6 +201,38 @@ class Engine:
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
 
+    def advance_until_choice(self):
+        while not self.is_done:
+            if self.event_queue.queue:
+                event = self.event_queue.queue[0]
+                if isinstance(event, ReactionOpportunityEvent):
+                    choices, entity = event.get_choices()
+                    if choices:
+                        self.current_choices = choices
+                        return
+                    else:
+                        self.event_queue.queue.pop(0)
+                        continue
+
+                self.event_queue.process_one()
+                continue
+
+            entity = self.advance_until_active_entity()
+            if self.is_done:
+                return
+
+            if entity.hp <= 0:
+                self.advance_to_next_activator()
+                continue
+
+            choices = self.get_legal_actions()
+            if not choices:
+                self.advance_to_next_activator()
+                continue
+
+            self.current_choices = choices
+            return
+
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
         winner_team = None
@@ -215,53 +241,25 @@ class Engine:
 
         pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
         self.next_turn()
+        self.advance_until_choice()
 
         while not self.is_done:
-            if self.advance_event_queue():
-                team = self.current_reaction_team
-                choices = self.current_reaction_choices
-                action_index = self.get_choice_index(team=team, choices=choices)
-                action_choice = choices[action_index]
-                self.step(action=action_choice, action_idx=action_index)
-                continue
-
-            entity = self.advance_until_active_entity()
-            if self.is_done:
-                break
             pbar.update()
             if after_state:
                 before_state = after_state
             else:
                 before_state = self.to_model()
 
-            if entity.hp <= 0:
-                self.advance_to_next_activator()
-                continue
-
-            all_choices = self.get_legal_actions()
-            if not all_choices:
-                self.advance_to_next_activator()
-                continue
-
-            action_index = self.get_choice_index(team=entity.team, choices=all_choices)
-            action_choice = all_choices[action_index]
+            action_index = self.get_choice_index(
+                team=self.get_current_player(), choices=self.current_choices
+            )
+            action_choice = self.current_choices[action_index]
 
             self.step(
-                actor=entity,
                 action=action_choice,
                 action_idx=action_index,
             )
-
-            while self.event_queue:
-                if self.advance_event_queue():
-                    team = self.current_reaction_team
-                    choices = self.current_reaction_choices
-                    action_index = self.get_choice_index(team=team, choices=choices)
-                    action_choice_react = choices[action_index]
-                    self.step(action=action_choice_react, action_idx=action_index)
-
-            if isinstance(action_choice, PlausibleMoveAndAction):
-                self.advance_to_next_activator()
+            self.advance_until_choice()
 
             is_done = self.is_done
             if is_done:
@@ -273,7 +271,11 @@ class Engine:
                     winner_team = 1
 
             action_state = ActionState(
-                actor=entity.id,
+                actor=(
+                    getattr(action_choice, "actor", self.active_entity).id
+                    if getattr(action_choice, "actor", self.active_entity)
+                    else -1
+                ),
                 target=(
                     action_choice.target.id
                     if getattr(action_choice, "target", None)
@@ -305,38 +307,43 @@ class Engine:
         self,
         action: Union[PlausibleMoveAndAction, PlausibleFreeAction, Choice],
         action_idx: int,
-        actor: Optional[Entity] = None,
     ) -> None:
-        from events import AbilityUseEvent, ReactionOpportunityEvent
+        from events import AbilityUseEvent
 
         self.action_history.append(action_idx)
+        self.current_choices = None
 
-        if self.current_reaction_choices is not None:
-            react_actor = self.current_reaction_entity
-            self.current_reaction_choices = None
-            self.current_reaction_team = None
-            self.current_reaction_entity = None
+        # todo well this seems sloppy and insufficient
+        #  Rewrite without get_attr and such that any mid-action choice can be handled.
+        #  Example choices
+        #  "target picks one, take 3 damage or be stunned"
+        #  "You may take 2 damage to repeat this effect"
+        #  "Target moves 3 spaces in a direction of their choice"
 
-            event = self.event_queue[0]
-            assert isinstance(event, ReactionOpportunityEvent)
-
+        if self.event_queue.queue and isinstance(
+            self.event_queue.queue[0], ReactionOpportunityEvent
+        ):
+            event = self.event_queue.queue[0]
+            choices, react_actor = event.get_choices()
             if action.features.get("pass_reaction"):
                 event.declined_entities.add(react_actor.id)
             else:
                 event.declined_entities.clear()
                 event.entity_idx = 0
                 with log(f"Reaction from {react_actor.name}:"):
-                    AbilityUseEvent(
-                        react_actor, action.ability, action.aiming_result
-                    ).resolve()
+                    reaction_event = AbilityUseEvent(
+                        source=react_actor,
+                        ability=action.ability,
+                        aiming_result=action.aiming_result,
+                    )
+                    self.event_queue.queue.insert(0, reaction_event)
             return
 
         was_resolving = self.is_resolving_action
         self.is_resolving_action = True
 
         try:
-            if actor is None:
-                actor = self.current_turn_hero
+            actor = getattr(action, "actor", self.active_entity)
 
             target_str = (
                 f" on {action.target.name}" if getattr(action, "target", None) else ""
@@ -346,12 +353,16 @@ class Engine:
                 for point in action.move_path:
                     ChangeLocationEvent(actor, point).resolve()
 
-            with log(f"{actor.name} used {action.ability.name}{target_str}."):
-                AbilityUseEvent(
-                    source=actor,
-                    ability=action.ability,
-                    aiming_result=action.aiming_result,
-                ).resolve()
+            if hasattr(action, "ability"):
+                with log(f"{actor.name} used {action.ability.name}{target_str}."):
+                    AbilityUseEvent(
+                        source=actor,
+                        ability=action.ability,
+                        aiming_result=action.aiming_result,
+                    ).resolve()
+
+            if isinstance(action, PlausibleMoveAndAction):
+                self.advance_to_next_activator()
         finally:
             self.is_resolving_action = was_resolving
 
@@ -435,26 +446,6 @@ class Engine:
             entities=[e.to_model() for e in self.entities],
         )
 
-    def queue_event(self, event: "Event"):
-        # assumes you always interrupt current active events
-        if self.is_processing_events:
-            self.event_queue.insert(0, event)
-        else:
-            self.event_queue.append(event)
-
-    def advance_event_queue(self) -> bool:
-        """Processes events. Returns True if a choice is needed, False if queue is empty."""
-        self.is_processing_events = True
-        try:
-            while self.event_queue:
-                if self.current_reaction_choices is not None:
-                    return True
-                event = self.event_queue.pop(0)
-                event.process()
-        finally:
-            self.is_processing_events = False
-        return False
-
     def copy(self) -> "Engine":
         return copy.deepcopy(self)
 
@@ -495,14 +486,6 @@ class Engine:
         result.activation_queue = copy.deepcopy(self.activation_queue, memo)
         result.current_choices = copy.deepcopy(self.current_choices, memo)
         result.event_queue = copy.deepcopy(self.event_queue, memo)
-        result.is_processing_events = self.is_processing_events
-        result.current_reaction_choices = copy.deepcopy(
-            self.current_reaction_choices, memo
-        )
-        result.current_reaction_team = self.current_reaction_team
-        result.current_reaction_entity = copy.deepcopy(
-            self.current_reaction_entity, memo
-        )
         if result.current_choices:
             assert hash(result.current_choices) == hash(self.current_choices)
 
@@ -511,8 +494,12 @@ class Engine:
         return result
 
     def get_current_player(self) -> int:
-        if self.current_reaction_team is not None:
-            return self.current_reaction_team
+        if self.event_queue.queue:
+            event = self.event_queue.queue[0]
+            if isinstance(event, ReactionOpportunityEvent):
+                choices, entity = event.get_choices()
+                if entity:
+                    return entity.team
         if self.active_entity:
             return self.active_entity.team
         return self.current_team
