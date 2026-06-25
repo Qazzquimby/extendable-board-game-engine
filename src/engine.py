@@ -7,17 +7,15 @@ from typing import (
     Optional,
     TypeVar,
     Union,
+    TYPE_CHECKING,
 )
 
 from tqdm import tqdm
 
-from abilities import Ability, ActionCost, RollResult
-from aimings import AimingResult
 from choices import (
     Choice,
     PlausibleFreeAction,
     PlausibleMoveAndAction,
-    _get_plausible_uses_of_ability_at_pos,
     get_plausible_free_actions,
     get_plausible_move_and_actions,
 )
@@ -40,6 +38,10 @@ from point import Point
 from queries import QueryIsAlive, Query
 from schemas import EngineState, GameLog, LogEntry, ActionState
 from util import UniqueTuple
+
+if TYPE_CHECKING:
+    pass
+
 
 ChoiceT = TypeVar("ChoiceT", bound="Choice")
 
@@ -117,14 +119,14 @@ class Engine:
         self.activation_queue: List["Entity"] = []
         self.activation_index: int = -1
         self._next_id: int = 1
-        self._reaction_declined_sets: List[set] = []
         self.current_choices = None
         self.is_resolving_action = False
-        self.event_queue: List[tuple] = []
+        self.event_queue: List["Event"] = []
+        self.is_processing_events = False
+
         self.current_reaction_choices: Optional[tuple[Choice]] = None
         self.current_reaction_team: Optional[int] = None
         self.current_reaction_entity: Optional["Entity"] = None
-        self.current_reaction_key: Optional[tuple] = None
 
     @property
     def is_done(self):
@@ -305,59 +307,28 @@ class Engine:
         action_idx: int,
         actor: Optional[Entity] = None,
     ) -> None:
+        from events import AbilityUseEvent, ReactionOpportunityEvent
+
         self.action_history.append(action_idx)
 
         if self.current_reaction_choices is not None:
+            react_actor = self.current_reaction_entity
             self.current_reaction_choices = None
             self.current_reaction_team = None
+            self.current_reaction_entity = None
+
+            event = self.event_queue[0]
+            assert isinstance(event, ReactionOpportunityEvent)
 
             if action.features.get("pass_reaction"):
-                self._reaction_declined_sets[-1].add(self.current_reaction_key)
-                event = self.event_queue.pop()
-                assert event[0] == "reaction_phase_wait"
-                _, ability, source, aiming_result, roll_result, phase, entity_idx = (
-                    event
-                )
-                self.event_queue.append(
-                    (
-                        "reaction_phase",
-                        ability,
-                        source,
-                        aiming_result,
-                        roll_result,
-                        phase,
-                        entity_idx + 1,
-                    )
-                )
+                event.declined_entities.add(react_actor.id)
             else:
-                event = self.event_queue.pop()
-                assert event[0] == "reaction_phase_wait"
-                _, ability, source, aiming_result, roll_result, phase, entity_idx = (
-                    event
-                )
-
-                self._reaction_declined_sets[-1].clear()
-                self.event_queue.append(
-                    (
-                        "reaction_phase",
-                        ability,
-                        source,
-                        aiming_result,
-                        roll_result,
-                        phase,
-                        0,
-                    )
-                )
-
-                react_actor = self.current_reaction_entity
+                event.declined_entities.clear()
+                event.entity_idx = 0
                 with log(f"Reaction from {react_actor.name}:"):
-                    action.ability.execute(
-                        engine=self,
-                        source=react_actor,
-                        aiming_result=action.aiming_result,
-                    )
-            self.current_reaction_entity = None
-            self.current_reaction_key = None
+                    AbilityUseEvent(
+                        react_actor, action.ability, action.aiming_result
+                    ).resolve()
             return
 
         was_resolving = self.is_resolving_action
@@ -376,9 +347,11 @@ class Engine:
                     ChangeLocationEvent(actor, point).resolve()
 
             with log(f"{actor.name} used {action.ability.name}{target_str}."):
-                action.ability.execute(
-                    engine=self, source=actor, aiming_result=action.aiming_result
-                )
+                AbilityUseEvent(
+                    source=actor,
+                    ability=action.ability,
+                    aiming_result=action.aiming_result,
+                ).resolve()
         finally:
             self.is_resolving_action = was_resolving
 
@@ -462,155 +435,24 @@ class Engine:
             entities=[e.to_model() for e in self.entities],
         )
 
-    def resolve_ability_with_reactions(
-        self, ability: "Ability", source: "Entity", aiming_result: "AimingResult"
-    ):
-        roll_result = ability.get_roll_result(
-            aiming_result=aiming_result, engine=self, source=source
-        )
-        self._reaction_declined_sets.append(set())
-
-        self.event_queue.append(("pop_declined_set",))
-        self.event_queue.append(
-            ("reaction_phase", ability, source, aiming_result, roll_result, "after", 0)
-        )
-        self.event_queue.append(
-            ("execute_instructions", ability, source, aiming_result, roll_result)
-        )
-        self.event_queue.append(
-            ("reaction_phase", ability, source, aiming_result, roll_result, "before", 0)
-        )
+    def queue_event(self, event: "Event"):
+        # assumes you always interrupt current active events
+        if self.is_processing_events:
+            self.event_queue.insert(0, event)
+        else:
+            self.event_queue.append(event)
 
     def advance_event_queue(self) -> bool:
         """Processes events. Returns True if a choice is needed, False if queue is empty."""
-        from choices import (
-            Choice,
-            PlausibleFreeAction,
-            _get_plausible_uses_of_ability_at_pos,
-        )
-        from abilities import ActionCost
-
-        while self.event_queue:
-            event = self.event_queue.pop()
-            event_type = event[0]
-
-            if event_type == "pop_declined_set":
-                self._reaction_declined_sets.pop()
-
-            elif event_type == "execute_instructions":
-                _, ability, source, aiming_result, roll_result = event
-                ability.execute_instructions(
-                    engine=self,
-                    source=source,
-                    aiming_result=aiming_result,
-                    roll_result=roll_result,
-                )
-
-            elif event_type == "reaction_phase":
-                _, ability, source, aiming_result, roll_result, phase, entity_idx = (
-                    event
-                )
-
-                if entity_idx >= len(self.entities):
-                    continue
-
-                entity = self.entities[entity_idx]
-                if entity.hp <= 0:
-                    self.event_queue.append(
-                        (
-                            "reaction_phase",
-                            ability,
-                            source,
-                            aiming_result,
-                            roll_result,
-                            phase,
-                            entity_idx + 1,
-                        )
-                    )
-                    continue
-
-                reaction_key = (
-                    entity.id,
-                    phase,
-                    ability.get_hash(),
-                    hash(roll_result),
-                )
-                if (
-                    self._reaction_declined_sets
-                    and reaction_key in self._reaction_declined_sets[-1]
-                ):
-                    self.event_queue.append(
-                        (
-                            "reaction_phase",
-                            ability,
-                            source,
-                            aiming_result,
-                            roll_result,
-                            phase,
-                            entity_idx + 1,
-                        )
-                    )
-                    continue
-
-                entity_reactions = []
-                for react_ability in entity.abilities:
-                    if (
-                        react_ability.action_cost == ActionCost.INSTANT
-                        and react_ability.is_available()
-                    ):
-                        is_after = False
-                        if react_ability.instant_speed > 0:
-                            if (
-                                roll_result.roll is not None
-                                and roll_result.roll > react_ability.instant_speed
-                            ):
-                                is_after = True
-                        reaction_phase = "after" if is_after else "before"
-
-                        if reaction_phase == phase:
-                            plausible_uses = _get_plausible_uses_of_ability_at_pos(
-                                actor=entity,
-                                engine=self,
-                                pos=entity.pos,
-                                ability=react_ability,
-                                choice_class=PlausibleFreeAction,
-                            )
-                            entity_reactions.extend(plausible_uses.values())
-
-                if entity_reactions:
-                    pass_choice = Choice(features={"pass_reaction": 1})
-                    choices = tuple(entity_reactions + [pass_choice])
-
-                    self.current_reaction_choices = choices
-                    self.current_reaction_team = entity.team
-                    self.current_reaction_entity = entity
-                    self.current_reaction_key = reaction_key
-
-                    self.event_queue.append(
-                        (
-                            "reaction_phase_wait",
-                            ability,
-                            source,
-                            aiming_result,
-                            roll_result,
-                            phase,
-                            entity_idx,
-                        )
-                    )
+        self.is_processing_events = True
+        try:
+            while self.event_queue:
+                if self.current_reaction_choices is not None:
                     return True
-                else:
-                    self.event_queue.append(
-                        (
-                            "reaction_phase",
-                            ability,
-                            source,
-                            aiming_result,
-                            roll_result,
-                            phase,
-                            entity_idx + 1,
-                        )
-                    )
-
+                event = self.event_queue.pop(0)
+                event.process()
+        finally:
+            self.is_processing_events = False
         return False
 
     def copy(self) -> "Engine":
@@ -651,11 +493,9 @@ class Engine:
         result.current_turn_hero = copy.deepcopy(self.current_turn_hero, memo)
         result.active_entity = copy.deepcopy(self.active_entity, memo)
         result.activation_queue = copy.deepcopy(self.activation_queue, memo)
-        result._reaction_declined_sets = copy.deepcopy(
-            self._reaction_declined_sets, memo
-        )
         result.current_choices = copy.deepcopy(self.current_choices, memo)
         result.event_queue = copy.deepcopy(self.event_queue, memo)
+        result.is_processing_events = self.is_processing_events
         result.current_reaction_choices = copy.deepcopy(
             self.current_reaction_choices, memo
         )
@@ -663,13 +503,11 @@ class Engine:
         result.current_reaction_entity = copy.deepcopy(
             self.current_reaction_entity, memo
         )
-        result.current_reaction_key = copy.deepcopy(self.current_reaction_key, memo)
         if result.current_choices:
             assert hash(result.current_choices) == hash(self.current_choices)
 
         result.router = copy.deepcopy(self.router, memo)
         assert len(result.router.subscribers) == len(self.router.subscribers)
-        # todo still missing pending events..?
         return result
 
     def get_current_player(self) -> int:
@@ -731,7 +569,6 @@ class Engine:
             choices,
             UniqueTuple(entity_states),
             marker_states,
-            # tuple(frozenset(s) for s in self._reaction_declined_sets),
         )
 
     def hash(self) -> int:

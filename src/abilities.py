@@ -11,10 +11,6 @@ from typing import (
 )
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from events import (
-    AddTokenEvent,
-    RemoveTokenEvent,
-)
 from event_library import (
     ChangeLocationEvent,
     PullEvent,
@@ -22,6 +18,8 @@ from event_library import (
     HealEvent,
     AddModifierEvent,
     RemoveModifierEvent,
+    AddTokenEvent,
+    RemoveTokenEvent,
 )
 from logger import log
 from queries import QueryAvoidInclusion, QueryRoll
@@ -208,7 +206,7 @@ class Ability:
                 roll_result=roll_result,
             )
         else:
-            engine.resolve_ability_with_reactions(
+            engine.resolve_ability_with_reactions(  # todo
                 ability=self, source=source, aiming_result=aiming_result
             )
 

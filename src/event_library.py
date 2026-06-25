@@ -216,3 +216,22 @@ class AddTokenEvent(Event):
                 return
         new_token = self.token_class(amount=self.amount, **self.token_kwargs)
         self.subject.add_modifier(new_token)
+
+
+class RemoveTokenEvent(Event):
+    def __init__(
+        self,
+        subject: "Entity",
+        token_class: Type["Token"],
+        amount: int,
+    ):
+        super().__init__(engine=subject.engine, subject=subject)
+        self.token_class = token_class
+        self.amount = amount
+
+    def _resolve(self):
+        log(f"{self.subject.name} lost {self.amount} {self.token_class.__name__}.")
+        for modifiers in self.subject.modifiers:
+            if isinstance(modifiers, self.token_class):
+                modifiers.remove(self.amount)
+                return

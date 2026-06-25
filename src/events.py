@@ -3,16 +3,11 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
-from logger import log
-from mod_value import ModInt
-
 if TYPE_CHECKING:
     from engine import Engine
     from abilities import Ability
-    from modifiers import Modifier, Token
-    from entities import Entity, Summon
-    from point import Point
-    from grid import Direction
+    from modifiers import Modifier
+    from entities import Entity
 
 
 class Event(abc.ABC):
@@ -20,18 +15,122 @@ class Event(abc.ABC):
         self.engine = engine
         self.subject = subject
         self.canceled = False
+        self.state = "BEFORE"
 
     def resolve(self) -> None:
-        self.engine.router.publish(self, EventPhase.BEFORE)
+        self.engine.queue_event(self)
 
-        if self.canceled:
-            return
-        self._resolve()
-
-        self.engine.router.publish(self, EventPhase.AFTER)
+    def process(self) -> None:
+        if self.state == "BEFORE":
+            self.state = "RESOLVE"
+            self.engine.queue_event(self)
+            self.engine.router.publish(self, EventPhase.BEFORE)
+        elif self.state == "RESOLVE":
+            self.state = "AFTER"
+            self.engine.queue_event(self)
+            if not self.canceled:
+                self._resolve()
+        elif self.state == "AFTER":
+            self.state = "DONE"
+            self.engine.router.publish(self, EventPhase.AFTER)
 
     def _resolve(self) -> None:
-        raise NotImplementedError("Events must implement resolve()")
+        raise NotImplementedError("Events must implement _resolve()")
+
+
+class ReactionOpportunityEvent(Event):
+    def __init__(self, engine: "Engine", triggering_event: Event, phase: str):
+        super().__init__(engine=engine)
+        self.triggering_event = triggering_event
+        self.phase = phase
+        self.entity_idx = 0
+        self.declined_entities = set()
+
+    def process(self) -> None:
+        if self.entity_idx >= len(self.engine.entities):
+            return
+
+        entity = self.engine.entities[self.entity_idx]
+
+        if entity.id in self.declined_entities or entity.hp <= 0:
+            self.entity_idx += 1
+            self.engine.queue_event(self)
+            return
+
+        from choices import (
+            PlausibleFreeAction,
+            _get_plausible_uses_of_ability_at_pos,
+            Choice,
+        )
+        from abilities import ActionCost
+
+        entity_reactions = []
+        for react_ability in entity.abilities:
+            if (
+                react_ability.action_cost == ActionCost.INSTANT
+                and react_ability.is_available()
+            ):
+                plausible_uses = _get_plausible_uses_of_ability_at_pos(
+                    actor=entity,
+                    engine=self.engine,
+                    pos=entity.pos,
+                    ability=react_ability,
+                    choice_class=PlausibleFreeAction,
+                )
+                entity_reactions.extend(plausible_uses.values())
+
+        if entity_reactions:
+            pass_choice = Choice(features={"pass_reaction": 1})
+            choices = tuple(entity_reactions + [pass_choice])
+
+            self.engine.current_reaction_choices = choices
+            self.engine.current_reaction_team = entity.team
+            self.engine.current_reaction_entity = entity
+            self.engine.queue_event(self)
+        else:
+            self.entity_idx += 1
+            self.engine.queue_event(self)
+
+
+class AbilityUseEvent(Event):
+    def __init__(
+        self, source: "Entity", ability: "Ability", aiming_result: "AimingResult"
+    ):
+        super().__init__(engine=source.engine, subject=source)
+        self.ability = ability
+        self.aiming_result = aiming_result
+        self.roll_result = None
+
+    def process(self) -> None:
+        if self.state == "BEFORE":
+            self.state = "RESOLVE"
+            self.engine.queue_event(self)
+            self.engine.queue_event(
+                ReactionOpportunityEvent(self.engine, self, "before")
+            )
+            self.engine.router.publish(self, EventPhase.BEFORE)
+        elif self.state == "RESOLVE":
+            self.state = "AFTER"
+            self.engine.queue_event(self)
+            if not self.canceled:
+                self._resolve()
+        elif self.state == "AFTER":
+            self.state = "DONE"
+            self.engine.queue_event(
+                ReactionOpportunityEvent(self.engine, self, "after")
+            )
+            self.engine.router.publish(self, EventPhase.AFTER)
+
+    def _resolve(self) -> None:
+        self.roll_result = self.ability.get_roll_result(
+            aiming_result=self.aiming_result, engine=self.engine, source=self.subject
+        )
+        self.ability.execute_instructions(
+            engine=self.engine,
+            source=self.subject,
+            aiming_result=self.aiming_result,
+            roll_result=self.roll_result,
+        )
 
 
 class EventPhase(Enum):
