@@ -7,10 +7,7 @@ from typing import (
     TYPE_CHECKING,
     Union,
     Type,
-    Tuple,
-    Set,
     Callable,
-    Dict,
 )
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
@@ -24,16 +21,9 @@ from events import (
     RemoveTokenEvent,
     RemoveModifierEvent,
 )
-from ai.feature_definitions import (
-    DAMAGE_DEALT,
-    FORCED_USE_ABILITY,
-    HEAL_DEALT,
-    KILLS,
-    NEW_LOCATION,
-    Feature,
-)
 from logger import log
 from queries import QueryAvoidInclusion, QueryRoll
+from util import UniqueTuple
 from valence import Valence
 from modifiers import Modifier, Token
 
@@ -62,10 +52,10 @@ class ActionContext:
     subject_point: "Point"  # The point currently being affected
 
     # all points with targets
-    target_points: List["Point"] = field(default_factory=list)
+    target_points: UniqueTuple["Point"] = field(default_factory=list)
 
     # all points included in areas
-    included_points: List["Point"] = field(default_factory=list)
+    included_points: UniqueTuple["Point"] = field(default_factory=list)
     ability: Optional["Ability"] = None
     is_hit: bool = True
     is_crit: bool = False
@@ -93,7 +83,7 @@ def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
 
 
-@dataclass(kw_only=True)
+@dataclass(kw_only=True)  # Not frozen
 class Instruction:
     """Base class for all ability effects."""
 
@@ -103,25 +93,12 @@ class Instruction:
     def execute(self, ctx: ActionContext) -> None:
         pass
 
-    def get_features(self, ctx: "ActionContext") -> dict:
-        return {}
 
-    def get_feature_templates(self) -> List["Feature"]:
-        return []
-
-
-@dataclass
+@dataclass(frozen=True)
 class RollResult:
     roll: Optional[int]
-    hit_points: Set["Point"]
-    crit_points: Set["Point"]
-
-    def __hash__(self):
-        return (
-            hash(self.roll)
-            + hash(frozenset(self.hit_points))
-            + hash(frozenset(self.crit_points))
-        )
+    hit_points: UniqueTuple["Point"]
+    crit_points: UniqueTuple["Point"]
 
 
 @dataclass
@@ -299,13 +276,14 @@ class Ability:
         source: "Entity",
     ) -> RollResult:
         if isinstance(aiming_result, dict):
-            all_target_points = set()
+            all_target_points = []
             for aiming_result_set in aiming_result.values():
-                all_target_points.update(aiming_result_set.target_points)
+                all_target_points += aiming_result_set.target_points
+                all_target_points = UniqueTuple(all_target_points)
         else:
             all_target_points = aiming_result.target_points
-        hit_target_points = set()
-        crit_target_points = set()
+        hit_target_points = []
+        crit_target_points = []
 
         roll = None
         for target_point in all_target_points:
@@ -320,9 +298,9 @@ class Ability:
                         roll = QueryRoll(subject=source).resolve()
 
                     if roll > defense:
-                        hit_target_points.add(target_point)
+                        hit_target_points.append(target_point)
                         if roll >= 7 - crit_chance:
-                            crit_target_points.add(target_point)
+                            crit_target_points.append(target_point)
                             log(
                                 f"Crit {target} with a roll of {roll} on crit chance {crit_chance}"
                             )
@@ -332,10 +310,12 @@ class Ability:
                         )
                 else:
                     # No roll means auto hits
-                    hit_target_points.add(target_point)
+                    hit_target_points.append(target_point)
 
         return RollResult(
-            roll=roll, hit_points=hit_target_points, crit_points=crit_target_points
+            roll=roll,
+            hit_points=UniqueTuple(hit_target_points),
+            crit_points=UniqueTuple(crit_target_points),
         )
 
 
@@ -345,16 +325,6 @@ class DamageInstruction(Instruction):
     undefendable: bool = False
     irreducible: bool = False
     valence = Valence.BAD
-
-    def get_features(self, ctx: ActionContext) -> dict:
-        features = {}
-        subject = ctx.engine.entity_at(ctx.subject_point)
-        if subject and ctx.is_hit:
-            amount = resolve_int(self.amount, ctx)
-            features[DAMAGE_DEALT(name=subject.name)] = amount
-            if subject.hp > 0 and subject.hp - amount <= 0:
-                features[KILLS(name=subject.name)] = True
-        return features
 
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
@@ -371,32 +341,17 @@ class DamageInstruction(Instruction):
                 ability=ctx.ability,
             ).resolve()
 
-    def get_feature_templates(self) -> List["Feature"]:
-        return [DAMAGE_DEALT, KILLS]
-
 
 @dataclass
 class HealInstruction(Instruction):
     amount: DynamicInt
     valence = Valence.GOOD
 
-    def get_features(self, ctx: ActionContext) -> dict:
-        features = {}
-        subject = ctx.engine.entity_at(ctx.subject_point)
-        if subject:
-            amount = resolve_int(self.amount, ctx)
-            key = HEAL_DEALT(name=subject.name)
-            features[key] = amount
-        return features
-
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
             HealEvent(subject=subject, amount=amount).resolve()
-
-    def get_feature_templates(self) -> List["Feature"]:
-        return [HEAL_DEALT]
 
 
 @dataclass
@@ -521,9 +476,6 @@ class UseAnAbilityInstruction(Instruction):
     subject_chooses: bool = True
     valence = Valence.MIXED
 
-    def get_feature_templates(self) -> List["Feature"]:
-        return [FORCED_USE_ABILITY]
-
     def execute(self, ctx: ActionContext) -> None:
         from choices import Choice
 
@@ -537,12 +489,16 @@ class UseAnAbilityInstruction(Instruction):
                 ability for ability in valid_abilities if ability.is_default
             ]
 
-        choices = [
-            Choice(
-                features={f"{ctx.source.name}_forced_use_ability_is_{ability.name}": 1}
-            )
-            for ability in valid_abilities
-        ]
+        choices = UniqueTuple(
+            [
+                Choice(
+                    features={
+                        f"{ctx.source.name}_forced_use_ability_is_{ability.name}": 1
+                    }
+                )
+                for ability in valid_abilities
+            ]
+        )
         if self.subject_chooses:
             choosing_team = subject.team
         else:
@@ -582,18 +538,6 @@ class TeleportInstruction(Instruction):
     destination: DynamicPoint
     valence = Valence.MIXED
 
-    def get_features(self, ctx: ActionContext) -> dict:
-        features = {}
-        subject = ctx.engine.entity_at(ctx.subject_point)
-        if subject:
-            dest = (
-                self.destination(ctx)
-                if callable(self.destination)
-                else self.destination
-            )
-            features[NEW_LOCATION(name=subject.name)] = dest
-        return features
-
     def execute(self, ctx: ActionContext) -> None:
         subject = ctx.engine.entity_at(ctx.subject_point)
         if subject:
@@ -603,9 +547,6 @@ class TeleportInstruction(Instruction):
                 else self.destination
             )
             ChangeLocationEvent(subject=subject, new_pos=dest).resolve()
-
-    def get_feature_templates(self) -> List["Feature"]:
-        return [NEW_LOCATION]
 
 
 @dataclass(kw_only=True)

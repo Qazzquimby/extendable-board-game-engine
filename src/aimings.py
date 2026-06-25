@@ -5,6 +5,7 @@ from typing import Optional, Union, List, Dict, TYPE_CHECKING, Callable
 
 from areas import Area
 from point import Point
+from util import UniqueTuple
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -48,10 +49,10 @@ def has_any_entity_aim_condition(
 # todo aimings should have their logic in the class, not in the agent.
 
 
-@dataclass
+@dataclass(frozen=True)
 class AimingResult:
-    target_points: List[Point] = field(default_factory=list)
-    included_points: List[Point] = field(default_factory=list)
+    target_points: UniqueTuple[Point] = field(default_factory=list)
+    included_points: UniqueTuple[Point] = field(default_factory=list)
     sub_aimings: Optional[Dict[str, "AimingResult"]] = None
 
     def __hash__(self):
@@ -61,9 +62,9 @@ class AimingResult:
             sub_aimings = dict()
         return hash(
             (
-                frozenset(self.target_points),
-                frozenset(self.included_points),
-                frozenset((k, hash(v)) for k, v in sub_aimings.items()),
+                UniqueTuple(self.target_points),
+                UniqueTuple(self.included_points),
+                UniqueTuple((k, hash(v)) for k, v in sub_aimings.items()),
             )
         )
 
@@ -173,16 +174,23 @@ class MultipleAiming(Aiming):
                         from_filter_result.included_points
                     )
 
-                    to_filter_result.target_points = [
-                        p
-                        for p in to_filter_result.target_points
-                        if p not in points_to_exclude
-                    ]
-                    to_filter_result.included_points = [
-                        p
-                        for p in to_filter_result.included_points
-                        if p not in points_to_exclude
-                    ]
+                    new_to_filter_result = AimingResult(
+                        target_points=UniqueTuple(
+                            [
+                                p
+                                for p in to_filter_result.target_points
+                                if p not in points_to_exclude
+                            ]
+                        ),
+                        included_points=UniqueTuple(
+                            [
+                                p
+                                for p in to_filter_result.included_points
+                                if p not in points_to_exclude
+                            ]
+                        ),
+                    )
+                    sub_aimings_dict[to_filter_name] = new_to_filter_result
 
             combined_target_points = []
             combined_included_points = []
@@ -192,8 +200,8 @@ class MultipleAiming(Aiming):
 
             res.append(
                 AimingResult(
-                    target_points=list(set(combined_target_points)),
-                    included_points=list(set(combined_included_points)),
+                    target_points=UniqueTuple(combined_target_points),
+                    included_points=UniqueTuple(combined_included_points),
                     sub_aimings=sub_aimings_dict,
                 )
             )

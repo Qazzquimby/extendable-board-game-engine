@@ -2,6 +2,7 @@ from typing import Set, List, Iterator, TYPE_CHECKING
 
 from grid import Grid
 from point import Point
+from util import UniqueTuple
 
 if TYPE_CHECKING:
     pass
@@ -59,11 +60,10 @@ class Line(Area):
             for aim in grid.get_points_in_range(s, self.length):
                 if aim == s:
                     continue
-                line = tuple(get_line(grid, s, aim, self.length))
+                line = UniqueTuple(get_line(grid, s, aim, self.length))
                 if line and line not in seen_lines:
                     seen_lines.add(line)
-                    points = set(line)
-                    yield points
+                    yield line
 
 
 class PathArea(Area):
@@ -77,26 +77,28 @@ class PathArea(Area):
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
-            {start}
+            [start]
             if self.in_range == 0
             else grid.get_points_in_range(start, self.in_range)
         )
         seen_paths = set()
 
-        def dfs(current: Point, current_path: Set[Point]) -> Iterator[Set[Point]]:
+        def dfs(
+            current: Point, current_path: list[Point]
+        ) -> Iterator[UniqueTuple[Point]]:
             if len(current_path) == self.length:
                 frozen = frozenset(current_path)
                 if frozen not in seen_paths:
                     seen_paths.add(frozen)
-                    yield set(current_path)
+                    yield UniqueTuple(current_path)
                 return
 
             for adj in grid.get_points_in_range(current, 1):
                 if adj != current and adj not in current_path:
-                    yield from dfs(adj, current_path | {adj})
+                    yield from dfs(adj, current_path + [adj])
 
-        for s in valid_starts:
-            yield from dfs(s, {s})
+        for start in valid_starts:
+            yield from dfs(start, [start])
 
 
 class Square(Area):
@@ -109,7 +111,7 @@ class Square(Area):
         self.side_length = side_length
         self.in_range = in_range
 
-    def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
+    def get_selections(self, grid: Grid, start: Point) -> Iterator[UniqueTuple[Point]]:
         valid_starts = (
             {start}
             if self.in_range == 0
@@ -121,7 +123,7 @@ class Square(Area):
         for start in valid_starts:
             for leftmost in range(start.x - self.side_length + 1, start.x + 1):
                 for topmost in range(start.y - self.side_length + 1, start.y + 1):
-                    points = set()
+                    points = []
                     for offset_x in range(self.side_length):
                         for offset_y in range(self.side_length):
                             cell = Point(leftmost + offset_x, topmost + offset_y)
@@ -130,13 +132,13 @@ class Square(Area):
                                 if cell in grid.get_points_in_range(
                                     start, self.side_length
                                 ):
-                                    points.add(cell)
+                                    points.append(cell)
 
                     if points:
-                        frozen_points = frozenset(points)
+                        frozen_points = UniqueTuple(points)
                         if frozen_points not in seen_squares:
                             seen_squares.add(frozen_points)
-                            yield points
+                            yield UniqueTuple(points)
 
 
 def get_line(grid: Grid, start: Point, target: Point, length: int) -> List[Point]:

@@ -67,7 +67,7 @@ class Edge:
         self.num_visits = num_visits
         self.total_value = total_value
 
-        # populated when simulated.One if deterministic.
+        # populated when simulated. One if deterministic.
         self.child_node_keys: set[int] = set()
 
     @property
@@ -140,10 +140,7 @@ class ExpansionStrategy(abc.ABC):
 
 class EvaluationStrategy(abc.ABC):
     @abc.abstractmethod
-    def evaluate(
-        self,
-        node: "MCTSNode",
-    ) -> float:
+    def evaluate(self, node: "MCTSNode", env: "Engine") -> float:
         """
         Evaluate a leaf node to estimate its value.
         The value should be from the perspective of the player whose turn it is at the leaf node.
@@ -362,9 +359,9 @@ class TreeSearchAgent(Agent):
 
         key = self.sim_env.hash()
         node = self.mcts.cache.get_matching_node(key)
-        matched = False
+        matched = True
         if not node:
-            matched = True
+            matched = False
             node = MCTSNode(key=key, current_player_index=self.team, env=env)
             self.mcts.cache.cache_node(key, node)
 
@@ -422,7 +419,7 @@ class MCTSAgent(Agent):
         self.cache = MCTSNodeCache()
 
     def _run_simulation(self, root_node: MCTSNode) -> None:
-        sim_env = root_node.env.copy()
+        sim_env: "Engine" = root_node.env.copy()
         sim_env.rng.stochastic_flag = False
 
         path = SearchPath()
@@ -435,6 +432,10 @@ class MCTSAgent(Agent):
         sim_env.agents = {0: agent0, 1: agent1}
 
         try:
+            # Assume first choice is already ready at root node, no advancing
+            assert root_node.actions == root_node.env.get_legal_actions()
+            self._simulate_choices(sim_env=sim_env, actor=sim_env.active_entity)
+
             while not sim_env.is_done:
                 # todo this might desync the root node in agents?
                 entity = sim_env.advance_until_active_entity()
@@ -444,20 +445,7 @@ class MCTSAgent(Agent):
                     sim_env.advance_to_next_activator()
                     continue
 
-                all_choices = sim_env.get_legal_actions()
-                action_index = sim_env.get_choice_index(
-                    team=entity.team, choices=all_choices
-                )
-                action_choice = all_choices[action_index]
-
-                sim_env.step(
-                    actor=entity,
-                    action=action_choice,
-                    action_idx=action_index,
-                )
-
-                if isinstance(action_choice, PlausibleMoveAndAction):
-                    sim_env.advance_to_next_activator()
+                self._simulate_choices(sim_env=sim_env, actor=entity)
 
             # If we reach here, the game finished without hitting an unexpanded node
             if path.steps:
@@ -476,6 +464,18 @@ class MCTSAgent(Agent):
         except SimulationComplete:
             pass
 
+    def _simulate_choices(self, sim_env: "Engine", actor: "Entity"):
+        all_choices = sim_env.get_legal_actions()
+        action_index = sim_env.get_choice_index(team=actor.team, choices=all_choices)
+        action_choice = all_choices[action_index]
+        sim_env.step(
+            actor=actor,
+            action=action_choice,
+            action_idx=action_index,
+        )
+        if isinstance(action_choice, PlausibleMoveAndAction):
+            sim_env.advance_to_next_activator()
+
     def choose(self, env: Engine) -> int:
         choices = env.current_choices
         if len(choices) <= 1:
@@ -489,7 +489,7 @@ class MCTSAgent(Agent):
             )
             self.cache.cache_node(root_key, root_node)
 
-        # Fix: Expand the root node immediately with the exact choices provided by the engine.
+        # Expand the root node immediately with the exact choices provided by the engine.
         # This prevents mid-turn reactive abilities from being overwritten by standard legal actions.
         # todo could cause root node desync?
         if not root_node.is_expanded:
@@ -525,5 +525,5 @@ class MCTSAgent(Agent):
     def select_action(
         self, choices: List[Choice], engine: Optional[Engine] = None
     ) -> Choice:
-        idx = self.choose(choices, engine=engine)
+        idx = self.choose(env=engine)
         return choices[idx]

@@ -159,9 +159,9 @@ class Engine:
             raise ValueError("Cannot request a choice from an empty list.")
         if len(choices) == 1:
             return 0
-        self.current_choices = choices
+        self.current_choices = UniqueTuple(choices)
         index = self.agents[team].choose(env=self)
-        self.current_choices = []
+        self.current_choices = tuple()
         assert 0 <= index < len(choices)
         return index
 
@@ -591,11 +591,11 @@ class Engine:
                 )
             )
         if self.current_choices:
-            choices = frozenset(self.current_choices)
+            choices = UniqueTuple(self.current_choices)
             assert len(choices) == len(self.current_choices)
         else:
             choices = None
-        marker_states = frozenset((m.id, m.name, m.pos, m.team) for m in self.markers)
+        marker_states = UniqueTuple((m.id, m.name, m.pos, m.team) for m in self.markers)
         return (
             self.round_num,
             self.current_hero_row_index,
@@ -603,7 +603,7 @@ class Engine:
             self.current_turn_hero.id if self.current_turn_hero else None,
             self.active_entity.id if self.active_entity else None,
             choices,
-            frozenset(entity_states),
+            UniqueTuple(entity_states),
             marker_states,
             # tuple(frozenset(s) for s in self._reaction_declined_sets),
         )

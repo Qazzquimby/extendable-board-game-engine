@@ -40,7 +40,7 @@ class EventPhase(Enum):
     QUERY = auto()
 
 
-@dataclass
+@dataclass(frozen=True)
 class Subscription:
     modifier: "Modifier"
     event_type: Type

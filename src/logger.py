@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(frozen=True)
 class LogNode:
     message: str
     children: list["LogNode"] = field(default_factory=list)

@@ -96,6 +96,7 @@ class OnDeathOtherViktoriasHealAndGainDef(Modifier):
                     self.owner.add_modifier(DefenseModifier(amount=2))
 
 
+@dataclass(kw_only=True)
 class DragonsBreathPull(Instruction):
     valence = Valence.MIXED
 

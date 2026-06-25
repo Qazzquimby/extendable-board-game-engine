@@ -60,10 +60,10 @@ class Grid:
         start: Point,
         max_range: int,
         blocking_los_points: Optional[Set[Point]] = None,
-    ) -> Set[Point]:
+    ) -> UniqueTuple[Point]:
         """Finds all points within max_range, respecting walls. First step can be diagonal. Must have line of sight."""
         if max_range < 0 or start is None:
-            return set()
+            return UniqueTuple()
 
         blocking_los_points = blocking_los_points or set()
 
@@ -103,14 +103,14 @@ class Grid:
                 if 0 <= nx < self.width and 0 <= ny < self.height:
                     queue.append((point, cost + 1))
 
-        visible_points = set()
+        visible_points = []
         for point in visited.keys():
             is_visible, _has_cover = self.get_line_of_sight(
                 start_pos=start, target_pos=point, blocked_points=blocking_los_points
             )
             if is_visible:
-                visible_points.add(point)
-        return visible_points
+                visible_points.append(point)
+        return UniqueTuple(visible_points)
 
     def get_movable_spaces(
         self,
@@ -176,9 +176,9 @@ class Grid:
         target: Point,
         actor: "Entity",
         valid_step=None,
-    ) -> Optional[List[Point]]:
+    ) -> Optional[tuple[Point]]:
         if start == target:
-            return [start]
+            return tuple(start)
 
         enemy_points = {
             e.pos
@@ -225,7 +225,7 @@ class Grid:
                     path.append(curr)
                     curr = parent[curr]
                 path.reverse()
-                return path
+                return tuple(path)
 
             closed.add(curr)
 
@@ -364,16 +364,6 @@ class Grid:
         Returns (isVisible, hasCover).
         """
         if start_pos == target_pos:
-            if visualize_file:
-                with open(visualize_file, "w") as f:
-                    f.write(
-                        self.visualize(
-                            start=start_pos,
-                            target=target_pos,
-                            visible=True,
-                            has_cover=False,
-                        )
-                    )
             return True, False
 
         sx, sy = start_pos.x, start_pos.y
@@ -468,93 +458,4 @@ class Grid:
                         has_cover = True
                         break
 
-        if visualize_file:
-            with open(visualize_file, "w") as f:
-                f.write(
-                    self.visualize(
-                        start=start_pos,
-                        target=target_pos,
-                        visible=visible,
-                        has_cover=has_cover,
-                    )
-                )
-
         return visible, has_cover
-
-    def _render_html(self, color_func, legend_html: str) -> str:
-        html = ['<table style="border-collapse: collapse;">']
-        for y in range(self.height):
-            html.append("  <tr>")
-            for x in range(self.width):
-                color = color_func(Point(x, y))
-                html.append(
-                    f'    <td style="width: 20px; height: 20px; background-color: {color}; border: 1px solid #ccc;"></td>'
-                )
-            html.append("  </tr>")
-        html.append("</table>")
-
-        html.append('<div style="margin-top: 10px; font-family: sans-serif;">')
-        html.append(legend_html)
-        html.append("</div>")
-
-        return "\n".join(html)
-
-    def visualize(
-        self,
-        start: Optional[Point] = None,
-        target: Optional[Point] = None,
-        path: Optional[List[Point]] = None,
-        visible: Optional[bool] = None,
-        has_cover: Optional[bool] = None,
-    ) -> str:
-        path_set = set(path) if path else set()
-
-        def get_color(p: Point) -> str:
-            if p == start:
-                return "green"
-            if p == target:
-                return "red"
-            if p in self.walls:
-                return "black"
-            if p in path_set:
-                return "blue"
-            return "white"
-
-        legend = [
-            "<strong>Legend:</strong><br>",
-            '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:red; border:1px solid #ccc;"></span> Target<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:blue; border:1px solid #ccc;"></span> Path<br>',
-        ]
-        if visible is not None:
-            legend.append(
-                f'<br><strong>Line of Sight:</strong> {"Visible" if visible else "Blocked"}'
-            )
-            if has_cover:
-                legend.append(" (Covered)")
-
-        return self._render_html(get_color, "\n".join(legend))
-
-    def visualize_visibility(self, start: Point) -> str:
-        def get_color(p: Point) -> str:
-            if p == start:
-                return "green"
-            if p in self.walls:
-                return "black"
-            visible, covered = self.get_line_of_sight(start, p)
-            if not visible:
-                return "darkgray"
-            if covered:
-                return "yellow"
-            return "lightblue"
-
-        legend = [
-            "<strong>Visibility Legend:</strong><br>",
-            '<span style="display:inline-block; width:15px; height:15px; background-color:green; border:1px solid #ccc;"></span> Start<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:black; border:1px solid #ccc;"></span> Wall<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:lightblue; border:1px solid #ccc;"></span> Visible<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:yellow; border:1px solid #ccc;"></span> Covered<br>',
-            '<span style="display:inline-block; width:15px; height:15px; background-color:darkgray; border:1px solid #ccc;"></span> Hidden<br>',
-        ]
-        return self._render_html(get_color, "\n".join(legend))

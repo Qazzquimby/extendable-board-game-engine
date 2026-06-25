@@ -1,16 +1,15 @@
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Union
 
-from abilities import Ability, ActionContext, ActionCost
-from ai.feature_definitions import NEW_LOCATION
+from abilities import Ability, ActionCost
 from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
 from entities import Entity
 from point import Point
 from queries import QueryLegalAimings, QuerySpeed
+from util import UniqueTuple
 from valence import Valence
 
 if TYPE_CHECKING:
     from engine import Engine
-    from features import ChoiceFeatureEvaluator
 
 
 class Choice:
@@ -39,7 +38,6 @@ class PlausibleMoveAndAction(Choice):
         engine: "Engine" = None,
         actor: "Entity" = None,
         aiming_result: "AimingResult" = None,
-        feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
     ):
         # todo right now aoe uses target None.
         #  Probably better to have a list of targets. Ml will need adjusting
@@ -72,7 +70,6 @@ class PlausibleMoveAndAction(Choice):
 def get_plausible_move_and_actions(
     actor: "Entity",
     engine: "Engine",
-    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> List[PlausibleMoveAndAction]:
     proposed_moves = get_plausible_movements(
         actor=actor,
@@ -86,7 +83,6 @@ def get_plausible_move_and_actions(
             engine=engine,
             move_pos=move_pos,
             movement_name=movement_name,
-            feature_evaluator=feature_evaluator,
         )
         actions_map.update(plausible_actions_after_movement)
 
@@ -167,7 +163,6 @@ def get_plausible_actions_after_movement(
     engine: "Engine",
     move_pos: Point,
     movement_name: str,
-    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     plausible_actions_after_movement = {}
     for ability in actor.abilities:
@@ -180,7 +175,6 @@ def get_plausible_actions_after_movement(
                 move_pos=move_pos,
                 movement_name=movement_name,
                 ability=ability,
-                feature_evaluator=feature_evaluator,
             )
         )
         plausible_actions_after_movement.update(
@@ -204,102 +198,6 @@ def get_plausible_actions_after_movement(
     return plausible_actions_after_movement
 
 
-def _compute_ability_features(
-    actor: "Entity",
-    engine: "Engine",
-    ability: "Ability",
-    aiming_result: "AimingResult",
-    feature_evaluator: Optional["ChoiceFeatureEvaluator"],
-    base_features: Dict[str, Any],
-    choice: "PlausibleActionOrMoveAndAction",
-) -> Dict[str, Any]:
-    features = base_features.copy()
-
-    feature_name_parts = [f"use {ability.name}"]
-    if aiming_result.sub_aimings:
-        # MultipleAiming case
-        for aiming_name, sub_aiming_result in aiming_result.sub_aimings.items():
-            target_names = set()
-            all_sub_points = set(sub_aiming_result.target_points) | set(
-                sub_aiming_result.included_points
-            )
-            for p in all_sub_points:
-                entity = engine.entity_at(p)
-                if entity:
-                    target_names.add(entity.name)
-
-            for target_name in target_names:
-                features[f"{ability.name} {aiming_name} on {target_name}"] = 1
-    else:
-        # Single aiming case
-        target_names = set()
-        all_points = set(aiming_result.target_points) | set(
-            aiming_result.included_points
-        )
-        for p in all_points:
-            entity = engine.entity_at(p)
-            if entity:
-                target_names.add(entity.name)
-        for target_name in target_names:
-            features[f"{ability.name} on {target_name}"] = 1
-
-    all_points = set(aiming_result.target_points) | set(aiming_result.included_points)
-
-    for instruction in ability.instructions:
-        for point in all_points:
-            ctx = ActionContext(
-                engine=engine,
-                source=actor,
-                subject_point=point,
-                target_points=aiming_result.target_points,
-                included_points=aiming_result.included_points,
-                ability=ability,
-                is_hit=True,
-                is_crit=False,
-            )
-            instruction_features = instruction.get_features(ctx)
-
-            for key, value in instruction_features.items():
-                if key in features:
-                    if isinstance(value, (int, float)):
-                        features[key] += value
-                    else:
-                        features[key] = value
-                else:
-                    features[key] = value
-
-    # Derived features
-    for entity in engine.entities:
-        new_pos_key = f"{entity.name}_changed_position"
-        entity_pos = features.get(new_pos_key, entity.pos)
-        if not entity_pos:
-            continue
-
-        for other_entity in engine.entities:
-            if entity.id >= other_entity.id:
-                continue
-
-            other_pos_key = f"{other_entity.name}_changed_position"
-            other_pos = features.get(other_pos_key, other_entity.pos)
-            if not other_pos:
-                continue
-
-            dist = engine.grid.get_range(entity_pos, other_pos)
-            key = f"distance_{entity.name}_to_{other_entity.name}"
-            features[key] = dist
-
-    if feature_evaluator:
-        eval_features = feature_evaluator.evaluate(
-            engine=engine,
-            actor=actor,
-            choice=choice,
-            core_features=features,
-        )
-        features.update(eval_features)
-
-    return features
-
-
 class PlausibleFreeAction(Choice):
     def __init__(
         self,
@@ -308,7 +206,6 @@ class PlausibleFreeAction(Choice):
         engine: "Engine",
         actor: "Entity",
         aiming_result: "AimingResult",
-        feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
         **kwargs,
     ):
         self.target = target
@@ -333,22 +230,6 @@ class PlausibleFreeAction(Choice):
     def ends_turn(self) -> bool:
         return False
 
-    def _compute_features(
-        self,
-        actor: "Entity",
-        engine: "Engine",
-        feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
-    ) -> Dict[str, Any]:
-        return _compute_ability_features(
-            actor=actor,
-            engine=engine,
-            ability=self.ability,
-            aiming_result=self.aiming_result,
-            feature_evaluator=feature_evaluator,
-            base_features={},
-            choice=self,
-        )
-
 
 PlausibleActionOrMoveAndAction = Union[PlausibleFreeAction, PlausibleMoveAndAction]
 
@@ -356,7 +237,6 @@ PlausibleActionOrMoveAndAction = Union[PlausibleFreeAction, PlausibleMoveAndActi
 def get_plausible_free_actions(
     actor: "Entity",
     engine: "Engine",
-    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> List[PlausibleFreeAction]:
     plausible_actions = {}
     for ability in actor.abilities:
@@ -371,7 +251,6 @@ def get_plausible_free_actions(
             engine=engine,
             pos=actor.pos,
             ability=ability,
-            feature_evaluator=feature_evaluator,
             choice_class=PlausibleFreeAction,
         )
         plausible_actions.update(plausible_uses)
@@ -385,7 +264,6 @@ def get_plausible_uses_of_ability_after_movement(
     move_pos: Point,
     movement_name: str,
     ability: "Ability",
-    feature_evaluator: Optional["ChoiceFeatureEvaluator"] = None,
 ) -> dict[tuple, PlausibleMoveAndAction]:
     if move_pos == actor.pos:
         move_path = []
@@ -397,7 +275,6 @@ def get_plausible_uses_of_ability_after_movement(
         engine=engine,
         pos=move_pos,
         ability=ability,
-        feature_evaluator=feature_evaluator,
         choice_class=PlausibleMoveAndAction,
         move_path=move_path,
         movement_name=movement_name,
@@ -435,7 +312,6 @@ def _get_plausible_uses_of_ability_at_pos(
     engine: "Engine",
     pos: Point,
     ability: "Ability",
-    feature_evaluator: Optional["ChoiceFeatureEvaluator"],
     choice_class: type,
     **choice_kwargs,
 ) -> dict[tuple, PlausibleMoveAndAction]:
@@ -466,13 +342,12 @@ def _get_plausible_uses_of_ability_at_pos(
 
         for aiming_res in legal_aimings:
             if isinstance(ability.aiming, MultipleAiming):
-                all_points = set(aiming_res.target_points) | set(
-                    aiming_res.included_points
-                )
+                all_points = aiming_res.target_points + aiming_res.included_points
+
                 if not all_points:
                     continue
 
-                key = (pos, frozenset(all_points), ability.get_hash())
+                key = (pos, UniqueTuple(all_points), ability.get_hash())
                 if key not in plausible_uses:
                     plausible_uses[key] = choice_class(
                         target=None,
@@ -480,7 +355,6 @@ def _get_plausible_uses_of_ability_at_pos(
                         engine=sim_engine,
                         actor=actor,
                         aiming_result=aiming_res,
-                        feature_evaluator=feature_evaluator,
                         **choice_kwargs,
                     )
             elif isinstance(ability.aiming, TargetEntity):
@@ -509,7 +383,6 @@ def _get_plausible_uses_of_ability_at_pos(
                             engine=engine,
                             actor=actor,
                             aiming_result=aiming_res,
-                            feature_evaluator=feature_evaluator,
                             **choice_kwargs,
                         )
             elif isinstance(ability.aiming, TargetSelf):
@@ -522,7 +395,6 @@ def _get_plausible_uses_of_ability_at_pos(
                         engine=sim_engine,
                         actor=actor,
                         aiming_result=aiming_res,
-                        feature_evaluator=feature_evaluator,
                         **choice_kwargs,
                     )
             elif isinstance(ability.aiming, IncludeArea):
@@ -536,7 +408,7 @@ def _get_plausible_uses_of_ability_at_pos(
 
                 key = (
                     pos,
-                    frozenset(e.pos for e in affected_entities),
+                    UniqueTuple(e.pos for e in affected_entities),
                     ability.get_hash(),
                 )
                 if key not in plausible_uses:
@@ -560,7 +432,6 @@ def _get_plausible_uses_of_ability_at_pos(
                         engine=sim_engine,
                         actor=actor,
                         aiming_result=aiming_res,
-                        feature_evaluator=feature_evaluator,
                         **choice_kwargs,
                     )
 
