@@ -288,7 +288,7 @@ class Engine:
     ) -> None:
         self.action_history.append(action_idx)
 
-        was_resolving = getattr(self, "is_resolving_action", False)
+        was_resolving = self.is_resolving_action
         self.is_resolving_action = True
 
         try:

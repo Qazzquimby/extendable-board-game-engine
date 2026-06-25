@@ -433,11 +433,13 @@ class MCTSAgent(Agent):
 
         try:
             # Assume first choice is already ready at root node, no advancing
-            assert root_node.actions == root_node.env.get_legal_actions()
-            self._simulate_choices(sim_env=sim_env, actor=sim_env.active_entity)
+            self._simulate_choices(
+                sim_env=sim_env,
+                actor=sim_env.active_entity,
+                choices=sim_env.current_choices,
+            )
 
             while not sim_env.is_done:
-                # todo this might desync the root node in agents?
                 entity = sim_env.advance_until_active_entity()
                 if sim_env.is_done:
                     break
@@ -445,7 +447,12 @@ class MCTSAgent(Agent):
                     sim_env.advance_to_next_activator()
                     continue
 
-                self._simulate_choices(sim_env=sim_env, actor=entity)
+                choices = sim_env.get_legal_actions()
+                if not choices:
+                    sim_env.advance_to_next_activator()
+                    continue
+
+                self._simulate_choices(sim_env=sim_env, actor=entity, choices=choices)
 
             # If we reach here, the game finished without hitting an unexpanded node
             if path.steps:
@@ -464,10 +471,11 @@ class MCTSAgent(Agent):
         except SimulationComplete:
             pass
 
-    def _simulate_choices(self, sim_env: "Engine", actor: "Entity"):
-        all_choices = sim_env.get_legal_actions()
-        action_index = sim_env.get_choice_index(team=actor.team, choices=all_choices)
-        action_choice = all_choices[action_index]
+    def _simulate_choices(
+        self, sim_env: "Engine", actor: "Entity", choices: tuple[Choice]
+    ):
+        action_index = sim_env.get_choice_index(team=actor.team, choices=choices)
+        action_choice = choices[action_index]
         sim_env.step(
             actor=actor,
             action=action_choice,
@@ -491,7 +499,6 @@ class MCTSAgent(Agent):
 
         # Expand the root node immediately with the exact choices provided by the engine.
         # This prevents mid-turn reactive abilities from being overwritten by standard legal actions.
-        # todo could cause root node desync?
         if not root_node.is_expanded:
             self.expansion.expand(
                 node=root_node, env_at_node=env, pending_choices=choices
