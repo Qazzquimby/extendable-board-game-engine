@@ -16,7 +16,6 @@ from modifiers import Modifier, Token, ImmobileToken
 from events import (
     after,
     before,
-    AddTokenEvent,
     query,
 )
 from event_library import (

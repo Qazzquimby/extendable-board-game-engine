@@ -2,7 +2,6 @@ from typing import List, Optional, Dict, Any, TYPE_CHECKING, Union
 
 from abilities import Ability, ActionCost
 from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
-from entities import Entity
 from point import Point
 from queries import QueryLegalAimings, QuerySpeed
 from util import UniqueTuple
@@ -10,6 +9,7 @@ from valence import Valence
 
 if TYPE_CHECKING:
     from engine import Engine
+    from entities import Entity
 
 
 class Choice:
@@ -259,7 +259,7 @@ def get_plausible_free_actions(
 
 
 def get_plausible_uses_of_ability_after_movement(
-    actor: Entity,
+    actor: "Entity",
     engine: "Engine",
     move_pos: Point,
     movement_name: str,
@@ -308,7 +308,7 @@ class _ActorMovedView:
 
 
 def _get_plausible_uses_of_ability_at_pos(
-    actor: Entity,
+    actor: "Entity",
     engine: "Engine",
     pos: Point,
     ability: "Ability",

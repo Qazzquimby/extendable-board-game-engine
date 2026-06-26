@@ -250,10 +250,11 @@ class Engine:
             else:
                 before_state = self.to_model()
 
+            choices = self.current_choices
             action_index = self.get_choice_index(
-                team=self.get_current_player(), choices=self.current_choices
+                team=self.get_current_player(), choices=choices
             )
-            action_choice = self.current_choices[action_index]
+            action_choice = choices[action_index]
 
             self.step(
                 action=action_choice,
@@ -553,6 +554,7 @@ class Engine:
             self.current_team,
             self.current_turn_hero.id if self.current_turn_hero else None,
             self.active_entity.id if self.active_entity else None,
+            self.event_queue,
             choices,
             UniqueTuple(entity_states),
             marker_states,

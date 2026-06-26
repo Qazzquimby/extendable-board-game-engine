@@ -4,11 +4,7 @@ from typing import Optional, List, Type, TYPE_CHECKING
 from abilities import Ability
 from aimings import TargetSelf
 
-from events import (
-    EventPhase,
-    AddTokenEvent,
-    RemoveTokenEvent,
-)
+from events import EventPhase
 from event_library import DeployEvent, SummonEvent
 from point import Point
 from queries import (
@@ -141,7 +137,7 @@ class Entity:
         self.engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
-    # Seems not used now
+    # todo Seems not used now but should be?
     # def get_legal_actions(self) -> List[Ability]:
     #     # Returns all abilities the entity has. Modifiers can alter this list.
     #     # A "basic move" is not an ability in this list, but a capability checked via `can_move()`.

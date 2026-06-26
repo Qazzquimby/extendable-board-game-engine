@@ -68,13 +68,16 @@ class Edge:
         self.total_value = total_value
 
         # populated when simulated. One if deterministic.
-        self.child_node_keys: set[int] = set()
+        self.child_nodes: set["MCTSNode"] = set()
 
     @property
     def value(self) -> float:
         if self.num_visits == 0:
             return 0.0
         return self.total_value / self.num_visits
+
+    def __str__(self):
+        return f"{self.num_visits} - {self.value}"
 
 
 class MCTSNode:
@@ -376,6 +379,8 @@ class MCTSAgent(Agent):
                 best_visits = edge.num_visits
                 best_idx = action_idx
 
+        assert sum(len(edge.child_nodes) for edge in root_node.edges.values())
+
         assert 0 <= best_idx < len(choices), (
             f"Crash: MCTS selected an invalid index: {best_idx} for {len(choices)} choices. "
             "Action bounds are corrupted."
@@ -384,6 +389,7 @@ class MCTSAgent(Agent):
         return best_idx
 
     def _run_simulation(self, root_node: MCTSNode) -> None:
+        previous_node = root_node
         sim_env: "Engine" = root_node.env.copy()
         sim_env.rng.stochastic_flag = False
 
@@ -396,14 +402,23 @@ class MCTSAgent(Agent):
         path.set_action_for_last_node(action_idx)
         action = root_node.actions[action_idx]
 
-        self._advance_env_and_step(sim_env, action, action_idx)
+        self._advance_env_and_step(
+            sim_env=sim_env, action=action, action_idx=action_idx
+        )
 
         while not sim_env.is_done:
             key = sim_env.hash()
             node = self.cache.get_matching_node(key)
             if not node:
-                node = MCTSNode(key=key, current_player_index=sim_env.get_current_player(), env=sim_env)
+                node = MCTSNode(
+                    key=key,
+                    current_player_index=sim_env.get_current_player(),
+                    env=sim_env,
+                )
                 self.cache.cache_node(key, node)
+
+            previous_node.edges[action_idx].child_nodes.add(node)
+            previous_node = node
 
             if path.has_visited_key(key):
                 break

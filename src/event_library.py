@@ -1,14 +1,15 @@
-from typing import Optional, Type
-
-from abilities import Ability
-from engine import Engine
-from entities import Entity, Summon
+from typing import Optional, Type, TYPE_CHECKING
 from events import Event
-from grid import Direction
 from logger import log
 from mod_value import ModInt
-from modifiers import Modifier
 from point import Point
+
+if TYPE_CHECKING:
+    from abilities import Ability
+    from engine import Engine
+    from entities import Entity, Summon
+    from grid import Direction
+    from modifiers import Modifier
 
 
 class ChangeLocationEvent(Event):

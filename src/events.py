@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
+from util import HashByValue
+
 if TYPE_CHECKING:
     from engine import Engine
     from abilities import Ability
@@ -12,10 +14,10 @@ if TYPE_CHECKING:
 
 class EventQueue:
     def __init__(self):
-        self.queue: List['Event'] = []
+        self.queue: List["Event"] = []
         self.is_processing = False
 
-    def enqueue(self, event: 'Event'):
+    def enqueue(self, event: "Event"):
         if self.is_processing:
             self.queue.insert(0, event)
         else:
@@ -31,8 +33,11 @@ class EventQueue:
         finally:
             self.is_processing = False
 
+    def __hash__(self):
+        return hash((tuple(self.queue), self.is_processing))
 
-class Event(abc.ABC):
+
+class Event(HashByValue, abc.ABC):
     def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
         self.engine = engine
         self.subject = subject
