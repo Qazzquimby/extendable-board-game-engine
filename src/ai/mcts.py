@@ -418,6 +418,7 @@ class MCTSAgent(Agent):
                 self.cache.cache_node(key, node)
 
             previous_node.edges[action_idx].child_nodes.add(node)
+            assert len(previous_node.edges[action_idx].child_nodes) < 20
             previous_node = node
 
             if path.has_visited_key(key):

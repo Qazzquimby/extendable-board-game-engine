@@ -525,10 +525,7 @@ class Engine:
     def _get_hash_info(self):
         entity_states = []
         for e in self.entities:
-            abilities_state = tuple(
-                (a.name, getattr(a, "is_tapped", False), getattr(a, "charges", None))
-                for a in e.abilities
-            )
+            abilities_state = tuple(ability.get_hash_info() for ability in e.abilities)
             modifiers_state = tuple(m.__class__.__name__ for m in e.modifiers)
             entity_states.append(
                 (

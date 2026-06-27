@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
-from util import HashByValue
-
 if TYPE_CHECKING:
     from engine import Engine
     from abilities import Ability
@@ -37,7 +35,7 @@ class EventQueue:
         return hash((tuple(self.queue), self.is_processing))
 
 
-class Event(HashByValue, abc.ABC):
+class Event(abc.ABC):
     def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
         self.engine = engine
         self.subject = subject
@@ -63,6 +61,23 @@ class Event(HashByValue, abc.ABC):
 
     def _resolve(self) -> None:
         raise NotImplementedError("Events must implement _resolve()")
+
+    def get_hash_info(self):
+        return (
+            str(self.subject),
+            self.canceled,
+            self.state,
+            self.__class__.__name__,
+            # todo probably need to iterate over __dict__ for subclass params
+        )
+
+    def __hash__(self):
+        return hash(self.get_hash_info())
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        return hash(self) == hash(other)
 
 
 class ReactionOpportunityEvent(Event):

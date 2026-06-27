@@ -125,6 +125,23 @@ class Ability:
     defense: int = 0
     crit_chance: int = 0
 
+    def get_hash_info(self):
+        return (
+            self.name,
+            self.aiming,
+            str(self.owner),
+            self.is_tapped,
+            self.charges,
+        )
+
+    def __hash__(self):
+        return hash(self.get_hash_info())
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        return hash(self) == hash(other)
+
     def __deepcopy__(self, memo):
         # Even though this is a dataclass, a custom __deepcopy__ is much faster.
         if id(self) in memo:
@@ -196,6 +213,7 @@ class Ability:
             self.tapped_this_turn = True
 
         from events import AbilityUseEvent
+
         AbilityUseEvent(
             source=source, ability=self, aiming_result=aiming_result
         ).resolve()
