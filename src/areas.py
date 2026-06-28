@@ -12,6 +12,14 @@ class Area:
     def __init__(self, in_range: int):
         self.in_range = in_range
 
+    def __hash__(self):
+        return hash((type(self), self.in_range))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.in_range == other.in_range
+
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         """Yields all possible valid area selections from the start point."""
         raise NotImplementedError
@@ -26,6 +34,14 @@ class Burst(Area):
         super().__init__(in_range=in_range)
         self.radius = radius  # radius n is all points in range n.
         self.range_limit = in_range
+
+    def __hash__(self):
+        return hash((type(self), self.in_range, self.radius, self.range_limit))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (self.in_range, self.radius, self.range_limit) == (other.in_range, other.radius, other.range_limit)
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         # If range_limit is 0, it's centered on the start point
@@ -48,6 +64,14 @@ class Line(Area):
     ):
         super().__init__(in_range=in_range)
         self.length = length
+
+    def __hash__(self):
+        return hash((type(self), self.in_range, self.length))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (self.in_range, self.length) == (other.in_range, other.length)
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
@@ -74,6 +98,14 @@ class PathArea(Area):
     ):
         super().__init__(in_range=in_range)
         self.length = length
+
+    def __hash__(self):
+        return hash((type(self), self.in_range, self.length))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (self.in_range, self.length) == (other.in_range, other.length)
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         valid_starts = (
@@ -110,6 +142,14 @@ class Square(Area):
         super().__init__(in_range=in_range)
         self.side_length = side_length
         self.in_range = in_range
+
+    def __hash__(self):
+        return hash((type(self), self.in_range, self.side_length))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (self.in_range, self.side_length) == (other.in_range, other.side_length)
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[UniqueTuple[Point]]:
         valid_starts = (

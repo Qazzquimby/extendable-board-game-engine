@@ -46,7 +46,7 @@ def has_any_entity_aim_condition(
     return engine.entity_at(point) is not None
 
 
-# todo aimings should have their logic in the class, not in the agent.
+#
 
 
 @dataclass(frozen=True)
@@ -78,7 +78,7 @@ class AimingResult:
             ) != set(other.sub_aimings.keys()):
                 return False
             return all(
-                (self.sub_aimings[k] == other.sub_aiming[k]) for k in self.sub_aimings
+                (self.sub_aimings[k] == other.sub_aimings[k]) for k in self.sub_aimings
             )
 
         a_targets = set(getattr(self, "target_points", []))
@@ -97,6 +97,14 @@ class Aiming(abc.ABC):
 
     def __init__(self, condition: Optional[AimingCondition] = None):
         self.condition = condition
+
+    def __hash__(self):
+        return hash((type(self), self.condition))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.condition == other.condition
 
     @abc.abstractmethod
     def get_all_aimings(
@@ -124,6 +132,25 @@ class MultipleAiming(Aiming):
             aimings = {f"{i}": t for i, t in enumerate(aimings)}
         self.aimings = aimings
         self.exclusions = exclusions or {}
+
+    def __hash__(self):
+        return hash(
+            (
+                type(self),
+                self.condition,
+                frozenset(self.aimings.items()),
+                frozenset(self.exclusions.items()),
+            )
+        )
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (
+            self.condition == other.condition
+            and self.aimings == other.aimings
+            and self.exclusions == other.exclusions
+        )
 
     def get_all_aimings(
         self,
@@ -234,6 +261,14 @@ class TargetEntity(Aiming):
         super().__init__(condition=condition)
         self.in_range = in_range
 
+    def __hash__(self):
+        return hash((type(self), self.condition, self.in_range))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.condition == other.condition and self.in_range == other.in_range
+
     def get_all_aimings(
         self,
         engine: "Engine",
@@ -279,6 +314,18 @@ class TargetPoint(Aiming):
         self.in_range = in_range
         self.empty = empty
 
+    def __hash__(self):
+        return hash((type(self), self.condition, self.in_range, self.empty))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (
+            self.condition == other.condition
+            and self.in_range == other.in_range
+            and self.empty == other.empty
+        )
+
     def get_all_aimings(
         self,
         engine: "Engine",
@@ -316,6 +363,14 @@ class IncludeArea(Aiming):
     ):
         super().__init__(condition=condition)
         self.area = area
+
+    def __hash__(self):
+        return hash((type(self), self.condition, self.area))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return self.condition == other.condition and self.area == other.area
 
     def get_all_aimings(
         self,
