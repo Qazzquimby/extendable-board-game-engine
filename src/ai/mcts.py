@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from choices import Choice, PlausibleMoveAndAction
 from engine import Agent, Engine
 from logger import log
+from valence import Valence
 
 if TYPE_CHECKING:
     from entities import Entity
@@ -293,7 +294,7 @@ class HeuristicEvaluation(EvaluationStrategy):
         self.heuristic_weight = heuristic_weight
 
     def evaluate(self, node: MCTSNode, env: Engine) -> float:
-        """Calculates a score based on remaining health of both teams."""
+        """Calculates a score based on remaining health, dead entities, and modifiers."""
         current_player = node.current_player_index
 
         if env.is_done:
@@ -303,18 +304,41 @@ class HeuristicEvaluation(EvaluationStrategy):
             return 1.0 if winner == current_player else -1.0
 
         team_hp = [0.0, 0.0]
-        for entity in env.living_entities:
-            team_hp[entity.team] += entity.hp
+        team_dead = [0, 0]
+        team_mod_score = [0.0, 0.0]
+
+        entities = env.entities.values() if isinstance(getattr(env, "entities", None), dict) else getattr(env, "entities", env.living_entities)
+
+        for entity in entities:
+            if entity.hp <= 0:
+                team_dead[entity.team] += 1
+            else:
+                team_hp[entity.team] += entity.hp
+                for mod in entity.modifiers:
+                    if mod.valence == Valence.GOOD:
+                        team_mod_score[entity.team] += 1.0
+                    elif mod.valence == Valence.BAD:
+                        team_mod_score[entity.team] -= 1.0
 
         my_team_hp = team_hp[current_player]
         other_team_hp = team_hp[1 - current_player]
+
+        my_team_dead = team_dead[current_player]
+        other_team_dead = team_dead[1 - current_player]
+
+        my_team_mods = team_mod_score[current_player]
+        other_team_mods = team_mod_score[1 - current_player]
 
         total_hp = my_team_hp + other_team_hp
         if total_hp == 0:
             return 0.0  # Should be covered by is_done, but for safety.
 
         health_advantage = (my_team_hp - other_team_hp) / total_hp
-        return health_advantage * self.heuristic_weight
+        dead_advantage = (other_team_dead - my_team_dead) * 0.5
+        mod_advantage = (my_team_mods - other_team_mods) * 0.1
+
+        score = health_advantage + dead_advantage + mod_advantage
+        return max(-1.0, min(1.0, score * self.heuristic_weight))
 
 
 class StandardBackpropagation(BackpropagationStrategy):

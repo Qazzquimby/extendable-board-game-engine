@@ -25,6 +25,7 @@ from event_library import (
     DamageEvent,
     DeathEvent,
     HealEvent,
+    AddTokenEvent,
 )
 from abilities import (
     Ability,
