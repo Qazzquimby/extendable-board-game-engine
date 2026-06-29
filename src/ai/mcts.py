@@ -67,6 +67,7 @@ class Edge:
         self.prior = prior
         self.num_visits = num_visits
         self.total_value = total_value
+        self.is_deterministic = False
 
         # populated when simulated. One if deterministic.
         self.child_nodes: set["MCTSNode"] = set()
@@ -380,7 +381,7 @@ class MCTSAgent(Agent):
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(
-                key=root_key, current_player_index=env.get_current_player(), env=env
+                key=root_key, current_player_index=env.get_current_player(), env=env.copy()
             )
             self.cache.cache_node(root_key, root_node)
 
@@ -415,34 +416,56 @@ class MCTSAgent(Agent):
     def _run_simulation(self, root_node: MCTSNode) -> None:
         previous_node = root_node
         sim_env: "Engine" = root_node.env.copy()
-        sim_env.rng.stochastic_flag = False
 
         path = SearchPath()
         path.add_node(root_node)
 
-        action_idx = self.selection._select_action_index_from_edges(
-            current_node=root_node, start_node=None, contender_actions=None
-        )
-        path.set_action_for_last_node(action_idx)
-
-        self._advance_env_and_step(sim_env=sim_env, action_idx=action_idx)
-
         while not sim_env.is_done:
-            key = sim_env.hash()
-            node = self.cache.get_matching_node(key)
-            if not node:
-                node = MCTSNode(
-                    key=key,
-                    current_player_index=sim_env.get_current_player(),
-                    env=sim_env,
-                )
-                self.cache.cache_node(key, node)
+            action_idx = self.selection._select_action_index_from_edges(
+                current_node=previous_node, start_node=None, contender_actions=None
+            )
+            path.set_action_for_last_node(action_idx)
+            
+            edge = previous_node.edges[action_idx]
+            
+            if edge.is_deterministic and edge.child_nodes:
+                node = next(iter(edge.child_nodes))
+                sim_env = node.env.copy()
+            else:
+                sim_env.rng.stochastic_flag = False
+                self._advance_env_and_step(sim_env=sim_env, action_idx=action_idx)
+                is_deterministic = not sim_env.rng.stochastic_flag
+                
+                key = sim_env.hash()
+                node = self.cache.get_matching_node(key)
+                if not node:
+                    node = MCTSNode(
+                        key=key,
+                        current_player_index=sim_env.get_current_player(),
+                        env=sim_env.copy(),
+                    )
+                    self.cache.cache_node(key, node)
+                
+                if is_deterministic:
+                    edge.is_deterministic = True
+                    
+                    duplicate_of = None
+                    for other_idx, other_edge in list(previous_node.edges.items()):
+                        if other_idx != action_idx and other_edge.is_deterministic:
+                            if any(child.key == node.key for child in other_edge.child_nodes):
+                                duplicate_of = other_idx
+                                break
+                    
+                    if duplicate_of is not None:
+                        del previous_node.edges[action_idx]
+                        path.steps[-1].action_taken = duplicate_of
+                
+                edge.child_nodes.add(node)
+                assert len(edge.child_nodes) < 20
 
-            previous_node.edges[action_idx].child_nodes.add(node)
-            assert len(previous_node.edges[action_idx].child_nodes) < 20
             previous_node = node
 
-            if path.has_visited_key(key):
+            if path.has_visited_key(node.key):
                 break
 
             path.add_node(node)
@@ -457,13 +480,6 @@ class MCTSAgent(Agent):
                 }
                 self.backprop.backpropagate(path, player_to_value)
                 return
-
-            action_idx = self.selection._select_action_index_from_edges(
-                current_node=node, start_node=None, contender_actions=None
-            )
-            path.set_action_for_last_node(action_idx)
-
-            self._advance_env_and_step(sim_env, action_idx)
 
         winner = sim_env.get_winning_player()
         curr_player = path.last_node.current_player_index
