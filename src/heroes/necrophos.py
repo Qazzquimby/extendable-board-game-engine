@@ -150,11 +150,14 @@ class NecroTeleportAdjacentInstruction(Instruction):
     valence = Valence.MIXED
 
     def execute(self, ctx: ActionContext) -> None:
-        points_adjacent = ctx.engine.grid.get_points_in_range(
-            start=ctx.target.pos, max_range=1
-        )
-        if points_adjacent:
-            ChangeLocationEvent(subject=ctx.source, new_pos=list(points_adjacent)[0])
+        if ctx.target:
+            points_adjacent = ctx.engine.grid.get_points_in_range(
+                start=ctx.target.pos, max_range=1
+            )
+            if points_adjacent:
+                ChangeLocationEvent(
+                    subject=ctx.source, new_pos=list(points_adjacent)[0]
+                )
 
 
 @dataclass(kw_only=True)

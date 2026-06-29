@@ -16,6 +16,7 @@ from queries import (
     GetTokenCountQuery,
 )
 from schemas import EntityState
+from util import DO_NOTHING
 
 if TYPE_CHECKING:
     from engine import Engine
@@ -216,7 +217,7 @@ class Hero(Entity):
         )
         self.activator = self
         self.abilities.append(
-            Ability(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner=self)
+            Ability(name=DO_NOTHING, aiming=TargetSelf(), instructions=[], owner=self)
         )
 
 

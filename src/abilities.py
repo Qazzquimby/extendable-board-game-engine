@@ -23,7 +23,7 @@ from event_library import (
 )
 from logger import log
 from queries import QueryAvoidInclusion, QueryRoll
-from util import UniqueTuple
+from util import UniqueTuple, DO_NOTHING
 from valence import Valence
 from modifiers import Modifier, Token
 
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
         Engine,
         Entity,
     )
-
+    from events import Event
     from point import Point
 
 
@@ -69,7 +69,7 @@ class ActionContext:
         return self.target_points[0]
 
     @property
-    def target(self):
+    def target(self) -> Optional["Entity"]:
         if self._target is None:
             self._target = self.engine.entity_at(self.target_point)
         return self._target
@@ -92,6 +92,46 @@ class Instruction:
 
     def execute(self, ctx: ActionContext) -> None:
         pass
+
+
+def default_reaction_condition(
+    event: "Event", engine: "Engine", actor: "Entity", ability: "Ability"
+) -> bool:
+    from events import AbilityUseEvent
+    from queries import QueryLegalAimings
+
+    if ability.name == DO_NOTHING:
+        return False
+    if not isinstance(event, AbilityUseEvent):
+        return False
+    if event.subject.team == actor.team:
+        return False
+
+    trigger_targets = []
+    if event.aiming_result.sub_aimings:
+        for res in event.aiming_result.sub_aimings.values():
+            trigger_targets.extend(res.target_points)
+            trigger_targets.extend(res.included_points)
+    elif event.aiming_result:
+        trigger_targets.extend(event.aiming_result.target_points)
+        trigger_targets.extend(event.aiming_result.included_points)
+
+    raw_aimings = ability.aiming.get_all_aimings(
+        engine=engine, actor=actor, start_pos=actor.pos, require_los=True
+    )
+
+    legal_aimings = engine.ask(
+        QueryLegalAimings(subject=actor, ability=ability, base_result=raw_aimings)
+    )
+
+    for aiming_res in legal_aimings:
+        ability_targets = list(aiming_res.target_points) + list(
+            aiming_res.included_points
+        )
+        if any(t in trigger_targets for t in ability_targets):
+            return True
+
+    return False
 
 
 @dataclass(frozen=True)
@@ -124,6 +164,9 @@ class Ability:
     is_undefendable: bool = False
     defense: int = 0
     crit_chance: int = 0
+    reaction_condition: Optional[
+        Callable[["Event", "Engine", "Entity", "Ability"], bool]
+    ] = default_reaction_condition
 
     def get_hash_info(self):
         return (
@@ -169,6 +212,7 @@ class Ability:
         result.is_undefendable = self.is_undefendable
         result.defense = self.defense
         result.crit_chance = self.crit_chance
+        result.reaction_condition = self.reaction_condition
         return result
 
     def __post_init__(self):

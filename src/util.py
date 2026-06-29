@@ -3,3 +3,6 @@ class UniqueTuple(tuple):
         if not iterable:
             iterable = []
         return super().__new__(cls, dict.fromkeys(iterable))
+
+
+DO_NOTHING = "Do Nothing"

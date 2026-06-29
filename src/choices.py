@@ -4,7 +4,7 @@ from abilities import Ability, ActionCost
 from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
 from point import Point
 from queries import QueryLegalAimings, QuerySpeed
-from util import UniqueTuple
+from util import UniqueTuple, DO_NOTHING
 from valence import Valence
 
 if TYPE_CHECKING:
@@ -187,7 +187,7 @@ def get_plausible_actions_after_movement(
     ] = {
         k: v
         for (k, v) in plausible_actions_after_movement.items()
-        if v.ability.name != "Do Nothing"
+        if v.ability.name != DO_NOTHING
     }
     if non_passing_plausible_actions_after_movement and any(
         v.ability.valence in (Valence.GOOD, Valence.BAD)

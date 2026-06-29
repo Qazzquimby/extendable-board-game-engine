@@ -12,6 +12,7 @@ from event_library import DamageEvent, HealEvent
 from mod_value import ModInt
 from point import Point
 from heroes import MeleeHero
+from util import DO_NOTHING
 
 
 def test_marksmanship_conditional_irreducible():
@@ -67,7 +68,7 @@ def test_taunted_legal_actions_override():
     actions = enemy.get_legal_actions()
     assert len(actions) == 2
     assert any(a.name == "Melee Attack" for a in actions)
-    assert any(a.name == "Do Nothing" for a in actions)
+    assert any(a.name == DO_NOTHING for a in actions)
 
     # Apply Taunt
     enemy.add_modifier(Taunted(taunter=axe))

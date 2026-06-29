@@ -115,6 +115,12 @@ class ReactionOpportunityEvent(Event):
                     react_ability.action_cost == ActionCost.INSTANT
                     and react_ability.is_available()
                 ):
+                    if react_ability.reaction_condition:
+                        if not react_ability.reaction_condition(
+                            self.triggering_event, self.engine, entity, react_ability
+                        ):
+                            continue
+
                     plausible_uses = _get_plausible_uses_of_ability_at_pos(
                         actor=entity,
                         engine=self.engine,
