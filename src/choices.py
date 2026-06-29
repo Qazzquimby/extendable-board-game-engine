@@ -104,6 +104,11 @@ def get_plausible_movements(
         max_movement=QuerySpeed(actor).resolve().value,
     )
 
+    occupied_points = {
+        e.pos for e in engine.entities if e != actor and e.pos is not None and e.hp > 0
+    }
+    reachable_points = {p for p in reachable_points if p not in occupied_points}
+
     proposed_moves = {actor.pos: "Stay"}
     if reachable_points:
         # For each enemy, find a good position to approach

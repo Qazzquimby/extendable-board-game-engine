@@ -5,7 +5,7 @@ from abilities import Ability
 from aimings import TargetSelf
 
 from events import EventPhase
-from event_library import DeployEvent, SummonEvent
+from event_library import DeployEvent, SummonEvent, RemoveTokenEvent, AddTokenEvent
 from point import Point
 from queries import (
     QueryHasArmor,
@@ -88,8 +88,13 @@ class Entity:
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
         assert isinstance(value, Point) or value is None
+        if value is not None and self.engine:
+            occupant = self.engine.entity_at(value)
+            if occupant and occupant is not self and occupant.hp > 0:
+                raise ValueError(
+                    f"Cannot move {self.name} to {value}, already occupied by {occupant.name}"
+                )
         self._pos = value
-        # may want to check no one else is there but right now engine.entity_at is O(n)
 
     def start_turn(self) -> None:
         self.move_actions = 1
