@@ -46,9 +46,6 @@ def has_any_entity_aim_condition(
     return engine.entity_at(point) is not None
 
 
-#
-
-
 @dataclass(frozen=True)
 class AimingResult:
     target_points: UniqueTuple[Point] = field(default_factory=list)

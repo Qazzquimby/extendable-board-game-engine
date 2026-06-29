@@ -285,10 +285,10 @@ class Engine:
                 ability=(
                     action_choice.ability.name
                     if getattr(action_choice, "ability", None)
-                    else "Pass"
+                    else "None"
                 ),
                 move_path=getattr(action_choice, "move_path", None),
-                movement_name=getattr(action_choice, "movement_name", None),
+                movement_name=getattr(action_choice, "movement_name", "None"),
             )
             after_state = self.to_model()
             log_entry = LogEntry(
@@ -311,6 +311,21 @@ class Engine:
     ) -> None:
         from events import AbilityUseEvent
 
+        if getattr(action, "actor", None) is not None:
+            assert (
+                action.actor.engine is self
+            ), "Action actor belongs to a different engine instance!"
+        if getattr(action, "ability", None) is not None:
+            owner = getattr(action.ability, "owner", None)
+            if owner is not None:
+                assert (
+                    owner.engine is self
+                ), "Action ability owner belongs to a different engine instance!"
+        if getattr(action, "target", None) is not None:
+            assert (
+                action.target.engine is self
+            ), "Action target belongs to a different engine instance!"
+
         self.action_history.append(action_idx)
         self.current_choices = None
 
@@ -324,18 +339,16 @@ class Engine:
         if self.event_queue.queue and isinstance(
             self.event_queue.queue[0], ReactionOpportunityEvent
         ):
-            event = self.event_queue.queue[0]
+            event: ReactionOpportunityEvent = self.event_queue.queue[0]
             choices, react_actor = event.get_choices()
-            if action.features.get("pass_reaction"):
-                event.declined_entities.add(react_actor.id)
-            else:
-                event.declined_entities.clear()
-                event.entity_idx = 0
+            event.declined_entities.add(react_actor.id)
+            if not action.features.get("pass_reaction"):
                 with log(f"Reaction from {react_actor.name}:"):
                     reaction_event = AbilityUseEvent(
                         source=react_actor,
                         ability=action.ability,
                         aiming_result=action.aiming_result,
+                        is_reaction=True,
                     )
                     self.event_queue.queue.insert(0, reaction_event)
             return

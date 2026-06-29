@@ -289,7 +289,7 @@ class UniformExpansion(ExpansionStrategy):
 class HeuristicEvaluation(EvaluationStrategy):
     """Evaluates a node by a health-based heuristic."""
 
-    def __init__(self, heuristic_weight: float = 0.1):
+    def __init__(self, heuristic_weight: float = 0.3):
         self.heuristic_weight = heuristic_weight
 
     def evaluate(self, node: MCTSNode, env: Engine) -> float:
@@ -400,11 +400,8 @@ class MCTSAgent(Agent):
             current_node=root_node, start_node=None, contender_actions=None
         )
         path.set_action_for_last_node(action_idx)
-        action = root_node.actions[action_idx]
 
-        self._advance_env_and_step(
-            sim_env=sim_env, action=action, action_idx=action_idx
-        )
+        self._advance_env_and_step(sim_env=sim_env, action_idx=action_idx)
 
         while not sim_env.is_done:
             key = sim_env.hash()
@@ -441,9 +438,8 @@ class MCTSAgent(Agent):
                 current_node=node, start_node=None, contender_actions=None
             )
             path.set_action_for_last_node(action_idx)
-            action = node.actions[action_idx]
 
-            self._advance_env_and_step(sim_env, action, action_idx)
+            self._advance_env_and_step(sim_env, action_idx)
 
         winner = sim_env.get_winning_player()
         curr_player = path.last_node.current_player_index
@@ -458,7 +454,8 @@ class MCTSAgent(Agent):
         }
         self.backprop.backpropagate(path, player_to_value)
 
-    def _advance_env_and_step(self, sim_env: Engine, action, action_idx):
+    def _advance_env_and_step(self, sim_env: Engine, action_idx: int):
+        action = sim_env.current_choices[action_idx]
         sim_env.step(action=action, action_idx=action_idx)
         sim_env.advance_until_choice()
 

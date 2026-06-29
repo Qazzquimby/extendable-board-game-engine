@@ -88,6 +88,13 @@ class ReactionOpportunityEvent(Event):
         self.entity_idx = 0
         self.declined_entities = set()
 
+    def get_hash_info(self):
+        return super().get_hash_info() + (
+            self.phase,
+            self.entity_idx,
+            tuple(sorted(self.declined_entities)),
+        )
+
     def get_choices(self) -> tuple:
         while self.entity_idx < len(self.engine.entities):
             entity = self.engine.entities[self.entity_idx]
@@ -135,20 +142,28 @@ class ReactionOpportunityEvent(Event):
 
 class AbilityUseEvent(Event):
     def __init__(
-        self, source: "Entity", ability: "Ability", aiming_result: "AimingResult"
+        self, source: "Entity", ability: "Ability", aiming_result: "AimingResult", is_reaction: bool = False
     ):
         super().__init__(engine=source.engine, subject=source)
         self.ability = ability
         self.aiming_result = aiming_result
         self.roll_result = None
+        self.is_reaction = is_reaction
+
+    def get_hash_info(self):
+        return super().get_hash_info() + (
+            self.ability.name,
+            self.is_reaction,
+        )
 
     def process(self) -> None:
         if self.state == "BEFORE":
             self.state = "RESOLVE"
             self.engine.event_queue.enqueue(self)
-            self.engine.event_queue.enqueue(
-                ReactionOpportunityEvent(self.engine, self, "before")
-            )
+            if not self.is_reaction:
+                self.engine.event_queue.enqueue(
+                    ReactionOpportunityEvent(self.engine, self, "before")
+                )
             self.engine.router.publish(self, EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
@@ -157,9 +172,10 @@ class AbilityUseEvent(Event):
                 self._resolve()
         elif self.state == "AFTER":
             self.state = "DONE"
-            self.engine.event_queue.enqueue(
-                ReactionOpportunityEvent(self.engine, self, "after")
-            )
+            if not self.is_reaction:
+                self.engine.event_queue.enqueue(
+                    ReactionOpportunityEvent(self.engine, self, "after")
+                )
             self.engine.router.publish(self, EventPhase.AFTER)
 
     def _resolve(self) -> None:
