@@ -116,18 +116,40 @@ function App() {
                   Next
                 </button>
               </div>
-              {currentLogEntry && 'action' in currentLogEntry && (
+              {currentLogEntry && 'action' in currentLogEntry && currentLogEntry.action.actor !== -1 && (
                   <div>
                     <h3>Action</h3>
-                    <p>Actor: {currentLogEntry.action.actor}</p>
+                    <p>Actor: {stateToRender?.entities.find(e => e.id === currentLogEntry.action.actor)?.name || currentLogEntry.action.actor}</p>
                     <p>"{currentLogEntry.action.movement_name}" to
                       [{String(getDestination(currentLogEntry))}], then
-                      performing {currentLogEntry.action.ability} on {currentLogEntry.action.target}.</p>
+                      performing {currentLogEntry.action.ability}{currentLogEntry.action.target !== null ? ` on ${stateToRender?.entities.find(e => e.id === currentLogEntry.action.target)?.name || currentLogEntry.action.target}` : ''}.</p>
+                  </div>
+              )}
+              {currentLogEntry && 'action' in currentLogEntry && currentLogEntry.action.actor === -1 && (
+                  <div>
+                    <h3>Game Over</h3>
                   </div>
               )}
               <div>
                 {stateToRender &&
                     <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action}/>}
+              </div>
+              <div style={{ marginTop: '20px', marginBottom: '20px' }}>
+                <h3>Entities in Current State</h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  {stateToRender?.entities.map(e => (
+                    <div key={e.id} style={{ border: '1px solid #ccc', padding: '5px', borderRadius: '4px', fontSize: '12px', width: '200px' }}>
+                      <strong>{e.name} (Team {e.team === 1 ? 'Red' : 'Blue'})</strong><br/>
+                      HP: {e.hp}<br/>
+                      Pos: {e.pos ? `[${e.pos[0]}, ${e.pos[1]}]` : 'None'}<br/>
+                      {e.modifiers && e.modifiers.length > 0 && (
+                        <div style={{ marginTop: '4px', color: '#666' }}>
+                          Mods: {e.modifiers.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

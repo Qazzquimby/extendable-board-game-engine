@@ -256,25 +256,11 @@ class Engine:
             )
             action_choice = choices[action_index]
 
-            self.step(
-                action=action_choice,
-                action_idx=action_index,
-            )
-            self.advance_until_choice()
-
-            is_done = self.is_done
-            if is_done:
-                team_0_living_members = [e for e in self.living_entities if e.team == 0]
-                team_1_living_members = [e for e in self.living_entities if e.team == 1]
-                if len(team_0_living_members) > len(team_1_living_members):
-                    winner_team = 0
-                elif len(team_1_living_members) > len(team_0_living_members):
-                    winner_team = 1
-
+            current_actor = self.get_current_actor()
             action_state = ActionState(
                 actor=(
-                    getattr(action_choice, "actor", self.active_entity).id
-                    if getattr(action_choice, "actor", self.active_entity)
+                    getattr(action_choice, "actor", current_actor).id
+                    if getattr(action_choice, "actor", current_actor)
                     else -1
                 ),
                 target=(
@@ -290,6 +276,22 @@ class Engine:
                 move_path=getattr(action_choice, "move_path", None),
                 movement_name=getattr(action_choice, "movement_name", "None"),
             )
+
+            self.step(
+                action=action_choice,
+                action_idx=action_index,
+            )
+            self.advance_until_choice()
+
+            is_done = self.is_done
+            if is_done:
+                team_0_living_members = [e for e in self.living_entities if e.team == 0]
+                team_1_living_members = [e for e in self.living_entities if e.team == 1]
+                if len(team_0_living_members) > len(team_1_living_members):
+                    winner_team = 0
+                elif len(team_1_living_members) > len(team_0_living_members):
+                    winner_team = 1
+
             after_state = self.to_model()
             log_entry = LogEntry(
                 before_state=before_state,
@@ -300,6 +302,17 @@ class Engine:
             )
             logs.append(log_entry)
             reset_logs()
+
+        if after_state:
+            logs.append(
+                LogEntry(
+                    before_state=after_state,
+                    action=ActionState(actor=-1, target=None, ability="None", movement_name="Game Over"),
+                    after_state=after_state,
+                    done=True,
+                    messages=["Game Over"],
+                )
+            )
 
         pbar.close()
         return GameLog(winner_team=winner_team, logs=logs)
@@ -507,15 +520,19 @@ class Engine:
         assert len(result.router.subscribers) == len(self.router.subscribers)
         return result
 
-    def get_current_player(self) -> int:
+    def get_current_actor(self) -> Optional["Entity"]:
         if self.event_queue.queue:
             event = self.event_queue.queue[0]
             if isinstance(event, ReactionOpportunityEvent):
                 choices, entity = event.get_choices()
                 if entity:
-                    return entity.team
-        if self.active_entity:
-            return self.active_entity.team
+                    return entity
+        return self.active_entity
+
+    def get_current_player(self) -> int:
+        actor = self.get_current_actor()
+        if actor:
+            return actor.team
         return self.current_team
 
     def _get_state(self):

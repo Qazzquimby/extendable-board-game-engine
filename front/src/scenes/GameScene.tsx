@@ -80,9 +80,27 @@ export class GameScene extends Phaser.Scene {
         let activeEntityContainer: Phaser.GameObjects.Container | null = null;
         let targetPos: [number, number] | null = null;
 
+        const posCounts: Record<string, number> = {};
+        const posIndex: Record<number, number> = {};
+
+        state.entities.forEach(e => {
+            if (e.pos) {
+                const key = `${e.pos[0]},${e.pos[1]}`;
+                posCounts[key] = (posCounts[key] || 0) + 1;
+                posIndex[e.id] = posCounts[key] - 1;
+            }
+        });
+
         state.entities.forEach(entityState => {
             const isActive = state.active_entity === entityState.id;
-            const container = this.drawEntity(entityState, isActive);
+            let totalAtPos = 1;
+            let indexAtPos = 0;
+            if (entityState.pos) {
+                const key = `${entityState.pos[0]},${entityState.pos[1]}`;
+                totalAtPos = posCounts[key];
+                indexAtPos = posIndex[entityState.id];
+            }
+            const container = this.drawEntity(entityState, isActive, totalAtPos, indexAtPos);
             
             if (action) {
                 if (action.actor === entityState.id) {
@@ -148,11 +166,17 @@ export class GameScene extends Phaser.Scene {
         this.overlaysGroup.add(arrow);
     }
 
-private drawEntity(entity: EntityState, isActive: boolean) {
+    private drawEntity(entity: EntityState, isActive: boolean, totalAtPos: number, indexAtPos: number) {
         if (!entity.pos) return null;
         const [x, y] = entity.pos as [number, number];
-        const pixelX = this.gridOffsetX + x * this.tileSize + this.tileSize / 2;
-        const pixelY = this.gridOffsetY + y * this.tileSize + this.tileSize / 2;
+        let pixelX = this.gridOffsetX + x * this.tileSize + this.tileSize / 2;
+        let pixelY = this.gridOffsetY + y * this.tileSize + this.tileSize / 2;
+
+        if (totalAtPos > 1) {
+            const offset = (indexAtPos - (totalAtPos - 1) / 2) * (this.tileSize * 0.25);
+            pixelX += offset;
+            pixelY += offset;
+        }
 
         const baseName = entity.name;
 
