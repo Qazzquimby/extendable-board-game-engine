@@ -390,10 +390,29 @@ class MCTSAgent(Agent):
                 node=root_node, env_at_node=env, pending_choices=choices
             )
 
+        contender_actions = set(root_node.edges.keys())
+
         log.enabled = False
         try:
-            for _ in range(self.num_simulations):
-                self._run_simulation(root_node=root_node)
+            for i in range(self.num_simulations):
+                self._run_simulation(root_node=root_node, contender_actions=contender_actions)
+
+                if (i + 1) % EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY == 0:
+                    remaining_sims = self.num_simulations - (i + 1)
+
+                    best_visits = -1
+                    for action_idx in contender_actions:
+                        visits = root_node.edges[action_idx].num_visits
+                        if visits > best_visits:
+                            best_visits = visits
+
+                    contender_actions = {
+                        action_idx for action_idx in contender_actions
+                        if root_node.edges[action_idx].num_visits + remaining_sims >= best_visits
+                    }
+
+                    if len(contender_actions) <= 1:
+                        break
         finally:
             log.enabled = True
 
@@ -413,7 +432,7 @@ class MCTSAgent(Agent):
 
         return best_idx
 
-    def _run_simulation(self, root_node: MCTSNode) -> None:
+    def _run_simulation(self, root_node: MCTSNode, contender_actions: Optional[set] = None) -> None:
         previous_node = root_node
         sim_env: "Engine" = root_node.env.copy()
 
@@ -422,7 +441,7 @@ class MCTSAgent(Agent):
 
         while not sim_env.is_done:
             action_idx = self.selection._select_action_index_from_edges(
-                current_node=previous_node, start_node=None, contender_actions=None
+                current_node=previous_node, start_node=root_node, contender_actions=contender_actions
             )
             path.set_action_for_last_node(action_idx)
             
