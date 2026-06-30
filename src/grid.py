@@ -268,12 +268,6 @@ class Grid:
         Finds a path of valid positions for a push in a specific direction.
         The path does not include the start point.
         """
-        occupied_points = {
-            e.pos
-            for e in self.engine.entities
-            if e.hp > 0 and e.pos is not None and e is not subject
-        }
-
         path = []
         current = subject.pos
         for _ in range(distance):
@@ -288,11 +282,6 @@ class Grid:
             path.append(next_pos)
             current = next_pos
 
-        while path:
-            if path[-1] in occupied_points:
-                path = path[:-1]
-            else:
-                break
         return path
 
     def get_pull_path(
@@ -302,17 +291,6 @@ class Grid:
         Finds a path of valid positions towards a pull point.
         The path does not include the start point.
         """
-        enemy_points = {
-            e.pos
-            for e in self.engine.entities
-            if e.team != subject.team and e.hp > 0 and e.pos is not None
-        }
-        occupied_points = {
-            e.pos
-            for e in self.engine.entities
-            if e.hp > 0 and e.pos is not None and e is not subject
-        }
-
         path = []
         current = subject.pos
         for _ in range(distance):
@@ -325,10 +303,7 @@ class Grid:
             for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
                 n = Point(nx, ny)
                 if 0 <= nx < self.width and 0 <= ny < self.height:
-                    if (
-                        not self.is_movement_blocked(current, n)
-                        and n not in enemy_points
-                    ):
+                    if not self.is_movement_blocked(current, n):
                         neighbors.append(n)
 
             if not neighbors:
@@ -345,11 +320,6 @@ class Grid:
             else:
                 break  # Can't get closer
 
-        while path:
-            if path[-1] in occupied_points:
-                path = path[:-1]
-            else:
-                break
         return path
 
     def get_line_of_sight(

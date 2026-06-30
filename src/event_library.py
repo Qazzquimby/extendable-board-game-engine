@@ -20,6 +20,55 @@ class ChangeLocationEvent(Event):
     def _resolve(self) -> None:
         self.subject.pos = self.new_pos
 
+        if self.subject.pos is None:
+            return
+
+        has_more_moves = any(
+            isinstance(e, ChangeLocationEvent) and e.subject == self.subject
+            for e in self.engine.event_queue.queue
+        )
+
+        if has_more_moves:
+            return
+
+        occupied = any(
+            e
+            for e in self.engine.entities
+            if e != self.subject and e.pos == self.subject.pos and e.hp > 0
+        )
+        if not occupied:
+            return
+        # Shunt to open space
+        from collections import deque
+
+        queue = deque([self.subject.pos])
+        visited = {self.subject.pos}
+
+        while queue:
+            curr = queue.popleft()
+            is_occupied = any(
+                e
+                for e in self.engine.entities
+                if e != self.subject and e.pos == curr and e.hp > 0
+            )
+            if not is_occupied and curr not in self.engine.grid.walls:
+                self.subject.pos = curr
+                log(
+                    f"{self.subject.name} was displaced to {curr} because their space was occupied."
+                )
+                break
+
+            for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
+                nx, ny = curr.x + dx, curr.y + dy
+                if (
+                    0 <= nx < self.engine.grid.width
+                    and 0 <= ny < self.engine.grid.height
+                ):
+                    n = Point(nx, ny)
+                    if n not in visited:
+                        visited.add(n)
+                        queue.append(n)
+
 
 class PushEvent(Event):
     def __init__(self, subject: "Entity", distance: int, direction: "Direction"):
