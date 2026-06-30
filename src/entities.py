@@ -88,12 +88,6 @@ class Entity:
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
         assert isinstance(value, Point) or value is None
-        if value is not None and self.engine:
-            occupant = self.engine.entity_at(value)
-            if occupant and occupant is not self and occupant.hp > 0:
-                raise ValueError(
-                    f"Cannot move {self.name} to {value}, already occupied by {occupant.name}"
-                )
         self._pos = value
 
     def start_turn(self) -> None:

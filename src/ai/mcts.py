@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 100
-NUM_SIMS = 1000
+NUM_SIMS = 100
 
 
 @dataclass
@@ -308,7 +308,11 @@ class HeuristicEvaluation(EvaluationStrategy):
         team_dead = [0, 0]
         team_mod_score = [0.0, 0.0]
 
-        entities = env.entities.values() if isinstance(getattr(env, "entities", None), dict) else getattr(env, "entities", env.living_entities)
+        entities = (
+            env.entities.values()
+            if isinstance(getattr(env, "entities", None), dict)
+            else getattr(env, "entities", env.living_entities)
+        )
 
         for entity in entities:
             if entity.hp <= 0:
@@ -381,7 +385,9 @@ class MCTSAgent(Agent):
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(
-                key=root_key, current_player_index=env.get_current_player(), env=env.copy()
+                key=root_key,
+                current_player_index=env.get_current_player(),
+                env=env.copy(),
             )
             self.cache.cache_node(root_key, root_node)
 
@@ -395,7 +401,9 @@ class MCTSAgent(Agent):
         log.enabled = False
         try:
             for i in range(self.num_simulations):
-                self._run_simulation(root_node=root_node, contender_actions=contender_actions)
+                self._run_simulation(
+                    root_node=root_node, contender_actions=contender_actions
+                )
 
                 if (i + 1) % EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY == 0:
                     remaining_sims = self.num_simulations - (i + 1)
@@ -407,8 +415,10 @@ class MCTSAgent(Agent):
                             best_visits = visits
 
                     contender_actions = {
-                        action_idx for action_idx in contender_actions
-                        if root_node.edges[action_idx].num_visits + remaining_sims >= best_visits
+                        action_idx
+                        for action_idx in contender_actions
+                        if root_node.edges[action_idx].num_visits + remaining_sims
+                        >= best_visits
                     }
 
                     if len(contender_actions) <= 1:
@@ -432,7 +442,9 @@ class MCTSAgent(Agent):
 
         return best_idx
 
-    def _run_simulation(self, root_node: MCTSNode, contender_actions: Optional[set] = None) -> None:
+    def _run_simulation(
+        self, root_node: MCTSNode, contender_actions: Optional[set] = None
+    ) -> None:
         previous_node = root_node
         sim_env: "Engine" = root_node.env.copy()
 
@@ -441,12 +453,14 @@ class MCTSAgent(Agent):
 
         while not sim_env.is_done:
             action_idx = self.selection._select_action_index_from_edges(
-                current_node=previous_node, start_node=root_node, contender_actions=contender_actions
+                current_node=previous_node,
+                start_node=root_node,
+                contender_actions=contender_actions,
             )
             path.set_action_for_last_node(action_idx)
-            
+
             edge = previous_node.edges[action_idx]
-            
+
             if edge.is_deterministic and edge.child_nodes:
                 node = next(iter(edge.child_nodes))
                 sim_env = node.env.copy()
@@ -454,7 +468,7 @@ class MCTSAgent(Agent):
                 sim_env.rng.stochastic_flag = False
                 self._advance_env_and_step(sim_env=sim_env, action_idx=action_idx)
                 is_deterministic = not sim_env.rng.stochastic_flag
-                
+
                 key = sim_env.hash()
                 node = self.cache.get_matching_node(key)
                 if not node:
@@ -464,21 +478,24 @@ class MCTSAgent(Agent):
                         env=sim_env.copy(),
                     )
                     self.cache.cache_node(key, node)
-                
+
                 if is_deterministic:
                     edge.is_deterministic = True
-                    
+
                     duplicate_of = None
                     for other_idx, other_edge in list(previous_node.edges.items()):
                         if other_idx != action_idx and other_edge.is_deterministic:
-                            if any(child.key == node.key for child in other_edge.child_nodes):
+                            if any(
+                                child.key == node.key
+                                for child in other_edge.child_nodes
+                            ):
                                 duplicate_of = other_idx
                                 break
-                    
+
                     if duplicate_of is not None:
                         del previous_node.edges[action_idx]
                         path.steps[-1].action_taken = duplicate_of
-                
+
                 edge.child_nodes.add(node)
                 assert len(edge.child_nodes) < 20
 
