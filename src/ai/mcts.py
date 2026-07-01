@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 100
-NUM_SIMS = 100
+NUM_SIMS = 100  # _000
 
 
 @dataclass
@@ -365,6 +365,9 @@ class StandardBackpropagation(BackpropagationStrategy):
                 )
 
 
+past_root_nodes = []
+
+
 class MCTSAgent(Agent):
     """An agent that uses MCTS to select actions."""
 
@@ -390,6 +393,7 @@ class MCTSAgent(Agent):
                 env=env.copy(),
             )
             self.cache.cache_node(root_key, root_node)
+        past_root_nodes.append(root_node)
 
         if not root_node.is_expanded:
             self.expansion.expand(
@@ -434,11 +438,7 @@ class MCTSAgent(Agent):
                 best_idx = action_idx
 
         assert sum(len(edge.child_nodes) for edge in root_node.edges.values())
-
-        assert 0 <= best_idx < len(choices), (
-            f"Crash: MCTS selected an invalid index: {best_idx} for {len(choices)} choices. "
-            "Action bounds are corrupted."
-        )
+        assert 0 <= best_idx < len(choices)
 
         return best_idx
 
@@ -495,9 +495,14 @@ class MCTSAgent(Agent):
                     if duplicate_of is not None:
                         del previous_node.edges[action_idx]
                         path.steps[-1].action_taken = duplicate_of
-
-                edge.child_nodes.add(node)
-                assert len(edge.child_nodes) < 20
+                        if contender_actions is not None and previous_node is root_node:
+                            contender_actions.discard(action_idx)
+                    else:
+                        edge.child_nodes.add(node)
+                        assert len(edge.child_nodes) < 20
+                else:
+                    edge.child_nodes.add(node)
+                    assert len(edge.child_nodes) < 20
 
             previous_node = node
 

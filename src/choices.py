@@ -60,9 +60,10 @@ class PlausibleMoveAndAction(Choice):
     def __eq__(self, other):
         if not isinstance(other, PlausibleMoveAndAction):
             return False
-        return (self.ability.name, self.movement_name, self.aiming_result) == (
+        return (self.ability.name, self.movement_name, self.move_pos, self.aiming_result) == (
             other.ability.name,
             other.movement_name,
+            other.move_pos,
             other.aiming_result,
         )
 
@@ -274,6 +275,8 @@ def get_plausible_uses_of_ability_after_movement(
         move_path = []
     else:
         move_path = engine.grid.get_path(start=actor.pos, target=move_pos, actor=actor)
+        if not move_path or move_path[-1] != move_pos:
+            return {}
 
     return _get_plausible_uses_of_ability_at_pos(
         actor=actor,
@@ -357,7 +360,7 @@ def _get_plausible_uses_of_ability_at_pos(
                     plausible_uses[key] = choice_class(
                         target=None,
                         ability=ability,
-                        engine=sim_engine,
+                        engine=engine,
                         actor=actor,
                         aiming_result=aiming_res,
                         **choice_kwargs,
@@ -397,7 +400,7 @@ def _get_plausible_uses_of_ability_at_pos(
                     plausible_uses[key] = choice_class(
                         target=actor,
                         ability=ability,
-                        engine=sim_engine,
+                        engine=engine,
                         actor=actor,
                         aiming_result=aiming_res,
                         **choice_kwargs,
@@ -434,7 +437,7 @@ def _get_plausible_uses_of_ability_at_pos(
                     plausible_uses[key] = choice_class(
                         target=None,
                         ability=ability,
-                        engine=sim_engine,
+                        engine=engine,
                         actor=actor,
                         aiming_result=aiming_res,
                         **choice_kwargs,
