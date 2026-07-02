@@ -490,7 +490,8 @@ class MCTSAgent(Agent):
                 sim_env.rng.stochastic_flag = False
                 action = sim_env.current_choices[action_idx]
                 sim_env.step(action=action, action_idx=action_idx)
-                sim_env.advance_until_choice()
+                new_choices = sim_env.advance_until_choice()
+                sim_env.current_choices = new_choices  # .todo ..?
 
                 key = sim_env.hash()
                 node = self.cache.get_matching_node(key)

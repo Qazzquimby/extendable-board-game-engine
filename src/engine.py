@@ -159,18 +159,20 @@ class Engine:
         for entity in self.entities:
             DeployEvent(entity).resolve()
 
-    def get_choice_index(self, team: int) -> int:
-        if not self.current_choices:
+    def get_choice_index(self, team: int, choices: UniqueTuple[ChoiceT]) -> int:
+        if not choices:
             raise ValueError("Cannot request a choice from an empty list.")
-        if len(self.current_choices) == 1:
+        if len(choices) == 1:
             return 0
+        self.current_choices = UniqueTuple(choices)
         index = self.agents[team].choose(env=self)
-        assert 0 <= index < len(self.current_choices)
+        self.current_choices = tuple()
+        assert 0 <= index < len(choices)
         return index
 
-    def get_choice(self, team: int) -> Choice:
-        index = self.get_choice_index(team=team)
-        return self.current_choices[index]
+    def get_choice(self, team: int, choices: UniqueTuple[ChoiceT]) -> ChoiceT:
+        index = self.get_choice_index(team=team, choices=choices)
+        return choices[index]
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
         return next(
@@ -198,14 +200,14 @@ class Engine:
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
 
-    def advance_until_choice(self):
+    def advance_until_choice(self) -> UniqueTuple[Choice]:
         while not self.is_done:
             if self.event_queue.queue:
                 event = self.event_queue.queue[0]
                 if isinstance(event, ReactionOpportunityEvent):
                     choices, entity = event.get_choices()
                     if choices:
-                        self.current_choices = choices
+                        return choices
                     else:
                         self.event_queue.queue.pop(0)
                         continue
@@ -215,7 +217,7 @@ class Engine:
 
             entity = self.advance_until_active_entity()
             if self.is_done:
-                self.current_choices = UniqueTuple()
+                return UniqueTuple()
 
             if entity.hp <= 0:
                 self.advance_to_next_activator()
@@ -226,9 +228,7 @@ class Engine:
                 self.advance_to_next_activator()
                 continue
 
-            self.current_choices = choices
-            debug_choices = self.get_legal_actions()
-            assert hash(self.current_choices) == hash(debug_choices)
+            return choices
 
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
@@ -237,7 +237,7 @@ class Engine:
         RoundStartEvent(engine=self).resolve()
 
         pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
-        self.next_turn()
+        next_choices = self.advance_until_choice()
         self.advance_until_choice()
 
         while not self.is_done:
@@ -247,8 +247,10 @@ class Engine:
             else:
                 before_state = self.to_model()
 
-            action_index = self.get_choice_index(team=self.get_current_player())
-            action_choice = self.current_choices[action_index]
+            action_index = self.get_choice_index(
+                team=self.get_current_player(), choices=next_choices
+            )
+            action_choice = next_choices[action_index]
 
             current_actor = self.get_current_actor()
             action_state = ActionState(
