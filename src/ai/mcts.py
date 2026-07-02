@@ -385,6 +385,38 @@ class MCTSAgent(Agent):
             return 0
 
         root_key = env.hash()
+
+        if past_root_nodes:
+            prev_root = past_root_nodes[-1]
+            new_history = env.action_history[len(prev_root.env.action_history) :]
+            if new_history:
+                chosen_action_idx = new_history[0]
+                edge = prev_root.edges.get(chosen_action_idx)
+                if edge and edge.child_nodes:
+                    matching_child = next(iter(edge.child_nodes))
+
+                    env_actions = env.current_choices
+                    child_actions = matching_child.env.current_choices
+                    a = (
+                        hash(env_actions) == hash(child_actions),
+                        env_actions,
+                        child_actions,
+                    )
+                    if not child_actions:
+                        child_actions = matching_child.env.get_legal_actions()
+
+                    if set(env_actions) != set(child_actions):
+                        debug_actions_env = env.get_legal_actions()
+                        print()
+                        debug_actions_child = matching_child.env.get_legal_actions()
+                        print()
+                        assert (
+                            hash(env.get_legal_actions())
+                            == hash(matching_child.env.get_legal_actions())
+                            == hash(env.current_choices)
+                            == hash(matching_child.env.current_choices)
+                        )
+
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:
             root_node = MCTSNode(

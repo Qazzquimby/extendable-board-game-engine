@@ -59,8 +59,7 @@ class Agent(abc.ABC):
 
 class RandomAgent(Agent):
     def choose(self, env: Optional["Engine"]) -> int:
-        choices = env.current_choices
-        return random.randint(0, len(choices) - 1)
+        return random.randint(0, len(env.current_choices) - 1)
 
 
 class TrackedRandom(random.Random):
@@ -138,18 +137,18 @@ class Engine:
             self.next_turn()
             if self.is_done:
                 break
+        assert self.active_entity is not None
         return self.active_entity
 
-    def get_legal_actions(self) -> tuple[Choice]:
+    def get_legal_actions(self) -> UniqueTuple[Choice]:
         entity = self.active_entity
         if not entity or entity.hp <= 0 or self.is_done:
-            return tuple()
+            return UniqueTuple()
 
         moves = get_plausible_move_and_actions(entity, self)
         frees = get_plausible_free_actions(entity, self)
         all_actions = moves + frees
-        deduped = tuple(dict.fromkeys(all_actions))
-        return deduped
+        return UniqueTuple(all_actions)
 
     def finalize_setup(self):
         self.team_heroes = [
@@ -307,7 +306,9 @@ class Engine:
             logs.append(
                 LogEntry(
                     before_state=after_state,
-                    action=ActionState(actor=-1, target=None, ability="None", movement_name="Game Over"),
+                    action=ActionState(
+                        actor=-1, target=None, ability="None", movement_name="Game Over"
+                    ),
                     after_state=after_state,
                     done=True,
                     messages=["Game Over"],

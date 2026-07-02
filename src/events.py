@@ -3,11 +3,14 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
+from util import UniqueTuple
+
 if TYPE_CHECKING:
     from engine import Engine
     from abilities import Ability
     from modifiers import Modifier
     from entities import Entity
+    from choices import Choice
 
 
 class EventQueue:
@@ -95,7 +98,7 @@ class ReactionOpportunityEvent(Event):
             tuple(sorted(self.declined_entities)),
         )
 
-    def get_choices(self) -> tuple:
+    def get_choices(self) -> tuple[UniqueTuple["Choice"], Optional["Entity"]]:
         while self.entity_idx < len(self.engine.entities):
             entity = self.engine.entities[self.entity_idx]
             if entity.id in self.declined_entities or entity.hp <= 0:
@@ -133,11 +136,11 @@ class ReactionOpportunityEvent(Event):
             if entity_reactions:
                 pass_choice = Choice(features={"pass_reaction": 1})
                 pass_choice.actor = entity
-                return tuple(entity_reactions + [pass_choice]), entity
+                return UniqueTuple(entity_reactions + [pass_choice]), entity
             else:
                 self.entity_idx += 1
 
-        return tuple(), None
+        return UniqueTuple(), None
 
     def process(self) -> None:
         pass
@@ -148,7 +151,11 @@ class ReactionOpportunityEvent(Event):
 
 class AbilityUseEvent(Event):
     def __init__(
-        self, source: "Entity", ability: "Ability", aiming_result: "AimingResult", is_reaction: bool = False
+        self,
+        source: "Entity",
+        ability: "Ability",
+        aiming_result: "AimingResult",
+        is_reaction: bool = False,
     ):
         super().__init__(engine=source.engine, subject=source)
         self.ability = ability
