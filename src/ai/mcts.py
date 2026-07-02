@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from choices import Choice, PlausibleMoveAndAction
 from engine import Agent, Engine
 from logger import log
+from util import UniqueTuple
 from valence import Valence
 
 if TYPE_CHECKING:
@@ -402,10 +403,8 @@ class MCTSAgent(Agent):
                         env_actions,
                         child_actions,
                     )
-                    if not child_actions:
-                        child_actions = matching_child.env.get_legal_actions()
 
-                    if set(env_actions) != set(child_actions):
+                    if hash(env_actions) != hash(child_actions):
                         debug_actions_env = env.get_legal_actions()
                         print()
                         debug_actions_child = matching_child.env.get_legal_actions()
@@ -498,8 +497,10 @@ class MCTSAgent(Agent):
                 sim_env = node.env.copy()
             else:
                 sim_env.rng.stochastic_flag = False
-                self._advance_env_and_step(sim_env=sim_env, action_idx=action_idx)
-                is_deterministic = not sim_env.rng.stochastic_flag
+                new_choices = self._advance_env_and_step(
+                    sim_env=sim_env, action_idx=action_idx
+                )
+                sim_env.current_choices = new_choices
 
                 key = sim_env.hash()
                 node = self.cache.get_matching_node(key)
@@ -511,6 +512,7 @@ class MCTSAgent(Agent):
                     )
                     self.cache.cache_node(key, node)
 
+                is_deterministic = not sim_env.rng.stochastic_flag
                 if is_deterministic:
                     edge.is_deterministic = True
 
@@ -567,10 +569,13 @@ class MCTSAgent(Agent):
         }
         self.backprop.backpropagate(path, player_to_value)
 
-    def _advance_env_and_step(self, sim_env: Engine, action_idx: int):
+    def _advance_env_and_step(
+        self, sim_env: Engine, action_idx: int
+    ) -> UniqueTuple[Choice]:
         action = sim_env.current_choices[action_idx]
         sim_env.step(action=action, action_idx=action_idx)
-        sim_env.advance_until_choice()
+        choices = sim_env.advance_until_choice()
+        return choices
 
     def select_action(
         self, choices: List[Choice], engine: Optional[Engine] = None

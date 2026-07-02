@@ -200,15 +200,14 @@ class Engine:
     def add_entity(self, entity: "Entity") -> None:
         self.entities.append(entity)
 
-    def advance_until_choice(self):
+    def advance_until_choice(self) -> UniqueTuple[Choice]:
         while not self.is_done:
             if self.event_queue.queue:
                 event = self.event_queue.queue[0]
                 if isinstance(event, ReactionOpportunityEvent):
                     choices, entity = event.get_choices()
                     if choices:
-                        self.current_choices = choices
-                        return
+                        return choices
                     else:
                         self.event_queue.queue.pop(0)
                         continue
@@ -218,7 +217,7 @@ class Engine:
 
             entity = self.advance_until_active_entity()
             if self.is_done:
-                return
+                return UniqueTuple()
 
             if entity.hp <= 0:
                 self.advance_to_next_activator()
@@ -229,8 +228,7 @@ class Engine:
                 self.advance_to_next_activator()
                 continue
 
-            self.current_choices = choices
-            return
+            return choices
 
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
@@ -240,7 +238,7 @@ class Engine:
 
         pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
         self.next_turn()
-        self.advance_until_choice()
+        next_choices = self.advance_until_choice()
 
         while not self.is_done:
             pbar.update()
@@ -249,11 +247,10 @@ class Engine:
             else:
                 before_state = self.to_model()
 
-            choices = self.current_choices
             action_index = self.get_choice_index(
-                team=self.get_current_player(), choices=choices
+                team=self.get_current_player(), choices=next_choices
             )
-            action_choice = choices[action_index]
+            action_choice = next_choices[action_index]
 
             current_actor = self.get_current_actor()
             action_state = ActionState(

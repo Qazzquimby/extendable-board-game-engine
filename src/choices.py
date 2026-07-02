@@ -60,7 +60,12 @@ class PlausibleMoveAndAction(Choice):
     def __eq__(self, other):
         if not isinstance(other, PlausibleMoveAndAction):
             return False
-        return (self.ability.name, self.movement_name, self.move_pos, self.aiming_result) == (
+        return (
+            self.ability.name,
+            self.movement_name,
+            self.move_pos,
+            self.aiming_result,
+        ) == (
             other.ability.name,
             other.movement_name,
             other.move_pos,
@@ -117,7 +122,9 @@ def get_plausible_movements(
             best_close_to_enemy = min(
                 reachable_points,
                 key=lambda point: (
-                    point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos)
+                    point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos),
+                    point.x,
+                    point.y,
                 ),
             )
             proposed_moves[best_close_to_enemy] = f"Approach {enemy.name} {enemy.id}"
@@ -133,11 +140,12 @@ def get_plausible_movements(
                 if attack_range > 0:
                     best_at_range = min(
                         reachable_points,
-                        key=lambda point: abs(
-                            point.get_distance(enemy.pos) - attack_range
-                        )
-                        * 100
-                        + point.get_distance(actor.pos),
+                        key=lambda point: (
+                            abs(point.get_distance(enemy.pos) - attack_range) * 100
+                            + point.get_distance(actor.pos),
+                            point.x,
+                            point.y,
+                        ),
                     )
                     proposed_moves[best_at_range] = (
                         f"Range {attack_range} of {enemy}{enemy.id} for {ability.name}"
@@ -155,7 +163,7 @@ def get_plausible_movements(
                     distance_to_ally = point.get_distance(ally.pos)
                     distance_to_enemy = point.get_distance(nearest_enemy_to_ally.pos)
                     detour = (distance_to_ally + distance_to_enemy) - ally_dist_to_enemy
-                    return detour * 10 + distance_to_enemy
+                    return detour * 10 + distance_to_enemy, point.x, point.y
 
                 best_guard_ally = min(reachable_points, key=betweenness_score)
                 proposed_moves[best_guard_ally] = (
@@ -416,7 +424,7 @@ def _get_plausible_uses_of_ability_at_pos(
 
                 key = (
                     pos,
-                    UniqueTuple(e.pos for e in affected_entities),
+                    UniqueTuple(sorted(e.pos for e in affected_entities)),
                     ability.get_hash(),
                 )
                 if key not in plausible_uses:
