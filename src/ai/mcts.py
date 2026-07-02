@@ -131,14 +131,13 @@ class ExpansionStrategy(abc.ABC):
         self,
         node: "MCTSNode",
         env_at_node: Engine,
-        pending_choices: Optional[List[Choice]] = None,
     ) -> None:
         """
         Expand a leaf node by adding children based on legal actions.
 
         Args:
             node: The leaf node to expand.
-            env: The environment state corresponding to the leaf node.
+            env_at_node: The environment state corresponding to the leaf node.
                  Should not be modified by the expansion strategy itself.
         """
         pass
@@ -272,19 +271,13 @@ class UniformExpansion(ExpansionStrategy):
         self,
         node: MCTSNode,
         env_at_node: Engine,
-        pending_choices: Optional[tuple[Choice]] = None,
     ) -> None:
         if node.is_expanded or env_at_node.is_done:
             return
 
-        if pending_choices is not None:
-            legal_actions = pending_choices
-        else:
-            legal_actions = env_at_node.get_legal_actions()
-
         assert not node.edges
-        node.actions = legal_actions
-        for action_index, action in enumerate(legal_actions):
+        node.actions = env_at_node.current_choices
+        for action_index, action in enumerate(env_at_node.current_choices):
             node.edges[action_index] = Edge(prior=1.0)
         node.is_expanded = True
 
@@ -387,7 +380,7 @@ class MCTSAgent(Agent):
 
         root_key = env.hash()
 
-        if past_root_nodes:
+        if past_root_nodes:  # temp debug check
             prev_root = past_root_nodes[-1]
             new_history = env.action_history[len(prev_root.env.action_history) :]
             if new_history:
@@ -427,9 +420,7 @@ class MCTSAgent(Agent):
         past_root_nodes.append(root_node)
 
         if not root_node.is_expanded:
-            self.expansion.expand(
-                node=root_node, env_at_node=env, pending_choices=choices
-            )
+            self.expansion.expand(node=root_node, env_at_node=env)
 
         contender_actions = set(root_node.edges.keys())
 
@@ -497,10 +488,9 @@ class MCTSAgent(Agent):
                 sim_env = node.env.copy()
             else:
                 sim_env.rng.stochastic_flag = False
-                new_choices = self._advance_env_and_step(
-                    sim_env=sim_env, action_idx=action_idx
-                )
-                sim_env.current_choices = new_choices
+                action = sim_env.current_choices[action_idx]
+                sim_env.step(action=action, action_idx=action_idx)
+                sim_env.advance_until_choice()
 
                 key = sim_env.hash()
                 node = self.cache.get_matching_node(key)
@@ -545,9 +535,8 @@ class MCTSAgent(Agent):
 
             path.add_node(node)
 
-            choices = sim_env.current_choices
             if not node.is_expanded:
-                self.expansion.expand(node, sim_env, pending_choices=choices)
+                self.expansion.expand(node, sim_env)
                 val = self.evaluation.evaluate(node, sim_env)
                 player_to_value = {
                     node.current_player_index: val,
@@ -568,14 +557,6 @@ class MCTSAgent(Agent):
             1 - curr_player: -val,
         }
         self.backprop.backpropagate(path, player_to_value)
-
-    def _advance_env_and_step(
-        self, sim_env: Engine, action_idx: int
-    ) -> UniqueTuple[Choice]:
-        action = sim_env.current_choices[action_idx]
-        sim_env.step(action=action, action_idx=action_idx)
-        choices = sim_env.advance_until_choice()
-        return choices
 
     def select_action(
         self, choices: List[Choice], engine: Optional[Engine] = None
