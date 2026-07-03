@@ -389,25 +389,33 @@ class MCTSAgent(Agent):
                 if edge and edge.child_nodes:
                     matching_child = next(iter(edge.child_nodes))
 
-                    env_actions = env.current_choices
-                    child_actions = matching_child.env.current_choices
+                    current_env_actions = env.current_choices
+                    past_env_actions = matching_child.env.current_choices
                     a = (
-                        hash(env_actions) == hash(child_actions),
-                        env_actions,
-                        child_actions,
+                        hash(current_env_actions) == hash(past_env_actions),
+                        current_env_actions,
+                        past_env_actions,
                     )
 
-                    if hash(env_actions) != hash(child_actions):
+                    if hash(current_env_actions) != hash(past_env_actions):
+                        b = (
+                            hash(env.get_legal_actions()),
+                            hash(matching_child.env.get_legal_actions()),
+                            hash(env.current_choices),
+                            hash(matching_child.env.current_choices),
+                        )
+                        c = (
+                            env.get_legal_actions(),
+                            matching_child.env.get_legal_actions(),
+                            env.current_choices,
+                            matching_child.env.current_choices,
+                        )
+                        print()
+
                         debug_actions_env = env.get_legal_actions()
                         print()
                         debug_actions_child = matching_child.env.get_legal_actions()
                         print()
-                        assert (
-                            hash(env.get_legal_actions())
-                            == hash(matching_child.env.get_legal_actions())
-                            == hash(env.current_choices)
-                            == hash(matching_child.env.current_choices)
-                        )
 
         root_node = self.cache.get_matching_node(root_key)
         if not root_node:

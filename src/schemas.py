@@ -31,6 +31,28 @@ class ActionState(BaseModel):
     move_path: Optional[List[Point]] = None
     movement_name: str = ""
 
+    @classmethod
+    def from_action_choice(cls, action_choice, current_actor):
+        return cls(
+            actor=(
+                getattr(action_choice, "actor", current_actor).id
+                if getattr(action_choice, "actor", current_actor)
+                else -1
+            ),
+            target=(
+                action_choice.target.id
+                if getattr(action_choice, "target", None)
+                else None
+            ),
+            ability=(
+                action_choice.ability.name
+                if getattr(action_choice, "ability", None)
+                else "None"
+            ),
+            move_path=getattr(action_choice, "move_path", None),
+            movement_name=getattr(action_choice, "movement_name", "None"),
+        )
+
 
 class ActionSim(BaseModel):
     action: ActionState

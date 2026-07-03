@@ -252,32 +252,11 @@ class Engine:
             )
             action_choice = next_choices[action_index]
 
-            current_actor = self.get_current_actor()
-            action_state = ActionState(
-                actor=(
-                    getattr(action_choice, "actor", current_actor).id
-                    if getattr(action_choice, "actor", current_actor)
-                    else -1
-                ),
-                target=(
-                    action_choice.target.id
-                    if getattr(action_choice, "target", None)
-                    else None
-                ),
-                ability=(
-                    action_choice.ability.name
-                    if getattr(action_choice, "ability", None)
-                    else "None"
-                ),
-                move_path=getattr(action_choice, "move_path", None),
-                movement_name=getattr(action_choice, "movement_name", "None"),
-            )
-
             self.step(
                 action=action_choice,
                 action_idx=action_index,
             )
-            self.advance_until_choice()
+            next_choices = self.advance_until_choice()
 
             is_done = self.is_done
             if is_done:
@@ -291,7 +270,9 @@ class Engine:
             after_state = self.to_model()
             log_entry = LogEntry(
                 before_state=before_state,
-                action=action_state,
+                action=ActionState.from_action_choice(
+                    action_choice=action_choice, current_actor=self.get_current_actor()
+                ),
                 after_state=after_state,
                 done=is_done,
                 messages=get_logs(),
