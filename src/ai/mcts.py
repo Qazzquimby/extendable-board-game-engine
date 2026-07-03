@@ -378,7 +378,7 @@ class MCTSAgent(Agent):
         if len(choices) <= 1:
             return 0
 
-        root_key = env.hash()
+        root_key = hash(env)
 
         if past_root_nodes:  # temp debug check
             prev_root = past_root_nodes[-1]
@@ -438,25 +438,13 @@ class MCTSAgent(Agent):
                 self._run_simulation(
                     root_node=root_node, contender_actions=contender_actions
                 )
+                self.assert_all_choices_still_accurate()
 
-                if (i + 1) % EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY == 0:
-                    remaining_sims = self.num_simulations - (i + 1)
-
-                    best_visits = -1
-                    for action_idx in contender_actions:
-                        visits = root_node.edges[action_idx].num_visits
-                        if visits > best_visits:
-                            best_visits = visits
-
-                    contender_actions = {
-                        action_idx
-                        for action_idx in contender_actions
-                        if root_node.edges[action_idx].num_visits + remaining_sims
-                        >= best_visits
-                    }
-
-                    if len(contender_actions) <= 1:
-                        break
+                contender_actions = self._get_contender_actions(
+                    i=i, root_node=root_node, contender_actions=contender_actions
+                )
+                if len(contender_actions) <= 1:
+                    break
         finally:
             log.enabled = True
 
@@ -470,11 +458,13 @@ class MCTSAgent(Agent):
         assert sum(len(edge.child_nodes) for edge in root_node.edges.values())
         assert 0 <= best_idx < len(choices)
 
+        self.assert_all_choices_still_accurate()
         return best_idx
 
     def _run_simulation(
         self, root_node: MCTSNode, contender_actions: Optional[set] = None
     ) -> None:
+        self.assert_all_choices_still_accurate()
         previous_node = root_node
         sim_env: "Engine" = root_node.env.copy()
 
@@ -482,6 +472,7 @@ class MCTSAgent(Agent):
         path.add_node(root_node)
 
         while not sim_env.is_done:
+            self.assert_all_choices_still_accurate()
             action_idx = self.selection._select_action_index_from_edges(
                 current_node=previous_node,
                 start_node=root_node,
@@ -490,7 +481,7 @@ class MCTSAgent(Agent):
             path.set_action_for_last_node(action_idx)
 
             edge = previous_node.edges[action_idx]
-
+            self.assert_all_choices_still_accurate()
             if edge.is_deterministic and edge.child_nodes:
                 node = next(iter(edge.child_nodes))
                 sim_env = node.env.copy()
@@ -498,18 +489,25 @@ class MCTSAgent(Agent):
                 sim_env.rng.stochastic_flag = False
                 action = sim_env.current_choices[action_idx]
                 sim_env.step(action=action, action_idx=action_idx)
+                self.assert_all_choices_still_accurate()
                 new_choices = sim_env.advance_until_choice()
+                # After this line the assert fails
+                self.assert_all_choices_still_accurate()
                 sim_env.current_choices = new_choices  # .todo ..?
+                self.assert_all_choices_still_accurate()
 
-                key = sim_env.hash()
+                key = hash(sim_env)
                 node = self.cache.get_matching_node(key)
                 if not node:
+                    self.assert_all_choices_still_accurate()
                     node = MCTSNode(
                         key=key,
                         current_player_index=sim_env.get_current_player(),
                         env=sim_env.copy(),
                     )
+                    self.assert_all_choices_still_accurate()
                     self.cache.cache_node(key, node)
+                    self.assert_all_choices_still_accurate()
 
                 is_deterministic = not sim_env.rng.stochastic_flag
                 if is_deterministic:
@@ -541,7 +539,7 @@ class MCTSAgent(Agent):
 
             if path.has_visited_key(node.key):
                 break
-
+            self.assert_all_choices_still_accurate()
             path.add_node(node)
 
             if not node.is_expanded:
@@ -553,7 +551,7 @@ class MCTSAgent(Agent):
                 }
                 self.backprop.backpropagate(path, player_to_value)
                 return
-
+        self.assert_all_choices_still_accurate()
         winner = sim_env.get_winning_player()
         curr_player = path.last_node.current_player_index
         if winner is None:
@@ -572,3 +570,42 @@ class MCTSAgent(Agent):
     ) -> Choice:
         idx = self.choose(env=engine)
         return choices[idx]
+
+    def _get_contender_actions(self, i, root_node, contender_actions):
+        if (i + 1) % EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY == 0:
+            remaining_sims = self.num_simulations - (i + 1)
+
+            best_visits = -1
+            for action_idx in contender_actions:
+                visits = root_node.edges[action_idx].num_visits
+                if visits > best_visits:
+                    best_visits = visits
+
+            contender_actions = {
+                action_idx
+                for action_idx in contender_actions
+                if root_node.edges[action_idx].num_visits + remaining_sims
+                >= best_visits
+            }
+
+        return contender_actions
+
+    def assert_all_choices_still_accurate(self):
+        mismatched = []
+        for node in self.cache._key_to_node.values():
+            if node.env is None:
+                continue
+            legal_actions = node.env.get_legal_actions()
+            current_choices = node.env.current_choices
+            if hash(legal_actions) != hash(current_choices):
+                mismatched.append(
+                    (
+                        node.key,
+                        hash(legal_actions),
+                        hash(current_choices),
+                        legal_actions,
+                        current_choices,
+                    )
+                )
+        if mismatched:
+            assert False

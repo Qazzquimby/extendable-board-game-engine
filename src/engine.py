@@ -237,8 +237,8 @@ class Engine:
         RoundStartEvent(engine=self).resolve()
 
         pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
+        self.next_turn()
         next_choices = self.advance_until_choice()
-        self.advance_until_choice()
 
         while not self.is_done:
             pbar.update()
@@ -566,5 +566,5 @@ class Engine:
             marker_states,
         )
 
-    def hash(self) -> int:
+    def __hash__(self) -> int:
         return hash(self._get_hash_info())

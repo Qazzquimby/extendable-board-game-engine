@@ -52,6 +52,9 @@ class PlausibleMoveAndAction(Choice):
         self.aiming_result = aiming_result
         super().__init__(features={})
 
+    def __str__(self):
+        return f"{self.ability.owner} at {self.ability.owner.pos} go to {self.move_pos} and use {self.ability.name} on {self.target.pos if self.target else None}"
+
     def __hash__(self):
         return hash(
             (self.ability.name, self.movement_name, self.move_pos, self.aiming_result)

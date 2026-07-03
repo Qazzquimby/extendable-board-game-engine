@@ -17,3 +17,11 @@ class Point(NamedTuple):
 
     def __sub__(self, other: "Point") -> "Point":
         return Point(x=self.x - other.x, y=self.y - other.y)
+
+    def __eq__(self, other):
+        if not isinstance(other, Point):
+            try:
+                return other[0] == self.x and other[1] == self.y
+            except (TypeError, IndexError):
+                return False
+        return self.x == other.x and self.y == other.y
