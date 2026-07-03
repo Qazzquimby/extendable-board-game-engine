@@ -13,7 +13,9 @@ if TYPE_CHECKING:
 
 
 class Choice:
-    def __init__(self, features: Dict[str, Any]):
+    def __init__(self, features: Dict[str, Any] = None):
+        if features is None:
+            features = {}
         self.features = features
 
     def __hash__(self):
@@ -35,7 +37,6 @@ class PlausibleMoveAndAction(Choice):
         target: Optional["Entity"],
         ability: "Ability",
         movement_name: str = "",
-        engine: "Engine" = None,
         actor: "Entity" = None,
         aiming_result: "AimingResult" = None,
     ):
@@ -50,6 +51,7 @@ class PlausibleMoveAndAction(Choice):
         self.ability = ability
         self.movement_name = movement_name
         self.aiming_result = aiming_result
+        self.actor = actor
         super().__init__(features={})
 
     def __str__(self):
@@ -220,7 +222,6 @@ class PlausibleFreeAction(Choice):
         self,
         target: Optional["Entity"],
         ability: "Ability",
-        engine: "Engine",
         actor: "Entity",
         aiming_result: "AimingResult",
         **kwargs,
@@ -228,9 +229,9 @@ class PlausibleFreeAction(Choice):
         self.target = target
         self.ability = ability
         self.aiming_result = aiming_result
+        self.actor = actor
 
-        features = {}  # self._compute_features(actor, engine, feature_evaluator)
-        super().__init__(features=features)
+        super().__init__()
 
     def __hash__(self):
         return hash((self.ability.name, self.aiming_result))
@@ -399,7 +400,6 @@ def _get_plausible_uses_of_ability_at_pos(
                         plausible_uses[key] = choice_class(
                             target=target,
                             ability=ability,
-                            engine=engine,
                             actor=actor,
                             aiming_result=aiming_res,
                             **choice_kwargs,
@@ -411,7 +411,6 @@ def _get_plausible_uses_of_ability_at_pos(
                     plausible_uses[key] = choice_class(
                         target=actor,
                         ability=ability,
-                        engine=engine,
                         actor=actor,
                         aiming_result=aiming_res,
                         **choice_kwargs,

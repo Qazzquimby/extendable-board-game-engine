@@ -41,6 +41,8 @@ from queries import QueryIsAlive, Query
 from schemas import EngineState, GameLog, LogEntry, ActionState
 from util import UniqueTuple
 
+DEBUG_DEEPCOPY = True
+
 if TYPE_CHECKING:
     pass
 
@@ -497,7 +499,37 @@ class Engine:
 
         result.router = copy.deepcopy(self.router, memo)
         assert len(result.router.subscribers) == len(self.router.subscribers)
+
+        if DEBUG_DEEPCOPY:
+            result._verify_engine_references(result)
+
         return result
+
+    def _verify_engine_references(self, obj, visited=None, path="root"):
+        if visited is None:
+            visited = set()
+
+        if id(obj) in visited:
+            return
+        visited.add(id(obj))
+
+        if hasattr(obj, "engine") and obj.engine is not None:
+            assert (
+                obj.engine is self
+            ), f"Object {obj} of type {type(obj)} at {path} has wrong engine reference! Expected {id(self)}, got {id(obj.engine)}"
+
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                self._verify_engine_references(k, visited, path + f"[{k}]")
+                self._verify_engine_references(v, visited, path + f"[{k}]")
+        elif isinstance(obj, (list, tuple, set, frozenset)):
+            for i, item in enumerate(obj):
+                self._verify_engine_references(item, visited, path + f"[{i}]")
+        elif hasattr(obj, "__dict__"):
+            for k, v in obj.__dict__.items():
+                if k.startswith("__") and k.endswith("__") or k in ("agents",):
+                    continue
+                self._verify_engine_references(v, visited, path + f".{k}")
 
     def get_current_actor(self) -> Optional["Entity"]:
         if self.event_queue.queue:
