@@ -185,36 +185,6 @@ class Ability:
             return False
         return hash(self) == hash(other)
 
-    def __deepcopy__(self, memo):
-        # Even though this is a dataclass, a custom __deepcopy__ is much faster.
-        if id(self) in memo:
-            return memo[id(self)]
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-
-        result.name = self.name
-        result.aiming = copy.deepcopy(self.aiming, memo)
-        result.text = self.text
-        result.instructions = copy.deepcopy(self.instructions, memo)
-        result.owner = copy.deepcopy(self.owner, memo)
-        result.is_default = self.is_default
-        result.action_cost = self.action_cost
-        result.instant_speed = self.instant_speed
-        result.modifiers = copy.deepcopy(self.modifiers, memo)
-        result.taps = self.taps
-        result.is_tapped = self.is_tapped
-        result.tapped_this_turn = self.tapped_this_turn
-        result.max_charges = self.max_charges
-        result.charges = self.charges
-        result.is_ultimate = self.is_ultimate
-        result.ultimate_turn = self.ultimate_turn
-        result.is_undefendable = self.is_undefendable
-        result.defense = self.defense
-        result.crit_chance = self.crit_chance
-        result.reaction_condition = self.reaction_condition
-        return result
-
     def __post_init__(self):
         self.charges = self.max_charges
 

@@ -67,7 +67,7 @@ class Event(abc.ABC):
 
     def get_hash_info(self):
         return (
-            str(self.subject),
+            str(self.subject),  # str is unique here.
             self.canceled,
             self.state,
             self.__class__.__name__,

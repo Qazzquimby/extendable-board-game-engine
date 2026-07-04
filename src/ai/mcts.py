@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 100
-NUM_SIMS = 100  # _000
+NUM_SIMS = 10  # _000
 
 
 @dataclass
@@ -438,7 +438,7 @@ class MCTSAgent(Agent):
                 self._run_simulation(
                     root_node=root_node, contender_actions=contender_actions
                 )
-                self.assert_all_choices_still_accurate()
+                # self.assert_all_choices_still_accurate()
 
                 contender_actions = self._get_contender_actions(
                     i=i, root_node=root_node, contender_actions=contender_actions

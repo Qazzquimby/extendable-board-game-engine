@@ -52,35 +52,6 @@ class Entity:
     def __str__(self):
         return f"{self.name}({self.id})"
 
-    def __deepcopy__(self, memo):
-        if id(self) in memo:
-            return memo[id(self)]
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-
-        result.engine = memo[id(self.engine)]
-
-        result.id = self.id
-        result.set = self.set
-        result.name = self.name
-
-        result.max_hp = self.max_hp
-        result.hp = self.hp
-        result.speed = self.speed
-
-        result._pos = self._pos
-        result.team = self.team
-        result.activator = copy.deepcopy(self.activator, memo)
-
-        result.modifiers = copy.deepcopy(self.modifiers, memo)
-        result.abilities = copy.deepcopy(self.abilities, memo)
-
-        result.move_actions = self.move_actions
-        result.standard_actions = self.standard_actions
-        result.free_actions = self.free_actions
-        return result
-
     @property
     def pos(self) -> Optional[Point]:
         return self._pos
@@ -238,37 +209,6 @@ class Summon(Entity):
         self.activator = summoner.activator
         SummonEvent(summoner=self.summoner, subject=self).resolve()
 
-    def __deepcopy__(self, memo):
-        if id(self) in memo:
-            return memo[id(self)]
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-
-        result.engine = memo[id(self.engine)]
-
-        result.id = self.id
-        result.set = self.set
-        result.name = self.name
-
-        result.max_hp = self.max_hp
-        result.hp = self.hp
-        result.speed = self.speed
-
-        result._pos = self._pos
-        result.team = self.team
-        result.activator = copy.deepcopy(self.activator, memo)
-
-        result.modifiers = copy.deepcopy(self.modifiers, memo)
-        result.abilities = copy.deepcopy(self.abilities, memo)
-
-        result.move_actions = self.move_actions
-        result.standard_actions = self.standard_actions
-        result.free_actions = self.free_actions
-
-        result.summoner = copy.deepcopy(self.summoner, memo)
-        return result
-
 
 class Object(Summon):
     def __init__(
@@ -301,23 +241,6 @@ class Marker:
         self.modifiers: List["Modifier"] = []
         self.engine.markers.append(self)
         self.pos = pos  # runs setter
-
-    def __deepcopy__(self, memo):
-        if id(self) in memo:
-            return memo[id(self)]
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-
-        result.engine = memo[id(self.engine)]
-
-        result.id = self.id
-        result.name = self.name
-        result._pos = self._pos
-
-        result.team = self.team
-        result.modifiers = copy.deepcopy(self.modifiers, memo)
-        return result
 
     @property
     def pos(self) -> Optional[Point]:

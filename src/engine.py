@@ -1,6 +1,5 @@
 import abc
 import random
-import copy
 from typing import (
     Dict,
     List,
@@ -10,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
+import copium
 from tqdm import tqdm
 
 from choices import (
@@ -41,8 +41,6 @@ from queries import QueryIsAlive, Query
 from schemas import EngineState, GameLog, LogEntry, ActionState
 from util import UniqueTuple
 
-DEBUG_DEEPCOPY = True
-
 if TYPE_CHECKING:
     pass
 
@@ -54,6 +52,9 @@ NUM_ROUNDS = 6
 
 
 class Agent(abc.ABC):
+    def __deepcopy__(self, memo):
+        return self
+
     @abc.abstractmethod
     def choose(self, env: "Engine") -> int:
         pass
@@ -455,81 +456,7 @@ class Engine:
         )
 
     def copy(self) -> "Engine":
-        return copy.deepcopy(self)
-
-    def __deepcopy__(self, memo):
-        cls = self.__class__
-        result = cls.__new__(cls)
-        memo[id(self)] = result
-
-        # --- Set up new engine instance
-        # Shared/immutable objects
-        result.setup = self.setup
-        result.agents = self.agents
-        result.grid = self.grid
-        if result.grid:
-            result.grid.engine = result
-
-        # Copy simple state
-        result.initial_seed = self.initial_seed
-        result.action_history = list(self.action_history)
-        result.rng = copy.deepcopy(self.rng, memo)  # rng has its own state
-        result.round_num = self.round_num
-        result.num_hero_rows = self.num_hero_rows
-        result.current_team = self.current_team
-        result.current_hero_row_index = self.current_hero_row_index
-        result.activation_index = self.activation_index
-        result.is_resolving_action = getattr(self, "is_resolving_action", False)
-        result._next_id = self._next_id
-
-        # --- Deep copy object graph. This is order-dependent.
-        # This will call __deepcopy__ on each entity and modifier, populating the memo.
-        result.entities = copy.deepcopy(self.entities, memo)
-        result.markers = copy.deepcopy(self.markers, memo)
-
-        # Now that all entities are in memo, we can copy lists that reference them.
-        result.team_heroes = copy.deepcopy(self.team_heroes, memo)
-        result.current_turn_hero = copy.deepcopy(self.current_turn_hero, memo)
-        result.active_entity = copy.deepcopy(self.active_entity, memo)
-        result.activation_queue = copy.deepcopy(self.activation_queue, memo)
-        result.current_choices = copy.deepcopy(self.current_choices, memo)
-        result.event_queue = copy.deepcopy(self.event_queue, memo)
-        if result.current_choices:
-            assert hash(result.current_choices) == hash(self.current_choices)
-
-        result.router = copy.deepcopy(self.router, memo)
-        assert len(result.router.subscribers) == len(self.router.subscribers)
-
-        if DEBUG_DEEPCOPY:
-            result._verify_engine_references(result)
-
-        return result
-
-    def _verify_engine_references(self, obj, visited=None, path="root"):
-        if visited is None:
-            visited = set()
-
-        if id(obj) in visited:
-            return
-        visited.add(id(obj))
-
-        if hasattr(obj, "engine") and obj.engine is not None:
-            assert (
-                obj.engine is self
-            ), f"Object {obj} of type {type(obj)} at {path} has wrong engine reference! Expected {id(self)}, got {id(obj.engine)}"
-
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                self._verify_engine_references(k, visited, path + f"[{k}]")
-                self._verify_engine_references(v, visited, path + f"[{k}]")
-        elif isinstance(obj, (list, tuple, set, frozenset)):
-            for i, item in enumerate(obj):
-                self._verify_engine_references(item, visited, path + f"[{i}]")
-        elif hasattr(obj, "__dict__"):
-            for k, v in obj.__dict__.items():
-                if k.startswith("__") and k.endswith("__") or k in ("agents",):
-                    continue
-                self._verify_engine_references(v, visited, path + f".{k}")
+        return copium.deepcopy(self)
 
     def get_current_actor(self) -> Optional["Entity"]:
         if self.event_queue.queue:

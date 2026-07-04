@@ -326,7 +326,6 @@ class Grid:
         self,
         start_pos: "Point",
         target_pos: "Point",
-        visualize_file: Optional[str] = None,
         blocked_points: Optional[Set["Point"]] = None,
     ) -> Tuple[bool, bool]:
         """

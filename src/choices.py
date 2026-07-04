@@ -372,7 +372,6 @@ def _get_plausible_uses_of_ability_at_pos(
                     plausible_uses[key] = choice_class(
                         target=None,
                         ability=ability,
-                        engine=engine,
                         actor=actor,
                         aiming_result=aiming_res,
                         **choice_kwargs,
@@ -447,7 +446,6 @@ def _get_plausible_uses_of_ability_at_pos(
                     plausible_uses[key] = choice_class(
                         target=None,
                         ability=ability,
-                        engine=engine,
                         actor=actor,
                         aiming_result=aiming_res,
                         **choice_kwargs,
