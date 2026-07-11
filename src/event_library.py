@@ -9,23 +9,24 @@ if TYPE_CHECKING:
     from engine import Engine
     from entities import Entity, Summon
     from grid import Direction
-    from modifiers import Modifier
+    from modifiers import Modifier, Token
 
 
 class ChangeLocationEvent(Event):
     def __init__(self, subject: "Entity", new_pos: Optional["Point"]):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.new_pos = new_pos
 
-    def _resolve(self) -> None:
-        self.subject.pos = self.new_pos
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        subject.pos = self.new_pos
 
-        if self.subject.pos is None:
+        if subject.pos is None:
             return
 
         has_more_moves = any(
-            isinstance(e, ChangeLocationEvent) and e.subject == self.subject
-            for e in self.engine.event_queue.queue
+            isinstance(e, ChangeLocationEvent) and e.subject_id == subject.id
+            for e in engine.event_queue.queue
         )
 
         if has_more_moves:
@@ -33,37 +34,34 @@ class ChangeLocationEvent(Event):
 
         occupied = any(
             e
-            for e in self.engine.entities
-            if e != self.subject and e.pos == self.subject.pos and e.hp > 0
+            for e in engine.entities
+            if e != subject and e.pos == subject.pos and e.hp > 0
         )
         if not occupied:
             return
         # Shunt to open space
         from collections import deque
 
-        queue = deque([self.subject.pos])
-        visited = {self.subject.pos}
+        queue = deque([subject.pos])
+        visited = {subject.pos}
 
         while queue:
             curr = queue.popleft()
             is_occupied = any(
                 e
-                for e in self.engine.entities
-                if e != self.subject and e.pos == curr and e.hp > 0
+                for e in engine.entities
+                if e != subject and e.pos == curr and e.hp > 0
             )
-            if not is_occupied and curr not in self.engine.grid.walls:
-                self.subject.pos = curr
+            if not is_occupied and curr not in engine.grid.walls:
+                subject.pos = curr
                 log(
-                    f"{self.subject.name} was displaced to {curr} because their space was occupied."
+                    f"{subject.name} was displaced to {curr} because their space was occupied."
                 )
                 break
 
             for dx, dy in [(0, 1), (1, 0), (0, -1), (-1, 0)]:
                 nx, ny = curr.x + dx, curr.y + dy
-                if (
-                    0 <= nx < self.engine.grid.width
-                    and 0 <= ny < self.engine.grid.height
-                ):
+                if 0 <= nx < engine.grid.width and 0 <= ny < engine.grid.height:
                     n = Point(nx, ny)
                     if n not in visited:
                         visited.add(n)
@@ -72,71 +70,83 @@ class ChangeLocationEvent(Event):
 
 class PushEvent(Event):
     def __init__(self, subject: "Entity", distance: int, direction: "Direction"):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.distance = ModInt(distance)
         self.direction = direction
 
-    def _resolve(self) -> None:
-        if not getattr(self.subject, "pos", None):
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        if not getattr(subject, "pos", None):
             return
 
         dist = max(0, self.distance.value)
         if dist > 0:
-            path = self.subject.engine.grid.get_push_path(
-                subject=self.subject,
+            path = engine.grid.get_push_path(
+                subject=subject,
                 direction=self.direction,
                 distance=dist,
             )
             if path:
-                log(f"Pushing {self.subject.name} to {path[-1]}")
+                log(f"Pushing {subject.name} to {path[-1]}")
                 for point in path:
-                    ChangeLocationEvent(self.subject, point).resolve()
+                    engine.event_queue.enqueue(
+                        ChangeLocationEvent(
+                            engine=engine, subject=subject, new_pos=point
+                        )
+                    )
 
 
 class PullEvent(Event):
     def __init__(self, subject: "Entity", distance: int, toward_point: "Point"):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.distance = ModInt(distance)
         self.toward_point = toward_point
 
-    def _resolve(self) -> None:
-        if not getattr(self.subject, "pos", None):
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        if not getattr(subject, "pos", None):
             return
         dist = max(0, self.distance.value)
         if dist > 0:
-            path = self.subject.engine.grid.get_pull_path(
-                subject=self.subject,
+            path = engine.grid.get_pull_path(
+                subject=subject,
                 pull_to=self.toward_point,
                 distance=dist,
             )
             if path:
-                log(f"Pulling {self.subject.name} to {path[-1]}")
+                log(f"Pulling {subject.name} to {path[-1]}")
                 for point in path:
-                    ChangeLocationEvent(self.subject, point).resolve()
+                    engine.event_queue.enqueue(
+                        ChangeLocationEvent(
+                            engine=engine, subject=subject, new_pos=point
+                        )
+                    )
 
 
 class DeployEvent(Event):
     def __init__(self, subject: "Entity"):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
 
-    def _resolve(self) -> None:
+    def _resolve(self, engine: "Engine") -> None:
         pass
 
 
 class TurnStartEvent(Event):
     def __init__(self, subject: "Entity"):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
 
-    def _resolve(self) -> None:
-        self.subject.engine.current_turn_hero.start_turn()
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        engine.current_turn_hero.start_turn()
 
 
 class TurnEndEvent(Event):
     def __init__(self, subject: "Entity"):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
 
-    def _resolve(self) -> None:
-        for ability in self.subject.abilities:
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        for ability in subject.abilities:
             if ability.taps:
                 if not ability.tapped_this_turn:
                     ability.is_tapped = False
@@ -144,11 +154,11 @@ class TurnEndEvent(Event):
 
 
 class RoundStartEvent(Event):
-    def __init__(self, engine: "Engine"):
-        super().__init__(engine=engine)
+    def __init__(self):
+        super().__init__()
 
-    def _resolve(self) -> None:
-        self.engine.round_num += 1
+    def _resolve(self, engine: "Engine") -> None:
+        engine.round_num += 1
 
 
 class DamageEvent(Event):
@@ -159,88 +169,100 @@ class DamageEvent(Event):
         amount: int | ModInt,
         ability: Optional["Ability"] = None,
     ):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.source = source
         self.amount = ModInt(amount)
         self.ability = ability
 
-    def _resolve(self) -> None:
-        if self.subject.has_armor():
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        if subject.has_armor(engine=engine):
             self.amount.add(-1)
 
         final_damage = max(0, self.amount.value)
-        old_hp = self.subject.hp
-        new_hp = max(0, self.subject.hp - final_damage)
-        self.subject.hp = new_hp
+        old_hp = subject.hp
+        new_hp = max(0, subject.hp - final_damage)
+        subject.hp = new_hp
 
         source_name = self.source.name if self.source else "Environment"
-        with log(f"{source_name} dealt {final_damage} damage to {self.subject.name}."):
-            if self.subject.hp <= 0 and old_hp > 0:
-                DeathEvent(subject=self.subject, killer=self.source).resolve()
+        with log(f"{source_name} dealt {final_damage} damage to {subject.name}."):
+            if subject.hp <= 0 and old_hp > 0:
+                engine.event_queue.enqueue(
+                    DeathEvent(subject=subject, killer=self.source)
+                )
 
 
 class DeathEvent(Event):
     # For on-kill use on-death and filter by killer
     def __init__(self, subject: "Entity", killer: Optional["Entity"] = None):
-        super().__init__(engine=subject.engine, subject=subject)
-        self.killer = killer
+        super().__init__(subject=subject)
+        self.killer_id = killer.id if killer else None
 
-    def _resolve(self) -> None:
-        log(f"{self.subject.name} died.")
-        self.subject.pos = None
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        log(f"{subject.name} died.")
+        subject.pos = None
 
 
 class SummonEvent(Event):
     def __init__(self, summoner: "Entity", subject: "Summon"):
-        super().__init__(engine=subject.engine, subject=subject)
-        self.summoner = summoner
+        super().__init__(subject=subject)
+        self.summoner_id = summoner.id if summoner else None
 
-    def _resolve(self) -> None:
+    def _resolve(self, engine: "Engine") -> None:
         pass  # should maybe set the summon's pos here?
         # If this is doing nothing it means the summoning couldn't be modified or cancelled by the before stage
 
 
 class HealEvent(Event):
     def __init__(self, subject: "Entity", amount: int | ModInt):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.amount = ModInt(amount)
 
-    def _resolve(self) -> None:
+    def _resolve(self, engine: "Engine") -> None:
         final_heal = max(0, self.amount.value)
-        self.subject.hp += final_heal
-        log(f"{self.subject.name} healed {final_heal} HP.")
+        subject = engine.get_entity_by_id(self.subject_id)
+        subject.hp += final_heal
+        log(f"{subject.name} healed {final_heal} HP.")
 
 
 class AddModifierEvent(Event):
     def __init__(
-        self, subject: "Entity", modifier_class: Type["Modifier"], modifier_kwargs: dict
+        self,
+        subject: "Entity",
+        modifier_class: Type["Modifier"],
+        modifier_kwargs: dict,
     ):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.modifier_class = modifier_class
         self.modifier_kwargs = modifier_kwargs
 
-    def _resolve(self):
-        log(f"{self.subject.name} gained {self.modifier_class.__name__}.")
-        self.subject.add_modifier(modifier=self.modifier_class(**self.modifier_kwargs))
+    def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
+        log(f"{subject.name} gained {self.modifier_class.__name__}.")
+        subject.add_modifier(
+            engine=engine, modifier=self.modifier_class(**self.modifier_kwargs)
+        )
 
 
 class RemoveModifierEvent(Event):
     def __init__(self, subject: "Entity", modifier_class: Type["Modifier"]):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.modifier_class = modifier_class
 
-    def _resolve(self):
-        log(f"{self.subject.name} lost {self.modifier_class.__name__}.")
+    def _resolve(self, engine: "Engine"):
+        subject = engine.get_entity_by_id(self.subject_id)
+        log(f"{subject.name} lost {self.modifier_class.__name__}.")
         existing_modifier = next(
             (
                 mod
-                for mod in self.subject.modifiers
+                for mod in subject.modifiers
                 if mod.name == self.modifier_class.__name__
             ),
             None,
         )
         if existing_modifier:
-            self.subject.remove_modifier(existing_modifier)
+            subject.remove_modifier(engine=engine, modifier=existing_modifier)
 
 
 class AddTokenEvent(Event):
@@ -251,21 +273,22 @@ class AddTokenEvent(Event):
         amount: int = 1,
         token_kwargs: Optional[dict] = None,
     ):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.token_class = token_class
         self.amount = amount
         if not token_kwargs:
             token_kwargs = {}
         self.token_kwargs = token_kwargs
 
-    def _resolve(self):
-        log(f"{self.subject.name} gained {self.amount} {self.token_class.__name__}.")
-        for modifier in self.subject.modifiers:
+    def _resolve(self, engine: "Engine"):
+        subject = engine.get_entity_by_id(self.subject_id)
+        log(f"{subject.name} gained {self.amount} {self.token_class.__name__}.")
+        for modifier in subject.modifiers:
             if isinstance(modifier, self.token_class):
                 modifier.add(self.amount)
                 return
         new_token = self.token_class(amount=self.amount, **self.token_kwargs)
-        self.subject.add_modifier(new_token)
+        subject.add_modifier(engine=engine, modifier=new_token)
 
 
 class RemoveTokenEvent(Event):
@@ -275,13 +298,14 @@ class RemoveTokenEvent(Event):
         token_class: Type["Token"],
         amount: int,
     ):
-        super().__init__(engine=subject.engine, subject=subject)
+        super().__init__(subject=subject)
         self.token_class = token_class
         self.amount = amount
 
-    def _resolve(self):
-        log(f"{self.subject.name} lost {self.amount} {self.token_class.__name__}.")
-        for modifiers in self.subject.modifiers:
-            if isinstance(modifiers, self.token_class):
-                modifiers.remove(self.amount)
+    def _resolve(self, engine: "Engine"):
+        subject = engine.get_entity_by_id(self.subject_id)
+        log(f"{subject.name} lost {self.amount} {self.token_class.__name__}.")
+        for modifier in subject.modifiers:
+            if isinstance(modifier, self.token_class):
+                modifier.remove(self.amount)  # safe because is token
                 return

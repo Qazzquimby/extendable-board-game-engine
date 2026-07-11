@@ -8,14 +8,15 @@ from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 from valence import Valence
 
 if TYPE_CHECKING:
-    from entities import Entity, Summon
+    from engine import Engine
+    from entities import Entity, Summon, EntityId
 
 
 @dataclass(kw_only=True)
 class Modifier:
     text: str = field(default=False, init=False)
     valence: Valence = field(default=False, init=False)
-    owner: "Entity" = field(init=False)
+    owner_id: EntityId = field(init=False)
     name: str = field(init=False)
 
     def __init_subclass__(cls, **kwargs):
@@ -25,10 +26,9 @@ class Modifier:
     def __str__(self):
         return self.name
 
-    def log_trigger(self, event):
-        return log(
-            f"{event.__class__.__name__} triggered {self.owner.name}'s {self.name}."
-        )
+    def log_trigger(self, engine, event):
+        owner = engine.get_entity_by_id(self.owner_id)
+        return log(f"{event.__class__.__name__} triggered {owner.name}'s {self.name}.")
 
 
 class SummonModifier(Modifier):
@@ -43,10 +43,11 @@ class Token(Modifier):
     def add(self, amount: int) -> None:
         self.amount += amount
 
-    def remove(self, amount: int) -> None:
+    def remove(self, engine: "Engine", amount: int) -> None:
         self.amount -= amount
         if self.amount <= 0:
-            self.owner.remove_modifier(self)
+            owner = engine.get_entity_by_id(self.owner_id)
+            owner.remove_modifier(engine=engine, modifier=self)
 
     def __str__(self):
         return f"{self.name} x {self.amount}"
@@ -54,9 +55,10 @@ class Token(Modifier):
 
 class ClearAtEndOfTurnMixin:
     @before(TurnEndEvent)
-    def clear_at_end_of_turn(self, event: TurnEndEvent) -> None:
-        if self in self.owner.modifiers:
-            self.owner.remove_modifier(self)
+    def clear_at_end_of_turn(self, engine: "Engine", event: TurnEndEvent) -> None:
+        owner = engine.get_entity_by_id(self.owner_id)
+        if self in owner.modifiers:
+            owner.remove_modifier(self)
 
 
 class Immobile(Modifier):

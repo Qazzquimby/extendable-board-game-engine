@@ -1,4 +1,3 @@
-import copy
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import (
@@ -11,6 +10,7 @@ from typing import (
 )
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
+from entities import EntityId
 from event_library import (
     ChangeLocationEvent,
     PullEvent,
@@ -47,8 +47,7 @@ class ActionCost(Enum):
 
 @dataclass
 class ActionContext:
-    engine: "Engine"
-    source: "Entity"
+    source_id: EntityId
     subject_point: "Point"  # The point currently being affected
 
     # all points with targets
@@ -68,10 +67,9 @@ class ActionContext:
             raise ValueError("Cannot use `.target` when there are multiple targets.")
         return self.target_points[0]
 
-    @property
-    def target(self) -> Optional["Entity"]:
+    def get_target(self, engine: "Engine") -> Optional["Entity"]:
         if self._target is None:
-            self._target = self.engine.entity_at(self.target_point)
+            self._target = engine.entity_at(self.target_point)
         return self._target
 
 
@@ -90,12 +88,12 @@ class Instruction:
     aiming_name: Optional[str] = None
     valence: Valence = field(init=False, default=False)
 
-    def execute(self, ctx: ActionContext) -> None:
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         pass
 
 
 def default_reaction_condition(
-    event: "Event", engine: "Engine", actor: "Entity", ability: "Ability"
+    engine: "Engine", event: "Event", actor: "Entity", ability: "Ability"
 ) -> bool:
     from events import AbilityUseEvent
     from queries import QueryLegalAimings
@@ -104,7 +102,8 @@ def default_reaction_condition(
         return False
     if not isinstance(event, AbilityUseEvent):
         return False
-    if event.subject.team == actor.team:
+    subject = engine.get_entity_by_id(event.subject_id)
+    if subject.team == actor.team:
         return False
 
     trigger_targets = []
@@ -228,9 +227,9 @@ class Ability:
 
         from events import AbilityUseEvent
 
-        AbilityUseEvent(
-            source=source, ability=self, aiming_result=aiming_result
-        ).resolve()
+        engine.event_queue.enqueue(
+            AbilityUseEvent(source=source, ability=self, aiming_result=aiming_result)
+        )
 
     def execute_instructions(
         self,
@@ -252,8 +251,7 @@ class Ability:
                 is_crit = target_point in roll_result.crit_points
 
                 ctx = ActionContext(
-                    engine=engine,
-                    source=source,
+                    source_id=source.id,
                     subject_point=target_point,
                     target_points=instruction_aiming_result.target_points,
                     included_points=instruction_aiming_result.included_points,
@@ -261,7 +259,7 @@ class Ability:
                     is_hit=is_hit,
                     is_crit=is_crit,
                 )
-                instruction.execute(ctx)
+                instruction.execute(engine=engine, ctx=ctx)
 
             for included_point in instruction_aiming_result.included_points:
                 entity = engine.entity_at(included_point)
@@ -269,18 +267,17 @@ class Ability:
                     is_avoided = QueryAvoidInclusion(
                         subject=entity,
                         ability=self,
-                    ).resolve()
+                    ).resolve(engine=engine)
                     if is_avoided:
                         continue
                 ctx = ActionContext(
-                    engine=engine,
-                    source=source,
+                    source_id=source.id,
                     subject_point=included_point,
                     target_points=instruction_aiming_result.target_points,
                     included_points=instruction_aiming_result.included_points,
                     ability=self,
                 )
-                instruction.execute(ctx)
+                instruction.execute(engine=engine, ctx=ctx)
 
     def get_hash(self) -> float:
         import hashlib
@@ -311,13 +308,19 @@ class Ability:
         for target_point in all_target_points:
             target = engine.entity_at(target_point)
             if target:
-                defense = target.get_defense(attack_source=source, ability=self)
+                defense = target.get_defense(
+                    engine=engine, attack_source=source, ability=self
+                )
                 defense = min(4, defense)
-                crit_chance = source.get_crit(subject=target, ability=self)
+                crit_chance = source.get_crit(
+                    engine=engine, subject=target, ability=self
+                )
 
                 if defense > 0 or crit_chance > 0:
                     if not roll:
-                        roll = QueryRoll(subject=source).resolve()
+                        roll = QueryRoll(rng=engine.rng, subject=source).resolve(
+                            engine=engine
+                        )
 
                     if roll > defense:
                         hit_target_points.append(target_point)
@@ -348,20 +351,22 @@ class DamageInstruction(Instruction):
     irreducible: bool = False
     valence = Valence.BAD
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
             if ctx.is_crit:
                 amount *= 2  # todo should be +1x damage multiplier. Use modvalue
             # todo crit handling will likely need to be more extensible later
 
-            DamageEvent(
-                source=ctx.source,
-                subject=subject,
-                amount=amount,
-                ability=ctx.ability,
-            ).resolve()
+            engine.event_queue.enqueue(
+                DamageEvent(
+                    source=engine.get_entity_by_id(ctx.source_id),
+                    subject=subject,
+                    amount=amount,
+                    ability=ctx.ability,
+                )
+            )
 
 
 @dataclass
@@ -369,11 +374,11 @@ class HealInstruction(Instruction):
     amount: DynamicInt
     valence = Valence.GOOD
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
-            HealEvent(subject=subject, amount=amount).resolve()
+            engine.event_queue.enqueue(HealEvent(subject=subject, amount=amount))
 
 
 @dataclass
@@ -384,14 +389,16 @@ class AddModifierInstruction(Instruction):
     def __post_init__(self):
         self.valence = self.modifier_class.valence
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
-            AddModifierEvent(
-                subject=subject,
-                modifier_class=self.modifier_class,
-                modifier_kwargs=self.modifier_kwargs,
-            ).resolve()
+            engine.event_queue.enqueue(
+                AddModifierEvent(
+                    subject=subject,
+                    modifier_class=self.modifier_class,
+                    modifier_kwargs=self.modifier_kwargs,
+                )
+            )
 
 
 @dataclass
@@ -407,12 +414,14 @@ class RemoveModifierInstruction(Instruction):
         else:
             self.valence = Valence.MIXED
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
-            RemoveModifierEvent(
-                subject=ctx.target, modifier_class=self.modifier_class
-            ).resolve()
+            engine.event_queue.enqueue(
+                RemoveModifierEvent(
+                    subject=ctx.get_target(engine), modifier_class=self.modifier_class
+                )
+            )
 
 
 @dataclass
@@ -424,16 +433,18 @@ class AddTokenInstruction(Instruction):
     def __post_init__(self):
         self.valence = self.token_class.valence
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
             amount = resolve_int(self.amount, ctx)
-            AddTokenEvent(
-                subject=subject,
-                token_class=self.token_class,
-                amount=amount,
-                token_kwargs=self.token_kwargs,
-            ).resolve()
+            engine.event_queue.enqueue(
+                AddTokenEvent(
+                    subject=subject,
+                    token_class=self.token_class,
+                    amount=amount,
+                    token_kwargs=self.token_kwargs,
+                )
+            )
 
 
 @dataclass
@@ -449,12 +460,16 @@ class RemoveTokenInstruction(Instruction):
         else:
             self.valence = Valence.MIXED
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
-            RemoveTokenEvent(
-                subject=ctx.target, token_class=self.token_class, amount=self.amount
-            ).resolve()
+            engine.event_queue.enqueue(
+                RemoveTokenEvent(
+                    subject=ctx.get_target(engine),
+                    token_class=self.token_class,
+                    amount=self.amount,
+                )
+            )
 
 
 # @dataclass
@@ -465,14 +480,14 @@ class RemoveTokenInstruction(Instruction):
 
 #     # todo probably want direction param and update resolution
 #     def execute(self, ctx: ActionContext) -> None:
-#         subject = ctx.engine.entity_at(ctx.subject_point)
+#         subject = engine.entity_at(ctx.subject_point)
 #         if subject:
 #             dist = resolve_int(self.distance, ctx)
 #             PushEvent(
-#                 engine=ctx.engine,
+#                 engine=engine,
 #                 subject=ctx.target,
 #                 distance=dist,
-#                 source=ctx.source,
+#                 source=ctx.source_id,
 #             ).resolve()
 
 
@@ -482,13 +497,18 @@ class PullInstruction(Instruction):
     valence = Valence.MIXED
 
     # todo probably want direction param and update resolution
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
             dist = resolve_int(self.distance, ctx)
-            PullEvent(
-                subject=ctx.target, distance=dist, toward_point=ctx.source.pos
-            ).resolve()
+            source = engine.get_entity_by_id(ctx.source_id)
+            engine.event_queue.enqueue(
+                PullEvent(
+                    subject=ctx.get_target(engine),
+                    distance=dist,
+                    toward_point=source.pos,
+                )
+            )
 
 
 @dataclass
@@ -498,10 +518,10 @@ class UseAnAbilityInstruction(Instruction):
     subject_chooses: bool = True
     valence = Valence.MIXED
 
-    def execute(self, ctx: ActionContext) -> None:
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         from choices import Choice
 
-        subject = ctx.engine.entity_at(ctx.subject_point)
+        subject = engine.entity_at(ctx.subject_point)
         if not subject or not hasattr(subject, "abilities"):
             return
 
@@ -511,12 +531,11 @@ class UseAnAbilityInstruction(Instruction):
                 ability for ability in valid_abilities if ability.is_default
             ]
 
+        source = engine.get_entity_by_id(ctx.source_id)
         choices = UniqueTuple(
             [
                 Choice(
-                    features={
-                        f"{ctx.source.name}_forced_use_ability_is_{ability.name}": 1
-                    }
+                    features={f"{source.name}_forced_use_ability_is_{ability.name}": 1}
                 )
                 for ability in valid_abilities
             ]
@@ -524,19 +543,20 @@ class UseAnAbilityInstruction(Instruction):
         if self.subject_chooses:
             choosing_team = subject.team
         else:
-            choosing_team = ctx.source.team
-        chosen_ability_index = ctx.engine.get_choice_index(
+            source = engine.get_entity_by_id(ctx.source_id)
+            choosing_team = source.team
+        chosen_ability_index = engine.get_choice_index(
             team=choosing_team, choices=choices
         )
         chosen_ability = valid_abilities[chosen_ability_index]
         possible_aimings = chosen_ability.aiming.get_all_aimings(
-            engine=ctx.engine, actor=subject, require_los=True
+            engine=engine, actor=subject, require_los=True
         )
         if possible_aimings:
             aiming = possible_aimings[0]
 
             chosen_ability.execute(
-                engine=ctx.engine,
+                engine=engine,
                 source=subject,
                 aiming_result=aiming,
             )
@@ -546,8 +566,8 @@ class UseAnAbilityInstruction(Instruction):
 class RefreshAbilityInstruction(Instruction):
     valence = Valence.GOOD
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
             if ctx.ability:
                 ctx.ability.is_tapped = False
@@ -560,15 +580,17 @@ class TeleportInstruction(Instruction):
     destination: DynamicPoint
     valence = Valence.MIXED
 
-    def execute(self, ctx: ActionContext) -> None:
-        subject = ctx.engine.entity_at(ctx.subject_point)
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = engine.entity_at(ctx.subject_point)
         if subject:
             dest = (
                 self.destination(ctx)
                 if callable(self.destination)
                 else self.destination
             )
-            ChangeLocationEvent(subject=subject, new_pos=dest).resolve()
+            engine.event_queue.enqueue(
+                ChangeLocationEvent(subject=subject, new_pos=dest)
+            )
 
 
 @dataclass(kw_only=True)

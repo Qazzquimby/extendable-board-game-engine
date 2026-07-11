@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from modifiers import Token
     from entities import Entity
     from aimings import AimingResult
+    from engine import Engine
 
 
 QueryResultT = TypeVar("QueryResultT")
@@ -18,8 +19,8 @@ class Query(Generic[QueryResultT]):
         self.subject = subject
         self.result: QueryResultT = base_result
 
-    def resolve(self) -> QueryResultT:
-        self.subject.engine.router.publish(self, EventPhase.QUERY)
+    def resolve(self, engine: "Engine") -> QueryResultT:
+        engine.router.publish(self, EventPhase.QUERY)
         return self.result
 
 
@@ -32,8 +33,8 @@ class QueryIsAlive(Query[bool]):
 
 
 class QueryRoll(Query[int]):
-    def __init__(self, subject: "Entity"):
-        super().__init__(subject=subject, base_result=subject.engine.rng.randint(1, 6))
+    def __init__(self, rng, subject: "Entity"):
+        super().__init__(subject=subject, base_result=rng.randint(1, 6))
 
 
 class QueryHasArmor(Query[bool]):

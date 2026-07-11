@@ -26,6 +26,7 @@ from events import (
     Router,
     EventQueue,
     ReactionOpportunityEvent,
+    DecisionEvent,
 )
 from event_library import (
     ChangeLocationEvent,
@@ -160,7 +161,7 @@ class Engine:
         ]
         self.num_hero_rows = max([len(team) for team in self.team_heroes])
         for entity in self.entities:
-            DeployEvent(entity).resolve()
+            self.event_queue.enqueue(DeployEvent(engine=self, subject=entity))
 
     def get_choice_index(self, team: int, choices: UniqueTuple[ChoiceT]) -> int:
         if not choices:
@@ -176,6 +177,11 @@ class Engine:
     def get_choice(self, team: int, choices: UniqueTuple[ChoiceT]) -> ChoiceT:
         index = self.get_choice_index(team=team, choices=choices)
         return choices[index]
+
+    def get_entity_by_id(self, entity_id: int) -> Optional["Entity"]:
+        return next(
+            (entity for entity in self.entities if entity.id == entity_id), None
+        )
 
     def entity_at(self, pos: Point) -> Optional["Entity"]:
         return next(
@@ -214,8 +220,15 @@ class Engine:
                     else:
                         self.event_queue.queue.pop(0)
                         continue
+                elif isinstance(event, DecisionEvent):
+                    choices = event.get_choices()
+                    if choices:
+                        return choices
+                    else:
+                        self.event_queue.queue.pop(0)
+                        continue
 
-                self.event_queue.process_one()
+                self.event_queue.process_one(engine=self)
                 continue
 
             entity = self.advance_until_active_entity()
@@ -237,7 +250,7 @@ class Engine:
         logs: List[LogEntry] = []
         winner_team = None
         after_state = None
-        RoundStartEvent(engine=self).resolve()
+        self.event_queue.enqueue(RoundStartEvent(engine=self))
 
         pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
         self.next_turn()
@@ -306,21 +319,6 @@ class Engine:
     ) -> None:
         from events import AbilityUseEvent
 
-        if getattr(action, "actor", None) is not None:
-            assert (
-                action.actor.engine is self
-            ), "Action actor belongs to a different engine instance!"
-        if getattr(action, "ability", None) is not None:
-            owner = getattr(action.ability, "owner", None)
-            if owner is not None:
-                assert (
-                    owner.engine is self
-                ), "Action ability owner belongs to a different engine instance!"
-        if getattr(action, "target", None) is not None:
-            assert (
-                action.target.engine is self
-            ), "Action target belongs to a different engine instance!"
-
         self.action_history.append(action_idx)
         self.current_choices = None
 
@@ -331,22 +329,27 @@ class Engine:
         #  "You may take 2 damage to repeat this effect"
         #  "Target moves 3 spaces in a direction of their choice"
 
-        if self.event_queue.queue and isinstance(
-            self.event_queue.queue[0], ReactionOpportunityEvent
-        ):
-            event: ReactionOpportunityEvent = self.event_queue.queue[0]
-            choices, react_actor = event.get_choices()
-            event.declined_entities.add(react_actor.id)
-            if not action.features.get("pass_reaction"):
-                with log(f"Reaction from {react_actor.name}:"):
-                    reaction_event = AbilityUseEvent(
-                        source=react_actor,
-                        ability=action.ability,
-                        aiming_result=action.aiming_result,
-                        is_reaction=True,
-                    )
-                    self.event_queue.queue.insert(0, reaction_event)
-            return
+        if self.event_queue.queue:
+            first_event = self.event_queue.queue[0]
+            if isinstance(first_event, ReactionOpportunityEvent):
+                event: ReactionOpportunityEvent = first_event
+                choices, react_actor = event.get_choices()
+                event.declined_entities.add(react_actor.id)
+                if not action.features.get("pass_reaction"):
+                    with log(f"Reaction from {react_actor.name}:"):
+                        reaction_event = AbilityUseEvent(
+                            source=react_actor,
+                            ability=action.ability,
+                            aiming_result=action.aiming_result,
+                            is_reaction=True,
+                        )
+                        self.event_queue.queue.insert(0, reaction_event)
+                return
+            elif isinstance(first_event, DecisionEvent):
+                event: DecisionEvent = first_event
+                self.event_queue.queue.pop(0)
+                event.resolve_choice(action)
+                return
 
         was_resolving = self.is_resolving_action
         self.is_resolving_action = True
@@ -360,7 +363,9 @@ class Engine:
 
             if isinstance(action, PlausibleMoveAndAction):
                 for point in action.move_path:
-                    ChangeLocationEvent(actor, point).resolve()
+                    ChangeLocationEvent(
+                        engine=self, subject=actor, new_pos=point
+                    ).resolve()
 
             if hasattr(action, "ability"):
                 with log(f"{actor.name} used {action.ability.name}{target_str}."):
@@ -412,7 +417,7 @@ class Engine:
             # First turn
             pass
         else:
-            TurnEndEvent(self.current_turn_hero).resolve()
+            TurnEndEvent(engine=self, subject=self.current_turn_hero).resolve()
             self._advance_hero_indices()
 
         while not self.is_done:
@@ -421,7 +426,7 @@ class Engine:
                 continue
 
             self.current_turn_hero = new_current_activator
-            TurnStartEvent(self.current_turn_hero).resolve()
+            TurnStartEvent(engine=self, subject=self.current_turn_hero).resolve()
 
             self.setup_activation_queue()
             self.advance_to_next_activator()
@@ -431,7 +436,7 @@ class Engine:
 
             # This hero's turn has no one to act (e.g. they and their summons are dead),
             # so end the turn and find the next.
-            TurnEndEvent(self.current_turn_hero).resolve()
+            TurnEndEvent(engine=self, subject=self.current_turn_hero).resolve()
             self._advance_hero_indices()
 
         # Game is done.

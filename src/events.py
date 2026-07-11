@@ -3,13 +3,14 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
+from aimings import AimingResult
 from util import UniqueTuple
 
 if TYPE_CHECKING:
     from engine import Engine
     from abilities import Ability
     from modifiers import Modifier
-    from entities import Entity
+    from entities import Entity, EntityId
     from choices import Choice
 
 
@@ -24,13 +25,13 @@ class EventQueue:
         else:
             self.queue.append(event)
 
-    def process_one(self) -> None:
+    def process_one(self, engine: "Engine") -> None:
         if not self.queue:
             return
         self.is_processing = True
         try:
             event = self.queue.pop(0)
-            event.process()
+            event.process(engine=engine)
         finally:
             self.is_processing = False
 
@@ -39,35 +40,31 @@ class EventQueue:
 
 
 class Event(abc.ABC):
-    def __init__(self, engine: "Engine", subject: Optional["Entity"] = None):
-        self.engine = engine
-        self.subject = subject
+    def __init__(self, subject: Optional["Entity"] = None):
+        self.subject_id = subject.id if subject else None
         self.canceled = False
         self.state = "BEFORE"
 
-    def resolve(self) -> None:
-        self.engine.event_queue.enqueue(self)
-
-    def process(self) -> None:
+    def process(self, engine: "Engine") -> None:
         if self.state == "BEFORE":
             self.state = "RESOLVE"
-            self.engine.event_queue.enqueue(self)
-            self.engine.router.publish(self, EventPhase.BEFORE)
+            engine.event_queue.enqueue(self)
+            engine.router.publish(self, EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
-            self.engine.event_queue.enqueue(self)
+            engine.event_queue.enqueue(self)
             if not self.canceled:
-                self._resolve()
+                self._resolve(engine=engine)
         elif self.state == "AFTER":
             self.state = "DONE"
-            self.engine.router.publish(self, EventPhase.AFTER)
+            engine.router.publish(self, EventPhase.AFTER)
 
-    def _resolve(self) -> None:
+    def _resolve(self, engine: "Engine") -> None:
         raise NotImplementedError("Events must implement _resolve()")
 
     def get_hash_info(self):
         return (
-            str(self.subject),  # str is unique here.
+            str(self.subject_id),  # str is unique here.
             self.canceled,
             self.state,
             self.__class__.__name__,
@@ -83,9 +80,25 @@ class Event(abc.ABC):
         return hash(self) == hash(other)
 
 
+class DecisionEvent(Event):
+    def process(self, engine: "Engine") -> None:
+        pass  # Handled externally by Engine
+
+    def _resolve(self, engine: "Engine") -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_choices(self) -> UniqueTuple["Choice"]:
+        pass
+
+    @abc.abstractmethod
+    def resolve_choice(self, choice: "Choice") -> None:
+        pass
+
+
 class ReactionOpportunityEvent(Event):
-    def __init__(self, engine: "Engine", triggering_event: Event, phase: str):
-        super().__init__(engine=engine)
+    def __init__(self, triggering_event: Event, phase: str):
+        super().__init__()
         self.triggering_event = triggering_event
         self.phase = phase
         self.entity_idx = 0
@@ -98,9 +111,11 @@ class ReactionOpportunityEvent(Event):
             tuple(sorted(self.declined_entities)),
         )
 
-    def get_choices(self) -> tuple[UniqueTuple["Choice"], Optional["Entity"]]:
-        while self.entity_idx < len(self.engine.entities):
-            entity = self.engine.entities[self.entity_idx]
+    def get_choices(
+        self, engine: "Engine"
+    ) -> tuple[UniqueTuple["Choice"], Optional["Entity"]]:
+        while self.entity_idx < len(engine.entities):
+            entity = engine.entities[self.entity_idx]
             if entity.id in self.declined_entities or entity.hp <= 0:
                 self.entity_idx += 1
                 continue
@@ -120,13 +135,13 @@ class ReactionOpportunityEvent(Event):
                 ):
                     if react_ability.reaction_condition:
                         if not react_ability.reaction_condition(
-                            self.triggering_event, self.engine, entity, react_ability
+                            self.triggering_event, engine, entity, react_ability
                         ):
                             continue
 
                     plausible_uses = _get_plausible_uses_of_ability_at_pos(
                         actor=entity,
-                        engine=self.engine,
+                        engine=engine,
                         pos=entity.pos,
                         ability=react_ability,
                         choice_class=PlausibleFreeAction,
@@ -142,10 +157,10 @@ class ReactionOpportunityEvent(Event):
 
         return UniqueTuple(), None
 
-    def process(self) -> None:
+    def process(self, engine: "Engine") -> None:
         pass
 
-    def _resolve(self) -> None:
+    def _resolve(self, engine: "Engine") -> None:
         pass
 
 
@@ -157,7 +172,7 @@ class AbilityUseEvent(Event):
         aiming_result: "AimingResult",
         is_reaction: bool = False,
     ):
-        super().__init__(engine=source.engine, subject=source)
+        super().__init__(subject=source)
         self.ability = ability
         self.aiming_result = aiming_result
         self.roll_result = None
@@ -169,35 +184,35 @@ class AbilityUseEvent(Event):
             self.is_reaction,
         )
 
-    def process(self) -> None:
+    def process(self, engine: "Engine") -> None:
         if self.state == "BEFORE":
             self.state = "RESOLVE"
-            self.engine.event_queue.enqueue(self)
+            engine.event_queue.enqueue(self)
             if not self.is_reaction:
-                self.engine.event_queue.enqueue(
-                    ReactionOpportunityEvent(self.engine, self, "before")
+                engine.event_queue.enqueue(
+                    ReactionOpportunityEvent(triggering_event=self, phase="before")
                 )
-            self.engine.router.publish(self, EventPhase.BEFORE)
+            engine.router.publish(self, EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
-            self.engine.event_queue.enqueue(self)
+            engine.event_queue.enqueue(self)
             if not self.canceled:
-                self._resolve()
+                self._resolve(engine=engine)
         elif self.state == "AFTER":
             self.state = "DONE"
             if not self.is_reaction:
-                self.engine.event_queue.enqueue(
-                    ReactionOpportunityEvent(self.engine, self, "after")
+                engine.event_queue.enqueue(
+                    ReactionOpportunityEvent(triggering_event=self, phase="after")
                 )
-            self.engine.router.publish(self, EventPhase.AFTER)
+            engine.router.publish(self, EventPhase.AFTER)
 
-    def _resolve(self) -> None:
+    def _resolve(self, engine: "Engine") -> None:
         self.roll_result = self.ability.get_roll_result(
-            aiming_result=self.aiming_result, engine=self.engine, source=self.subject
+            aiming_result=self.aiming_result, engine=engine, source=self.subject_id
         )
         self.ability.execute_instructions(
-            engine=self.engine,
-            source=self.subject,
+            engine=engine,
+            source=engine.get_entity_by_id(self.subject_id),
             aiming_result=self.aiming_result,
             roll_result=self.roll_result,
         )
@@ -243,7 +258,7 @@ class Router:
         for sub in list(self.subscribers):  # iterate copy
             if sub.event_type == type(event) and sub.phase == phase:
                 if sub.only_self:
-                    if event.subject != sub.modifier.owner:
+                    if event.subject_id != sub.modifier.owner_id:
                         continue
                 sub.func(event)
 

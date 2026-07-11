@@ -1,16 +1,13 @@
-import copy
 from typing import Optional, List, Type, TYPE_CHECKING
 
 from abilities import Ability
 from aimings import TargetSelf
-
 from events import EventPhase
-from event_library import DeployEvent, SummonEvent, RemoveTokenEvent, AddTokenEvent
+from event_library import SummonEvent, RemoveTokenEvent, AddTokenEvent
 from point import Point
 from queries import (
     QueryHasArmor,
     QueryCanMove,
-    QueryLegalActions,
     QueryDefense,
     QueryCrit,
     GetTokenCountQuery,
@@ -23,12 +20,14 @@ if TYPE_CHECKING:
     from modifiers import Modifier, Token
 
 
+EntityId = int
+
+
 class Entity:
     def __init__(
         self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
     ):
-        self.engine = engine
-        self.id = self.engine.generate_id()
+        self.id = engine.generate_id()
         self.set = "development"
         self.name = name
 
@@ -46,7 +45,7 @@ class Entity:
         self.move_actions: int = 0
         self.standard_actions: int = 0
         self.free_actions: int = 0
-        self.engine.add_entity(self)
+        engine.add_entity(self)
         self.pos = pos  # runs setter
 
     def __str__(self):
@@ -66,18 +65,18 @@ class Entity:
         self.standard_actions = 1
         self.free_actions = 99  # Arbitrary large number
 
-    def gain_ability(self, ability: Ability):
+    def gain_ability(self, engine: "Engine", ability: Ability):
         ability.owner = self
         self.abilities.append(ability)
         for mod in ability.modifiers:
-            self.add_modifier(mod)
+            self.add_modifier(engine=engine, modifier=mod)
 
-    def lose_ability(self, ability: Ability):
+    def lose_ability(self, engine: "Engine", ability: Ability):
         if ability in self.abilities:
             self.abilities.remove(ability)
             ability.owner = None
             for mod in ability.modifiers:
-                self.remove_modifier(mod)
+                self.remove_modifier(engine=engine, modifier=mod)
 
     def get_modifier(self, modifier_class):
         # Utility to find a specific modifier on this entity
@@ -100,12 +99,12 @@ class Entity:
         )
 
     # --- Engine Query Helpers ---
-    def has_armor(self) -> bool:
-        return QueryHasArmor(subject=self).resolve()
+    def has_armor(self, engine: "Engine") -> bool:
+        return QueryHasArmor(subject=self).resolve(engine)
 
-    def can_move(self) -> bool:
+    def can_move(self, engine: "Engine" = None) -> bool:
         q = QueryCanMove(self)
-        self.engine.router.publish(q, EventPhase.QUERY)
+        engine.router.publish(q, EventPhase.QUERY)
         return q.result
 
     # todo Seems not used now but should be?
@@ -121,61 +120,84 @@ class Entity:
     #         if (
     #             ability.is_ultimate
     #             and ability.ultimate_turn is not None
-    #             and self.engine.round_num < ability.ultimate_turn
+    #             and engine.round_num < ability.ultimate_turn
     #         ):
     #             continue
     #         legal.append(ability)
     #
     #     q = QueryLegalActions(self, base_result=legal)
-    #     self.engine.router.publish(q, EventPhase.QUERY)
+    #     engine.router.publish(q, EventPhase.QUERY)
     #     return q.result
 
     def get_defense(
         self,
+        engine: "Engine",
         attack_source: Optional["Entity"] = None,
         ability: Optional["Ability"] = None,
     ) -> int:
         q = QueryDefense(
             subject=self, attack_source=attack_source, ability=ability, result=0
         )
-        self.engine.router.publish(q, EventPhase.QUERY)
+        engine.router.publish(q, EventPhase.QUERY)
         return int(q.result)
 
-    def get_crit(self, subject: "Entity", ability: Optional["Ability"] = None) -> int:
+    def get_crit(
+        self,
+        engine: "Engine",
+        subject: "Entity",
+        ability: Optional["Ability"] = None,
+    ) -> int:
         q = QueryCrit(
             subject=subject,
             attack_source=self,
             ability=ability,
             result=ability.crit_chance,
         )
-        self.engine.router.publish(q, EventPhase.QUERY)
+        engine.router.publish(q, EventPhase.QUERY)
         return int(q.result)
 
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 
-    def add_modifier(self, modifier: "Modifier") -> None:
+    def add_modifier(
+        self,
+        engine: "Engine",
+        modifier: "Modifier",
+    ) -> None:
         modifier.owner = self
         self.modifiers.append(modifier)
-        self.engine.router.subscribe(modifier)
+        engine.router.subscribe(modifier)
 
-    def remove_modifier(self, modifier: "Modifier") -> None:
+    def remove_modifier(
+        self,
+        engine: "Engine",
+        modifier: "Modifier",
+    ) -> None:
         if modifier in self.modifiers:
             self.modifiers.remove(modifier)
-            self.engine.router.unsubscribe(modifier)
+            engine.router.unsubscribe(modifier)
 
-    def add_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        AddTokenEvent(
+    def add_token(
+        self, engine: "Engine", token_class: Type["Token"], amount: int = 1
+    ) -> None:
+        event = AddTokenEvent(
+            engine=engine,
             subject=self,
             token_class=token_class,
             amount=amount,
-        ).resolve()
+        )
+        engine.event_queue.enqueue(event)
 
-    def remove_token(self, token_class: Type["Token"], amount: int = 1) -> None:
-        RemoveTokenEvent(subject=self, token_class=token_class, amount=amount).resolve()
+    def remove_token(
+        self, engine: "Engine", token_class: Type["Token"], amount: int = 1
+    ) -> None:
+        event = RemoveTokenEvent(
+            engine=engine, subject=self, token_class=token_class, amount=amount
+        )
+        engine.event_queue.enqueue(event)
 
-    def get_token_count(self, token_class: Type["Token"]) -> int:
-        return GetTokenCountQuery(subject=self, token_class=token_class).resolve()
+    def get_token_count(self, token_class: Type["Token"], engine: "Engine") -> int:
+        return GetTokenCountQuery(subject=self, token_class=token_class).resolve(engine)
 
 
 class Hero(Entity):
@@ -207,7 +229,8 @@ class Summon(Entity):
         )
         self.summoner = summoner
         self.activator = summoner.activator
-        SummonEvent(summoner=self.summoner, subject=self).resolve()
+        event = SummonEvent(engine=engine, summoner=self.summoner, subject=self)
+        engine.event_queue.enqueue(event)
 
 
 class Object(Summon):
@@ -233,13 +256,13 @@ class Object(Summon):
 
 class Marker:
     def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
-        self.engine = engine
-        self.id = self.engine.generate_id()
+        engine = engine
+        self.id = engine.generate_id()
         self.name = name
         self._pos: Optional[Point] = None
         self.team = team
         self.modifiers: List["Modifier"] = []
-        self.engine.markers.append(self)
+        engine.markers.append(self)
         self.pos = pos  # runs setter
 
     @property
