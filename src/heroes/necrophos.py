@@ -202,7 +202,7 @@ class Necrophos(Hero):
                 aiming=IncludeArea(area=Burst(radius=3)),
                 instructions=[DeathPulse()],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
 
@@ -219,7 +219,7 @@ Until the end of your next turn:
                 instructions=[
                     AddModifierInstruction(modifier_class=NecroGhostShroud),
                 ],
-                owner=self,
+                owner_id=self.id,
                 action_cost=ActionCost.INSTANT,
                 instant_speed=3,
                 max_charges=1,
@@ -240,7 +240,7 @@ Use a default ability.
                     UseAnAbilityInstruction(default_only=True),
                 ],
                 max_charges=1,
-                owner=self,
+                owner_id=self.id,
             )
         )
 

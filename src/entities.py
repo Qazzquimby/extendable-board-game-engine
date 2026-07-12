@@ -135,7 +135,7 @@ class Entity:
         q = QueryDefense(
             subject=self, attack_source=attack_source, ability=ability, result=0
         )
-        engine.router.publish(q, EventPhase.QUERY)
+        engine.router.publish(engine=engine, event=q, phase=EventPhase.QUERY)
         return int(q.result)
 
     def get_crit(
@@ -150,7 +150,7 @@ class Entity:
             ability=ability,
             result=ability.crit_chance,
         )
-        engine.router.publish(q, EventPhase.QUERY)
+        engine.router.publish(engine=engine, event=q, phase=EventPhase.QUERY)
         return int(q.result)
 
     def distance_to(self, other: "Entity") -> int:
@@ -161,7 +161,7 @@ class Entity:
         engine: "Engine",
         modifier: "Modifier",
     ) -> None:
-        modifier.owner = self
+        modifier.owner_id = self.id
         self.modifiers.append(modifier)
         engine.router.subscribe(modifier)
 
@@ -204,7 +204,9 @@ class Hero(Entity):
         )
         self.activator = self
         self.abilities.append(
-            Ability(name=DO_NOTHING, aiming=TargetSelf(), instructions=[], owner=self)
+            Ability(
+                name=DO_NOTHING, aiming=TargetSelf(), instructions=[], owner_id=self.id
+            )
         )
 
 

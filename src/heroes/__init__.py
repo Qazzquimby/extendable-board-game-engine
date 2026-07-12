@@ -17,7 +17,7 @@ class MeleeHero(Hero):
                 aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=3)],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
 
@@ -34,6 +34,6 @@ class RangedHero(Hero):
                 aiming=TargetEntity(in_range=3),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )

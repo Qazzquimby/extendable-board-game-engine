@@ -145,7 +145,7 @@ class Ability:
     aiming: Aiming
     text: str = ""
     instructions: List[Instruction] = field(default_factory=list)
-    owner: Optional["Entity"] = None
+    owner_id: Optional[EntityId] = None
     is_default: bool = False
     action_cost: ActionCost = ActionCost.STANDARD
     instant_speed: int = 0
@@ -170,7 +170,7 @@ class Ability:
         return (
             self.name,
             self.aiming,
-            str(self.owner),
+            self.owner_id,
             self.is_tapped,
             self.charges,
         )
@@ -281,9 +281,7 @@ class Ability:
     def get_hash(self) -> float:
         import hashlib
 
-        owner_set = getattr(self.owner, "set", "unknown") if self.owner else "unknown"
-        owner_name = getattr(self.owner, "name", "unknown") if self.owner else "unknown"
-        key = f"{owner_set}__{owner_name}__{self.name}"
+        key = f"{self.owner_id}__{self.name}"
         hash_int = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
         return float(hash_int % 10000) / 100.0
 

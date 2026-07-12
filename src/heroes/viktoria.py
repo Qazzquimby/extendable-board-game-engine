@@ -155,7 +155,7 @@ class Viktoria(Hero):
                 ],
                 crit_chance=2,
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
         self.abilities.append(

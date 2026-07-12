@@ -67,7 +67,7 @@ class Immobile(Modifier):
     valence = Valence.BAD
 
     @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
+    def prevent_move(self, engine: "Engine", q: QueryCanMove) -> None:
         q.result = False
 
 
@@ -79,11 +79,11 @@ class Stunned(Modifier):
     valence = Valence.BAD
 
     @query(QueryCanMove)
-    def prevent_move(self, q: QueryCanMove) -> None:
+    def prevent_move(self, engine: "Engine", q: QueryCanMove) -> None:
         q.result = False
 
     @query(QueryLegalActions)
-    def prevent_actions(self, q: QueryLegalActions) -> None:
+    def prevent_actions(self, engine: "Engine", q: QueryLegalActions) -> None:
         q.result = []
 
 
@@ -98,7 +98,7 @@ class Slow(Modifier):
         self.amount = amount
 
     @query(QuerySpeed)
-    def reduce_speed(self, q: QuerySpeed) -> None:
+    def reduce_speed(self, engine: "Engine", q: QuerySpeed) -> None:
         q.result.add(-self.amount)
 
 
@@ -110,7 +110,7 @@ class Armor(Modifier):
     valence = Valence.GOOD
 
     @query(QueryHasArmor)
-    def grant_armor(self, q: QueryHasArmor) -> None:
+    def grant_armor(self, engine: "Engine", q: QueryHasArmor) -> None:
         q.result = True
 
 

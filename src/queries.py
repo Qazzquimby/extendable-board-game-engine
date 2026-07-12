@@ -16,11 +16,11 @@ QueryResultT = TypeVar("QueryResultT")
 
 class Query(Generic[QueryResultT]):
     def __init__(self, subject: "Entity", base_result: QueryResultT):
-        self.subject = subject
+        self.subject_id = subject.id
         self.result: QueryResultT = base_result
 
     def resolve(self, engine: "Engine") -> QueryResultT:
-        engine.router.publish(self, EventPhase.QUERY)
+        engine.router.publish(engine=engine, event=self, phase=EventPhase.QUERY)
         return self.result
 
 

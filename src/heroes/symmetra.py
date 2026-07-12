@@ -39,8 +39,8 @@ class PhotonBeamManager(Modifier):
         self.entities_hit_this_turn.clear()
 
     @after(TurnEndEvent)
-    def fade_tokens_on_turn_end(self, event: TurnEndEvent):
-        for entity in self.owner.engine.living_entities:
+    def fade_tokens_on_turn_end(self, engine: "Engine", event: TurnEndEvent):
+        for entity in engine.living_entities:
             if (
                 entity.get_token_count(PhotonBeamToken) > 0
                 and entity not in self.entities_hit_this_turn
@@ -91,13 +91,14 @@ class SentryTurret(Object):
             # At start of creator's activation: ⌖Nearest enemy in range 2: *Undefendable*, 1dmg.
             # If another **Sentry Turret** already hit the target this activation, the target gets **slow** -1.
             @after(TurnStartEvent)
-            def fire_at_nearest(self, event: TurnStartEvent):
-                manager = self.owner.summoner.get_modifier(SentryTurretManager)  # todo
+            def fire_at_nearest(self, engine: "Engine", event: TurnStartEvent):
+                owner = engine.get_entity_by_id(self.owner_id)
+                manager = owner.summoner.get_modifier(SentryTurretManager)  # todo
 
                 # Find nearest enemy in range 2
                 enemies = [
                     e
-                    for e in self.owner.engine.living_entities
+                    for e in engine.living_entities
                     if e.team != self.owner.team and self.owner.distance_to(e) <= 2
                 ]
                 if enemies:
@@ -120,9 +121,9 @@ class SentryTurret(Object):
         self.add_modifier(TurretAttack())
 
 
-def grant_sentry_turret_ability(owner_entity: Entity):
+def grant_sentry_turret_ability(engine: "Engine", owner_entity: Entity):
     if not owner_entity.has_modifier(SentryTurretManager):
-        owner_entity.add_modifier(SentryTurretManager())
+        owner_entity.add_modifier(engine, SentryTurretManager())
 
     create_turret_ability = Ability(
         name="Create Sentry Turret",
@@ -131,7 +132,7 @@ def grant_sentry_turret_ability(owner_entity: Entity):
         ),
         instructions=[CreateSentryTurretInstruction()],
         max_charges=1,
-        owner=owner_entity,
+        owner_id=owner_entity.id,
     )
     owner_entity.abilities.append(create_turret_ability)
 
@@ -160,7 +161,7 @@ class Teleporter(Object):
                             destination=lambda ctx: ctx.subject.pos,
                         )
                     ],
-                    owner=self,
+                    owner_id=self.id,
                 )
             )
             # todo no duplicate abilities
@@ -225,7 +226,7 @@ class Symmetra(Hero):
                 aiming=TargetEntity(in_range=4),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
 
@@ -242,7 +243,7 @@ class Symmetra(Hero):
                 ),
                 instructions=[CreateTeleporterInstruction()],
                 max_charges=1,
-                owner=self,
+                owner_id=self.id,
             )
         )
 

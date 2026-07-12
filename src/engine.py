@@ -196,7 +196,7 @@ class Engine:
         alive = []
         for entity in self.entities:
             q = QueryIsAlive(entity)
-            self.router.publish(q, EventPhase.QUERY)
+            self.router.publish(engine=self, event=q, phase=EventPhase.QUERY)
             if q.result:
                 alive.append(entity)
         return alive
@@ -451,7 +451,7 @@ class Engine:
             return None
 
     def ask(self, query: "Query"):
-        self.router.publish(event=query, phase=EventPhase.QUERY)
+        self.router.publish(engine=self, event=query, phase=EventPhase.QUERY)
         return query.result
 
     def to_model(self) -> EngineState:

@@ -37,6 +37,6 @@ class Spy(Hero):
                     RemoveTokenInstruction(token_class=KillCounter, amount=1),
                 ],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )

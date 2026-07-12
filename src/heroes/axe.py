@@ -34,9 +34,12 @@ class DamageOverTimeToken(Token):
     valence = Valence.BAD
 
     @before(TurnEndEvent)
-    def take_damage(self, event: TurnEndEvent) -> None:
-        with self.log_trigger(event):
-            DamageEvent(source=None, subject=self.owner, amount=self.amount).resolve()
+    def take_damage(self, engine: "Engine", event: TurnEndEvent) -> None:
+        with self.log_trigger(engine=engine, event=event):
+            owner = engine.get_entity_by_id(self.owner_id)
+            engine.event_queue.enqueue(
+                DamageEvent(source=None, subject=owner, amount=self.amount)
+            )
 
 
 class BattleHungerToken(Token):
@@ -84,22 +87,23 @@ class AxeCounterHelix(Modifier):
     #   text: |-
     #     Enemies in burst 1, 1dmg
     @after(DamageEvent)
-    def burst_damage(self, event: "DamageEvent") -> None:
+    def burst_damage(self, engine: "Engine", event: "DamageEvent") -> None:
         if event.amount > 0:
-            points_in_range = self.owner.engine.grid.get_points_in_range(
-                start=self.owner.pos, max_range=1
+            owner = engine.get_entity_by_id(self.owner_id)
+            points_in_range = engine.grid.get_points_in_range(
+                start=owner.pos, max_range=1
             )
             entities_hit = [
                 entity
-                for entity in self.owner.engine.living_entities
-                if entity.team != self.owner.team and entity.pos in points_in_range
+                for entity in engine.living_entities
+                if entity.team != owner.team and entity.pos in points_in_range
             ]
             if entities_hit:
                 with self.log_trigger(event):
                     for entity in entities_hit:
-                        DamageEvent(
-                            source=self.owner, subject=entity, amount=1
-                        ).resolve()
+                        engine.event_queue.enqueue(
+                            DamageEvent(source=owner, subject=entity, amount=1)
+                        )
 
 
 class AxeReflectHalfOfDamageFromDefaults(Modifier):
@@ -113,7 +117,7 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
         if event.ability and event.ability.is_default and event.source:
             reflect_amt = div(event.amount.value, 2)
             if reflect_amt > 0:
-                with self.log_trigger(event):
+                with self.log_trigger(engine=engine, event=event):
                     owner = engine.get_entity_by_id(self.owner_id)
                     engine.event_queue.enqueue(
                         DamageEvent(
@@ -138,7 +142,7 @@ class Axe(Hero):
                 aiming=TargetEntity(in_range=1),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
 
@@ -169,7 +173,7 @@ class Axe(Hero):
                         aiming_name="nearby_enemies", token_class=StunnedToken
                     ),
                 ],
-                owner=self,
+                owner_id=self.id,
                 action_cost=ActionCost.FREE,
             )
         )
@@ -192,7 +196,7 @@ class Axe(Hero):
                     AddTokenInstruction(token_class=BattleHungerToken),
                 ],
                 max_charges=1,
-                owner=self,
+                owner_id=self.id,
             )
         )
         self.abilities.append(
@@ -210,6 +214,6 @@ class Axe(Hero):
                 instructions=[CullingBladeInstruction()],
                 is_ultimate=True,
                 max_charges=1,
-                owner=self,
+                owner_id=self.id,
             )
         )

@@ -8,14 +8,13 @@ from typing import (
 import abc
 from dataclasses import dataclass
 
-from choices import Choice, PlausibleMoveAndAction
+from choices import Choice
 from engine import Agent, Engine
 from logger import log
-from util import UniqueTuple
 from valence import Valence
 
 if TYPE_CHECKING:
-    from entities import Entity
+    pass
 
 DEBUG = True
 

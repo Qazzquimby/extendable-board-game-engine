@@ -126,7 +126,7 @@ class Reinhardt(Hero):
                 ),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
         self.abilities.append(
@@ -136,7 +136,7 @@ class Reinhardt(Hero):
                 instructions=[ChargeInstruction()],
                 action_cost=ActionCost.MOVE_AND_STANDARD,
                 max_charges=1,
-                owner=self,
+                owner_id=self.id,
             )
         )
         self.abilities.append(
@@ -145,7 +145,7 @@ class Reinhardt(Hero):
                 aiming=IncludeArea(area=Line(length=99)),
                 instructions=[DamageInstruction(amount=3)],
                 taps=True,
-                owner=self,
+                owner_id=self.id,
             )
         )
         self.abilities.append(
@@ -156,6 +156,6 @@ class Reinhardt(Hero):
                 is_ultimate=True,
                 ultimate_turn=4,
                 max_charges=1,
-                owner=self,
+                owner_id=self.id,
             )
         )

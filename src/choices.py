@@ -111,8 +111,9 @@ def get_plausible_movements(
         e for e in engine.entities if e.team == actor.team and e != actor and e.hp > 0
     ]
     reachable_points = engine.grid.get_movable_spaces(
+        engine=engine,
         actor=actor,
-        max_movement=QuerySpeed(actor).resolve().value,
+        max_movement=QuerySpeed(actor).resolve(engine).value,
     )
 
     occupied_points = {
@@ -286,7 +287,9 @@ def get_plausible_uses_of_ability_after_movement(
     if move_pos == actor.pos:
         move_path = []
     else:
-        move_path = engine.grid.get_path(start=actor.pos, target=move_pos, actor=actor)
+        move_path = engine.grid.get_path(
+            engine=engine, start=actor.pos, target=move_pos, actor=actor
+        )
         if not move_path or move_path[-1] != move_pos:
             return {}
 

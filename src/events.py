@@ -49,7 +49,7 @@ class Event(abc.ABC):
         if self.state == "BEFORE":
             self.state = "RESOLVE"
             engine.event_queue.enqueue(self)
-            engine.router.publish(self, EventPhase.BEFORE)
+            engine.router.publish(engine=engine, event=self, phase=EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
             engine.event_queue.enqueue(self)
@@ -57,7 +57,7 @@ class Event(abc.ABC):
                 self._resolve(engine=engine)
         elif self.state == "AFTER":
             self.state = "DONE"
-            engine.router.publish(self, EventPhase.AFTER)
+            engine.router.publish(engine=engine, event=self, phase=EventPhase.AFTER)
 
     def _resolve(self, engine: "Engine") -> None:
         raise NotImplementedError("Events must implement _resolve()")
@@ -192,7 +192,7 @@ class AbilityUseEvent(Event):
                 engine.event_queue.enqueue(
                     ReactionOpportunityEvent(triggering_event=self, phase="before")
                 )
-            engine.router.publish(self, EventPhase.BEFORE)
+            engine.router.publish(engine=engine, event=self, phase=EventPhase.BEFORE)
         elif self.state == "RESOLVE":
             self.state = "AFTER"
             engine.event_queue.enqueue(self)
@@ -204,11 +204,12 @@ class AbilityUseEvent(Event):
                 engine.event_queue.enqueue(
                     ReactionOpportunityEvent(triggering_event=self, phase="after")
                 )
-            engine.router.publish(self, EventPhase.AFTER)
+            engine.router.publish(engine=engine, event=self, phase=EventPhase.AFTER)
 
     def _resolve(self, engine: "Engine") -> None:
+        subject = engine.get_entity_by_id(self.subject_id)
         self.roll_result = self.ability.get_roll_result(
-            aiming_result=self.aiming_result, engine=engine, source=self.subject_id
+            aiming_result=self.aiming_result, engine=engine, source=subject
         )
         self.ability.execute_instructions(
             engine=engine,
@@ -230,7 +231,7 @@ class Subscription:
     event_type: Type
     phase: EventPhase
     only_self: bool
-    func: Callable[[Any], None]
+    func: Callable[["Engine", "Event"], None]
 
 
 class Router:
@@ -254,13 +255,13 @@ class Router:
     def unsubscribe(self, modifier: "Modifier") -> None:
         self.subscribers = [sub for sub in self.subscribers if sub.modifier != modifier]
 
-    def publish(self, event: Event, phase: EventPhase) -> None:
+    def publish(self, engine: "Engine", event: Event, phase: EventPhase) -> None:
         for sub in list(self.subscribers):  # iterate copy
             if sub.event_type == type(event) and sub.phase == phase:
                 if sub.only_self:
                     if event.subject_id != sub.modifier.owner_id:
                         continue
-                sub.func(event)
+                sub.func(engine=engine, event=event)
 
 
 def before(event_type: Type, only_self: bool = True) -> Callable:

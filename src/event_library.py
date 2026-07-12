@@ -117,9 +117,7 @@ class PullEvent(Event):
                 log(f"Pulling {subject.name} to {path[-1]}")
                 for point in path:
                     engine.event_queue.enqueue(
-                        ChangeLocationEvent(
-                            engine=engine, subject=subject, new_pos=point
-                        )
+                        ChangeLocationEvent(subject=subject, new_pos=point)
                     )
 
 
