@@ -20,9 +20,6 @@ if TYPE_CHECKING:
     from modifiers import Modifier, Token
 
 
-EntityId = int
-
-
 class Entity:
     def __init__(
         self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
@@ -191,12 +188,10 @@ class Entity:
     def remove_token(
         self, engine: "Engine", token_class: Type["Token"], amount: int = 1
     ) -> None:
-        event = RemoveTokenEvent(
-            engine=engine, subject=self, token_class=token_class, amount=amount
-        )
+        event = RemoveTokenEvent(subject=self, token_class=token_class, amount=amount)
         engine.event_queue.enqueue(event)
 
-    def get_token_count(self, token_class: Type["Token"], engine: "Engine") -> int:
+    def get_token_count(self, engine: "Engine", token_class: Type["Token"]) -> int:
         return GetTokenCountQuery(subject=self, token_class=token_class).resolve(engine)
 
 

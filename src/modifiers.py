@@ -7,9 +7,11 @@ from logger import log
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 from valence import Valence
 
+from util import EntityId
+
 if TYPE_CHECKING:
     from engine import Engine
-    from entities import Entity, Summon, EntityId
+    from entities import Entity, Summon
 
 
 @dataclass(kw_only=True)

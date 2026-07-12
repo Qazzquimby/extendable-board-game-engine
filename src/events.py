@@ -4,39 +4,39 @@ from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
 from aimings import AimingResult
-from util import UniqueTuple
+from util import UniqueTuple, EntityId
 
 if TYPE_CHECKING:
     from engine import Engine
     from abilities import Ability
     from modifiers import Modifier
-    from entities import Entity, EntityId
+    from entities import Entity
     from choices import Choice
 
 
 class EventQueue:
     def __init__(self):
-        self.queue: List["Event"] = []
+        self._queue: List["Event"] = []
         self.is_processing = False
 
     def enqueue(self, event: "Event"):
         if self.is_processing:
-            self.queue.insert(0, event)
+            self._queue.insert(0, event)
         else:
-            self.queue.append(event)
+            self._queue.append(event)
 
     def process_one(self, engine: "Engine") -> None:
-        if not self.queue:
+        if not self._queue:
             return
         self.is_processing = True
         try:
-            event = self.queue.pop(0)
+            event = self._queue.pop(0)
             event.process(engine=engine)
         finally:
             self.is_processing = False
 
     def __hash__(self):
-        return hash((tuple(self.queue), self.is_processing))
+        return hash((tuple(self._queue), self.is_processing))
 
 
 class Event(abc.ABC):

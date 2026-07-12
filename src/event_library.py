@@ -26,7 +26,7 @@ class ChangeLocationEvent(Event):
 
         has_more_moves = any(
             isinstance(e, ChangeLocationEvent) and e.subject_id == subject.id
-            for e in engine.event_queue.queue
+            for e in engine.event_queue._queue
         )
 
         if has_more_moves:

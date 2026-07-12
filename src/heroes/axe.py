@@ -43,11 +43,13 @@ class BattleHungerToken(Token):
     valence = Valence.BAD
 
     @after(DeathEvent)
-    def on_kill_clear_this_and_DoT(self, event: DeathEvent) -> None:
-        if event.killer == self.owner and isinstance(event.subject, Hero):
-            with self.log_trigger(event):
-                self.owner.remove_token(BattleHungerToken)
-                self.owner.remove_token(DamageOverTimeToken, amount=99)
+    def on_kill_clear_this_and_DoT(self, engine: "Engine", event: DeathEvent) -> None:
+        subject = engine.get_entity_by_id(event.subject_id)
+        owner = engine.get_entity_by_id(self.owner_id)
+        if event.killer_id == self.owner_id and isinstance(subject, Hero):
+            with self.log_trigger(engine, event):
+                owner.remove_token(engine, BattleHungerToken)
+                owner.remove_token(engine, DamageOverTimeToken, amount=99)
 
 
 @dataclass
@@ -107,24 +109,27 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
     #       name: Receive damage from a Default Ability
     #       text: The attacker takes 1/2 the damage received, before Armor.
     @after(DamageEvent)
-    def reflect_default_damage(self, event: "DamageEvent") -> None:
+    def reflect_default_damage(self, engine: "Engine", event: "DamageEvent") -> None:
         if event.ability and event.ability.is_default and event.source:
             reflect_amt = div(event.amount.value, 2)
             if reflect_amt > 0:
                 with self.log_trigger(event):
-                    DamageEvent(
-                        source=self.owner,
-                        subject=event.source,
-                        amount=reflect_amt,
-                    ).resolve()
+                    owner = engine.get_entity_by_id(self.owner_id)
+                    engine.event_queue.enqueue(
+                        DamageEvent(
+                            source=owner,
+                            subject=event.source,
+                            amount=reflect_amt,
+                        )
+                    )
 
 
 class Axe(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
 
-        self.add_modifier(AxeCounterHelix())
-        self.add_modifier(AxeReflectHalfOfDamageFromDefaults())
+        self.add_modifier(engine=engine, modifier=AxeCounterHelix())
+        self.add_modifier(engine, AxeReflectHalfOfDamageFromDefaults())
 
         self.abilities.append(
             Ability(

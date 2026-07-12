@@ -36,7 +36,6 @@ class Grid:
         self.height = height
         self.walls: Set[Point] = set()
         self.edge_walls: Set[Edge] = set()
-        self.engine: Optional["Engine"] = None
 
     def add_wall(self, p: Point) -> None:
         self.walls.add(p)
@@ -114,6 +113,7 @@ class Grid:
 
     def get_movable_spaces(
         self,
+        engine: "Engine",
         actor: "Entity",
         max_movement: int,
     ) -> UniqueTuple[Point]:
@@ -124,12 +124,12 @@ class Grid:
 
         enemy_points = {
             e.pos
-            for e in self.engine.entities
+            for e in engine.entities
             if e.team != actor.team and e.hp > 0 and e.pos is not None
         }
         occupied_points = {
             e.pos
-            for e in self.engine.entities
+            for e in engine.entities
             if e.hp > 0 and e.pos is not None and e is not actor
         }
 
@@ -172,6 +172,7 @@ class Grid:
 
     def get_path(
         self,
+        engine: "Engine",
         start: Point,
         target: Point,
         actor: "Entity",
@@ -182,7 +183,7 @@ class Grid:
 
         enemy_points = {
             e.pos
-            for e in self.engine.entities
+            for e in engine.entities
             if e.team != actor.team and e.hp > 0 and e.pos is not None
         }
 

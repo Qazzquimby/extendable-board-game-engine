@@ -46,9 +46,12 @@ class DamageOverTimeToken(Token):
     valence = Valence.BAD
 
     @before(TurnEndEvent)
-    def take_damage(self, event: TurnEndEvent) -> None:
-        with self.log_trigger(event):
-            DamageEvent(source=None, subject=self.owner, amount=self.amount).resolve()
+    def take_damage(self, engine: "Engine", event: TurnEndEvent) -> None:
+        with self.log_trigger(engine=engine, event=event):
+            owner = engine.get_entity_by_id(self.owner_id)
+            engine.event_queue.enqueue(
+                DamageEvent(source=None, subject=owner, amount=self.amount)
+            )
 
 
 class KillCounter(Token):
@@ -61,27 +64,33 @@ class NecroStartTurnAura(Modifier):
     valence = Valence.GOOD
 
     @after(TurnStartEvent)
-    def aura(self, event: "TurnStartEvent") -> None:
-        num_kill_counters = event.subject.get_token_count(KillCounter)
-        with self.log_trigger(event):
-            points_in_range = self.owner.engine.grid.get_points_in_range(
-                start=self.owner.pos, max_range=3
+    def aura(self, engine: "Engine", event: "TurnStartEvent") -> None:
+        subject = engine.get_entity_by_id(event.subject_id)
+        num_kill_counters = subject.get_token_count(
+            engine=engine, token_class=KillCounter
+        )
+        with self.log_trigger(engine=engine, event=event):
+            owner = engine.get_entity_by_id(self.owner_id)
+            points_in_range = engine.grid.get_points_in_range(
+                start=owner.pos, max_range=3
             )
             enemies_in_range = []
             allies_in_range = []
-            for entity in self.owner.engine.living_entities:
+            for entity in engine.living_entities:
                 if entity.pos in points_in_range:
-                    if entity.team == event.subject.team:
+                    if entity.team == subject.team:
                         allies_in_range.append(entity)
                     else:
                         enemies_in_range.append(entity)
 
             for enemy in enemies_in_range:
-                DamageEvent(
-                    source=event.subject,
-                    subject=enemy,
-                    amount=ModInt(1 + num_kill_counters // 2, is_irreducible=True),
-                ).resolve()
+                engine.event_queue.enqueue(
+                    DamageEvent(
+                        source=subject,
+                        subject=enemy,
+                        amount=ModInt(1 + num_kill_counters // 2, is_irreducible=True),
+                    )
+                )
             for ally in allies_in_range:
                 HealEvent(subject=ally, amount=ModInt(num_kill_counters))
 
@@ -92,10 +101,15 @@ class NecroGetKillCounter(Modifier):
     valence = Valence.GOOD
 
     @after(DeathEvent, only_self=False)
-    def gain_kill_counter(self, event: "DeathEvent") -> None:
-        if event.killer == self.owner and event.subject.max_hp >= 4:
-            with self.log_trigger(event):
-                AddTokenEvent(subject=self.owner, token_class=KillCounter).resolve()
+    def gain_kill_counter(self, engine: "Engine", event: "DeathEvent") -> None:
+        if event.killer_id == self.owner_id:
+            subject = engine.get_entity_by_id(event.subject_id)
+            if subject.max_hp >= 4:
+                with self.log_trigger(engine=engine, event=event):
+                    owner = engine.get_entity_by_id(self.owner_id)
+                    engine.event_queue.enqueue(
+                        AddTokenEvent(subject=owner, token_class=KillCounter)
+                    )
 
 
 @dataclass(kw_only=True)
@@ -108,12 +122,11 @@ class NecroGhostShroud(Modifier):
     valence = Valence.MIXED
 
     @query(QueryLegalAimings)
-    def cannot_target_with_default(self, q: "QueryLegalAimings"):
+    def cannot_target_with_default(self, engine: "Engine", q: "QueryLegalAimings"):
+        owner = engine.get_entity_by_id(self.owner_id)
         if q.ability.is_default:
             legal_aimings = [
-                aiming
-                for aiming in q.result
-                if self.owner.pos not in aiming.target_points
+                aiming for aiming in q.result if owner.pos not in aiming.target_points
             ]
             q.result = legal_aimings
 
@@ -135,29 +148,30 @@ class NecroGhostShroud(Modifier):
 class DeathPulse(Instruction):
     valence = Valence.MIXED
 
-    def execute(self, ctx: ActionContext) -> None:
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         for point in ctx.included_points:
-            entity = ctx.engine.entity_at(point)
+            entity = engine.entity_at(point)
             if entity:
-                if entity.team == ctx.source.team:
+                source = engine.get_entity_by_id(ctx.source_id)
+                if entity.team == source.team:
                     HealEvent(subject=entity, amount=1)
                 else:
-                    DamageEvent(source=ctx.source, subject=entity, amount=1)
+                    DamageEvent(source=source, subject=entity, amount=1)
 
 
 @dataclass
 class NecroTeleportAdjacentInstruction(Instruction):
     valence = Valence.MIXED
 
-    def execute(self, ctx: ActionContext) -> None:
-        if ctx.target:
-            points_adjacent = ctx.engine.grid.get_points_in_range(
-                start=ctx.target.pos, max_range=1
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        target = ctx.get_target(engine)
+        if target:
+            points_adjacent = engine.grid.get_points_in_range(
+                start=target.pos, max_range=1
             )
             if points_adjacent:
-                ChangeLocationEvent(
-                    subject=ctx.source, new_pos=list(points_adjacent)[0]
-                )
+                source = engine.get_entity_by_id(ctx.source_id)
+                ChangeLocationEvent(subject=source, new_pos=list(points_adjacent)[0])
 
 
 @dataclass(kw_only=True)
@@ -178,8 +192,8 @@ class Necrophos(Hero):
             engine=engine, name="Necrophos", hp=8, speed=3, pos=pos, team=team
         )
 
-        self.add_modifier(NecroStartTurnAura())
-        self.add_modifier(NecroGetKillCounter())
+        self.add_modifier(engine, NecroStartTurnAura())
+        self.add_modifier(engine, NecroGetKillCounter())
 
         self.abilities.append(
             Ability(

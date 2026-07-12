@@ -8,3 +8,4 @@ class UniqueTuple(tuple):
 
 
 DO_NOTHING = "Do Nothing"
+EntityId = int

@@ -149,8 +149,8 @@ class Teleporter(Object):
         # todo, teleporter behavior. Everyone has action while in teleporter's space to teleport to other space.
 
     @after(SummonEvent)
-    def give_teleport_ability(self):
-        for entity in self.engine.living_entities:
+    def give_teleport_ability(self, engine: "Engine"):
+        for entity in engine.living_entities:
             entity.abilities.append(
                 Ability(
                     name="Use Teleporter",

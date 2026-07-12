@@ -10,7 +10,6 @@ from typing import (
 )
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from entities import EntityId
 from event_library import (
     ChangeLocationEvent,
     PullEvent,
@@ -23,7 +22,7 @@ from event_library import (
 )
 from logger import log
 from queries import QueryAvoidInclusion, QueryRoll
-from util import UniqueTuple, DO_NOTHING
+from util import UniqueTuple, DO_NOTHING, EntityId
 from valence import Valence
 from modifiers import Modifier, Token
 
