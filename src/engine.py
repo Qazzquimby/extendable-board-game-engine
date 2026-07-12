@@ -93,6 +93,31 @@ class TrackedRandom(random.Random):
 
 
 class Engine:
+    __slots__ = (
+        "setup",
+        "initial_seed",
+        "action_history",
+        "router",
+        "agents",
+        "entities",
+        "markers",
+        "rng",
+        "round_num",
+        "team_heroes",
+        "num_hero_rows",
+        "current_team",
+        "current_hero_row_index",
+        "grid",
+        "current_turn_hero",
+        "active_entity",
+        "activation_queue",
+        "activation_index",
+        "_next_id",
+        "current_choices",
+        "is_resolving_action",
+        "event_queue",
+    )
+
     def __init__(
         self,
         seed: int = 42,
@@ -273,6 +298,8 @@ class Engine:
                 action_idx=action_index,
             )
             next_choices = self.advance_until_choice()
+
+            return  # todo
 
             is_done = self.is_done
             if is_done:

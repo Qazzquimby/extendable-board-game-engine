@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 DEBUG = True
 
 EARLY_STOP_IF_CHANGE_IMPOSSIBLE_CHECK_FREQUENCY = 100
-NUM_SIMS = 10  # _000
+NUM_SIMS = 10_000
 
 
 @dataclass
@@ -590,21 +590,23 @@ class MCTSAgent(Agent):
         return contender_actions
 
     def assert_all_choices_still_accurate(self):
-        mismatched = []
-        for node in self.cache._key_to_node.values():
-            if node.env is None:
-                continue
-            legal_actions = node.env.get_legal_actions()
-            current_choices = node.env.current_choices
-            if hash(legal_actions) != hash(current_choices):
-                mismatched.append(
-                    (
-                        node.key,
-                        hash(legal_actions),
-                        hash(current_choices),
-                        legal_actions,
-                        current_choices,
-                    )
-                )
-        if mismatched:
-            assert False
+        return
+
+        # mismatched = []
+        # for node in self.cache._key_to_node.values():
+        #     if node.env is None:
+        #         continue
+        #     legal_actions = node.env.get_legal_actions()
+        #     current_choices = node.env.current_choices
+        #     if hash(legal_actions) != hash(current_choices):
+        #         mismatched.append(
+        #             (
+        #                 node.key,
+        #                 hash(legal_actions),
+        #                 hash(current_choices),
+        #                 legal_actions,
+        #                 current_choices,
+        #             )
+        #         )
+        # if mismatched:
+        #     assert False

@@ -247,7 +247,7 @@ def test_engine_rng_seed():
 
 class PaladinAura(Modifier):
     @query(QueryHasArmor, only_self=False)
-    def grant_armor_to_adjacent(self, q: QueryHasArmor):
+    def grant_armor_to_adjacent(self, engine: "Engine", q: QueryHasArmor):
         # Affects OTHERS: checks if the query target is near this aura's owner
         if q.subject != self.owner and q.subject.distance_to(self.owner) <= 1:
             q.result = True

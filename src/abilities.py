@@ -44,7 +44,7 @@ class ActionCost(Enum):
     MOVE_OR_STANDARD = "move_or_standard"
 
 
-@dataclass
+@dataclass(slots=True)
 class ActionContext:
     source_id: EntityId
     subject_point: "Point"  # The point currently being affected
@@ -86,6 +86,9 @@ class Instruction:
 
     aiming_name: Optional[str] = None
     valence: Valence = field(init=False, default=False)
+
+    def __deepcopy__(self, memo):
+        return self
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         pass
@@ -132,14 +135,14 @@ def default_reaction_condition(
     return False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RollResult:
     roll: Optional[int]
     hit_points: UniqueTuple["Point"]
     crit_points: UniqueTuple["Point"]
 
 
-@dataclass
+@dataclass(slots=True)
 class Ability:
     name: str
     aiming: Aiming
@@ -156,6 +159,7 @@ class Ability:
     is_tapped: bool = False
     tapped_this_turn: bool = False
     max_charges: Optional[int] = None
+    charges: Optional[int] = field(init=False, default=None)
     is_ultimate: bool = False
     ultimate_turn: Optional[int] = None
 

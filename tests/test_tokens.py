@@ -12,7 +12,7 @@ from abilities import (
 
 class PoisonToken(Token):
     @before(TurnEndEvent)
-    def take_poison_damage(self, event: TurnEndEvent):
+    def take_poison_damage(self, engine: "Engine", event: TurnEndEvent):
         DamageEvent(
             event.engine, source=None, subject=self.owner, amount=self.amount
         ).resolve()
@@ -33,7 +33,7 @@ venom_strike = Ability(
 
 class RootToken(Token):
     @query(QueryLegalActions)
-    def grant_rip_roots(self, q: QueryLegalActions):
+    def grant_rip_roots(self, engine: "Engine", q: QueryLegalActions):
         ability = Ability(
             name="Rip Free",
             aiming=TargetSelf(),

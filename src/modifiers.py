@@ -60,7 +60,7 @@ class ClearAtEndOfTurnMixin:
     def clear_at_end_of_turn(self, engine: "Engine", event: TurnEndEvent) -> None:
         owner = engine.get_entity_by_id(self.owner_id)
         if self in owner.modifiers:
-            owner.remove_modifier(self)
+            owner.remove_modifier(engine=engine, modifier=self)
 
 
 class Immobile(Modifier):

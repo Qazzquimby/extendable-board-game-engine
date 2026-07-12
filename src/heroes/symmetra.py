@@ -35,7 +35,7 @@ class PhotonBeamManager(Modifier):
         super().__init__()
 
     @after(TurnStartEvent)
-    def clear_tracker_on_turn_start(self, event: TurnStartEvent):
+    def clear_tracker_on_turn_start(self, engine: "Engine", event: TurnStartEvent):
         self.entities_hit_this_turn.clear()
 
     @after(TurnEndEvent)
@@ -72,7 +72,7 @@ class SentryTurretManager(Modifier):
     @after(
         TurnStartEvent
     )  # todo should separate turn and activation. Hero and their summons activate on same turn.
-    def clear_on_turn_start(self, event: TurnStartEvent):
+    def clear_on_turn_start(self, engine: "Engine", event: TurnStartEvent):
         self.target_hit_this_activation.clear()
 
 

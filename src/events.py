@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 
 class EventQueue:
+    __slots__ = ("_queue", "is_processing")
+
     def __init__(self):
         self._queue: List["Event"] = []
         self.is_processing = False
@@ -40,6 +42,8 @@ class EventQueue:
 
 
 class Event(abc.ABC):
+    __slots__ = ("subject_id", "canceled", "state")
+
     def __init__(self, subject: Optional["Entity"] = None):
         self.subject_id = subject.id if subject else None
         self.canceled = False
@@ -81,6 +85,8 @@ class Event(abc.ABC):
 
 
 class DecisionEvent(Event):
+    __slots__ = ()
+
     def process(self, engine: "Engine") -> None:
         pass  # Handled externally by Engine
 
@@ -97,6 +103,8 @@ class DecisionEvent(Event):
 
 
 class ReactionOpportunityEvent(Event):
+    __slots__ = ("triggering_event", "phase", "entity_idx", "declined_entities")
+
     def __init__(self, triggering_event: Event, phase: str):
         super().__init__()
         self.triggering_event = triggering_event
@@ -165,6 +173,8 @@ class ReactionOpportunityEvent(Event):
 
 
 class AbilityUseEvent(Event):
+    __slots__ = ("ability", "aiming_result", "roll_result", "is_reaction")
+
     def __init__(
         self,
         source: "Entity",
@@ -225,7 +235,7 @@ class EventPhase(Enum):
     QUERY = auto()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Subscription:
     modifier: "Modifier"
     event_type: Type
@@ -235,6 +245,8 @@ class Subscription:
 
 
 class Router:
+    __slots__ = ("subscribers",)
+
     def __init__(self) -> None:
         self.subscribers: List[Subscription] = []
 
@@ -261,7 +273,7 @@ class Router:
                 if sub.only_self:
                     if event.subject_id != sub.modifier.owner_id:
                         continue
-                sub.func(engine=engine, event=event)
+                sub.func(engine, event)
 
 
 def before(event_type: Type, only_self: bool = True) -> Callable:

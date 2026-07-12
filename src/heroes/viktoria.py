@@ -86,7 +86,7 @@ class DefenseModifier(Modifier):
     valence = Valence.GOOD
 
     @query(QueryDefense)
-    def modify_defense(self, q: QueryDefense):
+    def modify_defense(self, engine: "Engine", q: QueryDefense):
         q.result += self.amount
 
 

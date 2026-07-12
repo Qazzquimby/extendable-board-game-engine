@@ -131,16 +131,16 @@ class NecroGhostShroud(Modifier):
             q.result = legal_aimings
 
     @query(QueryAvoidInclusion)
-    def avoid_inclusion_in_default(self, q: "QueryAvoidInclusion"):
+    def avoid_inclusion_in_default(self, engine: "Engine", q: "QueryAvoidInclusion"):
         if q.ability.is_default:
             q.result = True
 
     @before(HealEvent)
-    def receive_double_heal(self, event: "HealEvent"):
+    def receive_double_heal(self, engine: "Engine", event: "HealEvent"):
         event.amount.mult(2)
 
     @before(DamageEvent)
-    def take_1_more_damage(self, event: "DamageEvent"):
+    def take_1_more_damage(self, engine: "Engine", event: "DamageEvent"):
         event.amount.add(1)  # seems like a query
 
 
@@ -182,7 +182,7 @@ class ReapersScythe(Token):
     valence = Valence.BAD
 
     @after(TurnStartEvent)
-    def trigger(self, q: "TurnStartEvent"):
+    def trigger(self, engine: "Engine", q: "TurnStartEvent"):
         pass
 
 

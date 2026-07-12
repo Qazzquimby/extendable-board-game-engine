@@ -99,11 +99,11 @@ class ChargeInstruction(Instruction):
 
 class CannotBePushedOrPulled(Modifier):
     @before(PushEvent)
-    def prevent_movement(self, event):
+    def prevent_movement(self, engine: "Engine", event):
         event.canceled = True
 
     @before(PullEvent)
-    def prevent_movement(self, event):
+    def prevent_movement(self, engine: "Engine", event):
         event.canceled = True
 
 

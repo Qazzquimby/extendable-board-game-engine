@@ -21,6 +21,11 @@ if TYPE_CHECKING:
 
 
 class Entity:
+    __slots__ = (
+        "id", "set", "name", "max_hp", "hp", "speed", "_pos", "team", "activator",
+        "modifiers", "abilities", "move_actions", "standard_actions", "free_actions"
+    )
+
     def __init__(
         self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
     ):
@@ -63,7 +68,7 @@ class Entity:
         self.free_actions = 99  # Arbitrary large number
 
     def gain_ability(self, engine: "Engine", ability: Ability):
-        ability.owner = self
+        ability.owner_id = self.id
         self.abilities.append(ability)
         for mod in ability.modifiers:
             self.add_modifier(engine=engine, modifier=mod)
@@ -71,7 +76,7 @@ class Entity:
     def lose_ability(self, engine: "Engine", ability: Ability):
         if ability in self.abilities:
             self.abilities.remove(ability)
-            ability.owner = None
+            ability.owner_id = None
             for mod in ability.modifiers:
                 self.remove_modifier(engine=engine, modifier=mod)
 
@@ -196,6 +201,8 @@ class Entity:
 
 
 class Hero(Entity):
+    __slots__ = ()
+
     def __init__(
         self, engine: "Engine", name: str, hp: int, speed: int, pos: Point, team: int
     ):
@@ -211,6 +218,8 @@ class Hero(Entity):
 
 
 class Summon(Entity):
+    __slots__ = ("summoner",)
+
     def __init__(
         self,
         engine: "Engine",
@@ -231,6 +240,8 @@ class Summon(Entity):
 
 
 class Object(Summon):
+    __slots__ = ()
+
     def __init__(
         self,
         engine: "Engine",
@@ -252,6 +263,8 @@ class Object(Summon):
 
 
 class Marker:
+    __slots__ = ("id", "name", "_pos", "team", "modifiers")
+
     def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
         engine = engine
         self.id = engine.generate_id()

@@ -99,7 +99,7 @@ class AxeCounterHelix(Modifier):
                 if entity.team != owner.team and entity.pos in points_in_range
             ]
             if entities_hit:
-                with self.log_trigger(event):
+                with self.log_trigger(engine=engine, event=event):
                     for entity in entities_hit:
                         engine.event_queue.enqueue(
                             DamageEvent(source=owner, subject=entity, amount=1)
