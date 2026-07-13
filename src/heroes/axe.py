@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from typing import Union
+from typing import Union, Optional
 from aimings import (
     TargetEntity,
     TargetSelf,
@@ -135,14 +135,14 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
 
 
 class AxeSwing(Ability):
-    def get_priority(
+    def _get_priority(
         self,
         engine: "Engine",
         actor: "Entity",
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        return 2
+        return 2.0
 
 
 class BerserkersCall(Ability):
@@ -169,19 +169,6 @@ class BerserkersCall(Ability):
             proposed_moves[best_pt] = "Maximize Berserker's Call targets"
         return proposed_moves
 
-    def is_plausible(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> bool:
-        included = aiming_result.sub_aimings["nearby_enemies"].included_points
-        return any(
-            engine.entity_at(pt) and engine.entity_at(pt).team != actor.team
-            for pt in included
-        )
-
     def get_priority(
         self,
         engine: "Engine",
@@ -195,23 +182,13 @@ class BerserkersCall(Ability):
             for pt in included
             if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team
         )
+        if num_enemies_hit == 0:
+            return 0.0
         return 1.9 * num_enemies_hit
 
 
 class BattleHunger(Ability):
-    def is_plausible(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> bool:
-        target = engine.entity_at(aiming_result.target_points[0])
-        if target:
-            return not target.get_modifier(BattleHungerToken)
-        return False
-
-    def get_priority(
+    def _get_priority(
         self,
         engine: "Engine",
         actor: "Entity",
@@ -219,53 +196,27 @@ class BattleHunger(Ability):
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
         target = engine.entity_at(aiming_result.target_points[0])
-        if not target:
-            return 1
-
         turns_remaining = 7 - engine.round_num
         total_damage = min(turns_remaining * 2, target.hp)
         return 0.7 * total_damage
 
 
 class CullingBlade(Ability):
-    def get_movement(
+    def get_target(
         self,
         engine: "Engine",
         actor: "Entity",
-        reachable_points: set["Point"],
         enemies: list["Entity"],
         allies: list["Entity"],
-    ) -> dict["Point", str]:
-        proposed_moves = {}
-        if not reachable_points:
-            return proposed_moves
-
+    ) -> Optional["Entity"]:
         killable_enemies = [e for e in enemies if e.hp <= 3]
         if killable_enemies:
-            for enemy in killable_enemies:
-                best_pt = min(
-                    reachable_points,
-                    key=lambda pt: (
-                        abs(pt.get_distance(enemy.pos) - 1),
-                        pt.get_distance(actor.pos),
-                    ),
-                )
-                if best_pt.get_distance(enemy.pos) == 1:
-                    proposed_moves[best_pt] = f"Move to cull {enemy.name}"
-        else:
-            for enemy in enemies:
-                best_pt = min(
-                    reachable_points,
-                    key=lambda pt: (
-                        abs(pt.get_distance(enemy.pos) - 1),
-                        pt.get_distance(actor.pos),
-                    ),
-                )
-                proposed_moves[best_pt] = f"Move to range 1 of {enemy.name}"
+            return min(killable_enemies, key=lambda e: e.hp)
+        if enemies:
+            return min(enemies, key=lambda e: e.hp)
+        return None
 
-        return proposed_moves
-
-    def get_priority(
+    def _get_priority(
         self,
         engine: "Engine",
         actor: "Entity",
@@ -273,13 +224,10 @@ class CullingBlade(Ability):
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
         target = engine.entity_at(aiming_result.target_points[0])
-        if not target:
-            return 1
-
         if target.hp <= 3:
             return 5
         else:
-            return 2  # less than damage because opportunity cost
+            return 1
 
 
 class Axe(Hero):

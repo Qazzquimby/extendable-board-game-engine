@@ -161,7 +161,7 @@ class DeathPulse(Instruction):
 
 @dataclass
 class NecroTeleportAdjacentInstruction(Instruction):
-    valence = Valence.MIXED
+    valence = Valence.BAD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         target = ctx.get_target(engine)
@@ -234,6 +234,7 @@ Until the end of your next turn:
 Teleport to a space adjacent to an enemy in range 3.
 Use a default ability.
                 """,
+                # todo should be multiple aiming. Teleport next to them, but *you* use ability.
                 aiming=TargetEntity(in_range=3, condition=is_enemy_aim_condition),
                 instructions=[
                     NecroTeleportAdjacentInstruction(),

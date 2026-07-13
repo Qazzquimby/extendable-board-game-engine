@@ -320,9 +320,9 @@ def _get_plausible_uses_of_ability_at_pos(
         )
 
         for aiming_res in legal_aimings:
-            if not ability.is_plausible(engine, actor, pos, aiming_res):
-                continue
             priority = ability.get_priority(engine, actor, pos, aiming_res)
+            if priority <= 0 and ability.name != DO_NOTHING:
+                continue
 
             if isinstance(ability.aiming, MultipleAiming):
                 all_points = aiming_res.target_points + aiming_res.included_points

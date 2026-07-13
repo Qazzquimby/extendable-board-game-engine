@@ -170,55 +170,109 @@ class Ability:
     reaction_condition: Optional[
         Callable[["Event", "Engine", "Entity", "Ability"], bool]
     ] = default_reaction_condition
+    requires_target: bool = True
 
-    def is_plausible(self, engine: "Engine", actor: "Entity", pos: "Point", aiming_result: Union["AimingResult", "MultipleAimingResults"]) -> bool:
-        return True
+    def get_target(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        enemies: List["Entity"],
+        allies: List["Entity"],
+    ) -> Optional["Entity"]:
+        if self.valence == Valence.MIXED:
+            raise ValueError(f"Ability {self.name} needs a custom get_target")
+        targets = []
+        if self.valence == Valence.BAD:
+            targets.extend(enemies)
+        if self.valence == Valence.GOOD:
+            targets.extend(allies)
 
-    def get_movement(self, engine: "Engine", actor: "Entity", reachable_points: set["Point"], enemies: List["Entity"], allies: List["Entity"]) -> dict["Point", str]:
+        if not targets:
+            return None
+        return min(targets, key=lambda e: e.hp)
+
+    def get_movement(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        reachable_points: set["Point"],
+        enemies: List["Entity"],
+        allies: List["Entity"],
+    ) -> dict["Point", str]:
         proposed_moves = {}
         attack_range = 0
         from aimings import TargetEntity, IncludeArea
+
         if isinstance(self.aiming, TargetEntity):
             attack_range = self.aiming.in_range
         elif isinstance(self.aiming, IncludeArea):
             attack_range = self.aiming.area.in_range
 
         if attack_range > 0 and reachable_points:
-            if self.valence in (Valence.BAD, Valence.MIXED):
-                for enemy in enemies:
+            reachable_enemies = [
+                e
+                for e in enemies
+                if any(
+                    pt.get_distance(e.pos) <= attack_range for pt in reachable_points
+                )
+            ]
+            reachable_allies = [
+                a
+                for a in allies
+                if any(
+                    pt.get_distance(a.pos) <= attack_range for pt in reachable_points
+                )
+            ]
+
+            target = self.get_target(engine, actor, reachable_enemies, reachable_allies)
+            if target:
+                valid_points = [
+                    pt
+                    for pt in reachable_points
+                    if pt.get_distance(target.pos) <= attack_range
+                ]
+                if valid_points:
                     best_at_range = min(
-                        reachable_points,
+                        valid_points,
                         key=lambda point: (
-                            abs(point.get_distance(enemy.pos) - attack_range) * 100
+                            abs(point.get_distance(target.pos) - attack_range) * 100
                             + point.get_distance(actor.pos),
                             point.x,
                             point.y,
                         ),
                     )
                     proposed_moves[best_at_range] = (
-                        f"Range {attack_range} of {enemy.name} {enemy.id} for {self.name}"
-                    )
-            if self.valence in (Valence.GOOD, Valence.MIXED):
-                for ally in allies:
-                    best_at_range = min(
-                        reachable_points,
-                        key=lambda point: (
-                            abs(point.get_distance(ally.pos) - attack_range) * 100
-                            + point.get_distance(actor.pos),
-                            point.x,
-                            point.y,
-                        ),
-                    )
-                    proposed_moves[best_at_range] = (
-                        f"Range {attack_range} of {ally.name} {ally.id} for {self.name}"
+                        f"Range {attack_range} of {target.name} {target.id} for {self.name}"
                     )
         return proposed_moves
 
-    def is_plausible_reaction(self, engine: "Engine", event: "Event", actor: "Entity") -> bool:
+    def is_plausible_reaction(
+        self, engine: "Engine", event: "Event", actor: "Entity"
+    ) -> bool:
         return True
 
-    def get_priority(self, engine: "Engine", actor: "Entity", pos: "Point", aiming_result: Union["AimingResult", "MultipleAimingResults"]) -> float:
-        return 1.0
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        if self.requires_target and getattr(aiming_result, "target_points", None):
+            if not any(engine.entity_at(pt) for pt in aiming_result.target_points):
+                return 0.0
+        return self._get_priority(
+            engine=engine, actor=actor, pos=pos, aiming_result=aiming_result
+        )
+
+    def _get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 1
 
     def get_hash_info(self):
         return (
