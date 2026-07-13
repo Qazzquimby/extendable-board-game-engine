@@ -66,6 +66,18 @@ class RandomAgent(Agent):
         return random.randint(0, len(env.current_choices) - 1)
 
 
+class RuleBasedAgent(Agent):
+    def choose(self, env: "Engine") -> int:
+        choices = env.current_choices
+        if not choices:
+            return 0
+
+        max_priority = max(c.priority for c in choices)
+        best_choices = [i for i, c in enumerate(choices) if c.priority == max_priority]
+
+        return env.rng.choice(best_choices)
+
+
 class TrackedRandom(random.Random):
     def __init__(self, seed=None):
         super().__init__(seed)

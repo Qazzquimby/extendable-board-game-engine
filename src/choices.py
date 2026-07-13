@@ -13,10 +13,11 @@ if TYPE_CHECKING:
 
 
 class Choice:
-    def __init__(self, features: Dict[str, Any] = None):
+    def __init__(self, features: Dict[str, Any] = None, priority: float = 1.0):
         if features is None:
             features = {}
         self.features = features
+        self.priority = priority
 
     def __hash__(self):
         try:
@@ -34,11 +35,12 @@ class PlausibleMoveAndAction(Choice):
     def __init__(
         self,
         move_path: List[Point],
-        target: Optional["Entity"],
+        target: Optional["Entity"],  # TODO use ID
         ability: "Ability",
         movement_name: str = "",
         actor: "Entity" = None,
         aiming_result: "AimingResult" = None,
+        priority: float = 1.0,
     ):
         # todo right now aoe uses target None.
         #  Probably better to have a list of targets. Ml will need adjusting
@@ -52,10 +54,10 @@ class PlausibleMoveAndAction(Choice):
         self.movement_name = movement_name
         self.aiming_result = aiming_result
         self.actor = actor
-        super().__init__(features={})
+        super().__init__(features={}, priority=priority)
 
     def __str__(self):
-        return f"{self.ability.owner} at {self.ability.owner.pos} go to {self.move_pos} and use {self.ability.name} on {self.target.pos if self.target else None}"
+        return f"{self.ability.owner_id} go to {self.move_pos} and use {self.ability.name} on {self.target.pos if self.target else None}"
 
     def __hash__(self):
         return hash(
@@ -135,27 +137,10 @@ def get_plausible_movements(
             )
             proposed_moves[best_close_to_enemy] = f"Approach {enemy.name} {enemy.id}"
 
-            # For each ability that can target units/areas, find a spot at optimal range
-            for ability in actor.abilities:
-                attack_range = 0
-                if isinstance(ability.aiming, TargetEntity):
-                    attack_range = ability.aiming.in_range
-                elif isinstance(ability.aiming, IncludeArea):
-                    attack_range = ability.aiming.area.in_range  # todo plus radius
-
-                if attack_range > 0:
-                    best_at_range = min(
-                        reachable_points,
-                        key=lambda point: (
-                            abs(point.get_distance(enemy.pos) - attack_range) * 100
-                            + point.get_distance(actor.pos),
-                            point.x,
-                            point.y,
-                        ),
-                    )
-                    proposed_moves[best_at_range] = (
-                        f"Range {attack_range} of {enemy}{enemy.id} for {ability.name}"
-                    )
+        for ability in actor.abilities:
+            proposed_moves.update(
+                ability.get_movement(engine, actor, reachable_points, enemies, allies)
+            )
 
         # For each ally, find a good position to "guard" them from nearest enemy
         for ally in allies:
@@ -225,6 +210,7 @@ class PlausibleFreeAction(Choice):
         ability: "Ability",
         actor: "Entity",
         aiming_result: "AimingResult",
+        priority: float = 1.0,
         **kwargs,
     ):
         self.target = target
@@ -232,7 +218,7 @@ class PlausibleFreeAction(Choice):
         self.aiming_result = aiming_result
         self.actor = actor
 
-        super().__init__()
+        super().__init__(priority=priority)
 
     def __hash__(self):
         return hash((self.ability.name, self.aiming_result))
@@ -364,6 +350,10 @@ def _get_plausible_uses_of_ability_at_pos(
         )
 
         for aiming_res in legal_aimings:
+            if not ability.is_plausible(engine, actor, pos, aiming_res):
+                continue
+            priority = ability.get_priority(engine, actor, pos, aiming_res)
+
             if isinstance(ability.aiming, MultipleAiming):
                 all_points = aiming_res.target_points + aiming_res.included_points
 
@@ -377,6 +367,7 @@ def _get_plausible_uses_of_ability_at_pos(
                         ability=ability,
                         actor=actor,
                         aiming_result=aiming_res,
+                        priority=priority,
                         **choice_kwargs,
                     )
             elif isinstance(ability.aiming, TargetEntity):
@@ -404,6 +395,7 @@ def _get_plausible_uses_of_ability_at_pos(
                             ability=ability,
                             actor=actor,
                             aiming_result=aiming_res,
+                            priority=priority,
                             **choice_kwargs,
                         )
             elif isinstance(ability.aiming, TargetSelf):
@@ -415,6 +407,7 @@ def _get_plausible_uses_of_ability_at_pos(
                         ability=ability,
                         actor=actor,
                         aiming_result=aiming_res,
+                        priority=priority,
                         **choice_kwargs,
                     )
             elif isinstance(ability.aiming, IncludeArea):
@@ -451,6 +444,7 @@ def _get_plausible_uses_of_ability_at_pos(
                         ability=ability,
                         actor=actor,
                         aiming_result=aiming_res,
+                        priority=priority,
                         **choice_kwargs,
                     )
 

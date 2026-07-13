@@ -130,7 +130,8 @@ def default_reaction_condition(
             aiming_res.included_points
         )
         if any(t in trigger_targets for t in ability_targets):
-            return True
+            if ability.is_plausible_reaction(engine, event, actor):
+                return True
 
     return False
 
@@ -169,6 +170,40 @@ class Ability:
     reaction_condition: Optional[
         Callable[["Event", "Engine", "Entity", "Ability"], bool]
     ] = default_reaction_condition
+
+    def is_plausible(self, engine: "Engine", actor: "Entity", pos: "Point", aiming_result: Union["AimingResult", "MultipleAimingResults"]) -> bool:
+        return True
+
+    def get_movement(self, engine: "Engine", actor: "Entity", reachable_points: set["Point"], enemies: List["Entity"], allies: List["Entity"]) -> dict["Point", str]:
+        proposed_moves = {}
+        attack_range = 0
+        from aimings import TargetEntity, IncludeArea
+        if isinstance(self.aiming, TargetEntity):
+            attack_range = self.aiming.in_range
+        elif isinstance(self.aiming, IncludeArea):
+            attack_range = self.aiming.area.in_range
+
+        if attack_range > 0 and reachable_points:
+            for enemy in enemies:
+                best_at_range = min(
+                    reachable_points,
+                    key=lambda point: (
+                        abs(point.get_distance(enemy.pos) - attack_range) * 100
+                        + point.get_distance(actor.pos),
+                        point.x,
+                        point.y,
+                    ),
+                )
+                proposed_moves[best_at_range] = (
+                    f"Range {attack_range} of {enemy.name} {enemy.id} for {self.name}"
+                )
+        return proposed_moves
+
+    def is_plausible_reaction(self, engine: "Engine", event: "Event", actor: "Entity") -> bool:
+        return True
+
+    def get_priority(self, engine: "Engine", actor: "Entity", pos: "Point", aiming_result: Union["AimingResult", "MultipleAimingResults"]) -> float:
+        return 1.0
 
     def get_hash_info(self):
         return (
