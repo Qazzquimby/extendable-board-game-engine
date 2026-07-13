@@ -1,17 +1,21 @@
 from dataclasses import dataclass
 
+from typing import Union
 from aimings import (
     TargetEntity,
     TargetSelf,
     MultipleAiming,
     IncludeArea,
     is_enemy_aim_condition,
+    AimingResult,
+    MultipleAimingResults,
 )
 from areas import Burst
 from engine import (
     Engine,
     Hero,
 )
+from entities import Entity
 from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor, SlowToken
 from events import after, before
 from event_library import TurnEndEvent, DamageEvent, DeathEvent
@@ -130,6 +134,154 @@ class AxeReflectHalfOfDamageFromDefaults(Modifier):
                     )
 
 
+class AxeSwing(Ability):
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 2
+
+
+class BerserkersCall(Ability):
+    def get_movement(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        reachable_points: set["Point"],
+        enemies: list["Entity"],
+        allies: list["Entity"],
+    ) -> dict["Point", str]:
+        proposed_moves = {}
+        if not reachable_points or not enemies:
+            return proposed_moves
+
+        def enemies_in_burst(pt: Point) -> int:
+            return sum(1 for e in enemies if pt.get_distance(e.pos) <= 1)
+
+        best_pt = max(
+            reachable_points,
+            key=lambda pt: (enemies_in_burst(pt), -pt.get_distance(actor.pos)),
+        )
+        if enemies_in_burst(best_pt) > 0:
+            proposed_moves[best_pt] = "Maximize Berserker's Call targets"
+        return proposed_moves
+
+    def is_plausible(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> bool:
+        included = aiming_result.sub_aimings["nearby_enemies"].included_points
+        return any(
+            engine.entity_at(pt) and engine.entity_at(pt).team != actor.team
+            for pt in included
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        included = aiming_result.sub_aimings["nearby_enemies"].included_points
+        num_enemies_hit = sum(
+            1
+            for pt in included
+            if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team
+        )
+        return 1.9 * num_enemies_hit
+
+
+class BattleHunger(Ability):
+    def is_plausible(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> bool:
+        target = engine.entity_at(aiming_result.target_points[0])
+        if target:
+            return not target.get_modifier(BattleHungerToken)
+        return False
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        target = engine.entity_at(aiming_result.target_points[0])
+        if not target:
+            return 1
+
+        turns_remaining = 7 - engine.round_num
+        total_damage = min(turns_remaining * 2, target.hp)
+        return 0.7 * total_damage
+
+
+class CullingBlade(Ability):
+    def get_movement(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        reachable_points: set["Point"],
+        enemies: list["Entity"],
+        allies: list["Entity"],
+    ) -> dict["Point", str]:
+        proposed_moves = {}
+        if not reachable_points:
+            return proposed_moves
+
+        killable_enemies = [e for e in enemies if e.hp <= 3]
+        if killable_enemies:
+            for enemy in killable_enemies:
+                best_pt = min(
+                    reachable_points,
+                    key=lambda pt: (
+                        abs(pt.get_distance(enemy.pos) - 1),
+                        pt.get_distance(actor.pos),
+                    ),
+                )
+                if best_pt.get_distance(enemy.pos) == 1:
+                    proposed_moves[best_pt] = f"Move to cull {enemy.name}"
+        else:
+            for enemy in enemies:
+                best_pt = min(
+                    reachable_points,
+                    key=lambda pt: (
+                        abs(pt.get_distance(enemy.pos) - 1),
+                        pt.get_distance(actor.pos),
+                    ),
+                )
+                proposed_moves[best_pt] = f"Move to range 1 of {enemy.name}"
+
+        return proposed_moves
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        target = engine.entity_at(aiming_result.target_points[0])
+        if not target:
+            return 1
+
+        if target.hp <= 3:
+            return 5
+        else:
+            return 2  # less than damage because opportunity cost
+
+
 class Axe(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Axe", hp=10, speed=3, pos=pos, team=team)
@@ -138,7 +290,7 @@ class Axe(Hero):
         self.add_modifier(engine, AxeReflectHalfOfDamageFromDefaults())
 
         self.abilities.append(
-            Ability(
+            AxeSwing(
                 name="Axe Swing",
                 text="Range 1, 2dmg",
                 aiming=TargetEntity(in_range=1),
@@ -149,7 +301,7 @@ class Axe(Hero):
         )
 
         self.abilities.append(
-            Ability(
+            BerserkersCall(
                 name="Berserker's Call",
                 text="""\
         1/Game, Free Action
@@ -181,7 +333,7 @@ class Axe(Hero):
         )
 
         self.abilities.append(
-            Ability(
+            BattleHunger(
                 name="Battle Hunger",
                 text="""\
                 1/Game:
@@ -202,7 +354,7 @@ class Axe(Hero):
             )
         )
         self.abilities.append(
-            Ability(
+            CullingBlade(
                 name="Culling Blade",
                 text="""\
                 1/Game

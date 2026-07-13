@@ -1,7 +1,7 @@
 from typing import Optional, List, Type, TYPE_CHECKING
 
 from abilities import Ability
-from aimings import TargetSelf
+from aimings import TargetSelf, AimingResult
 from events import EventPhase
 from event_library import SummonEvent, RemoveTokenEvent, AddTokenEvent
 from point import Point
@@ -200,6 +200,10 @@ class Entity:
         return GetTokenCountQuery(subject=self, token_class=token_class).resolve(engine)
 
 
+class DoNothingAbility(Ability):
+    def get_priority(self, engine: "Engine", actor: "Entity", pos: "Point", aiming_result: "AimingResult") -> float:
+        return 0.0
+
 class Hero(Entity):
     __slots__ = ()
 
@@ -211,7 +215,7 @@ class Hero(Entity):
         )
         self.activator = self
         self.abilities.append(
-            Ability(
+            DoNothingAbility(
                 name=DO_NOTHING, aiming=TargetSelf(), instructions=[], owner_id=self.id
             )
         )

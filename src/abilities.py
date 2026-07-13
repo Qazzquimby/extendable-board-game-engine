@@ -184,19 +184,34 @@ class Ability:
             attack_range = self.aiming.area.in_range
 
         if attack_range > 0 and reachable_points:
-            for enemy in enemies:
-                best_at_range = min(
-                    reachable_points,
-                    key=lambda point: (
-                        abs(point.get_distance(enemy.pos) - attack_range) * 100
-                        + point.get_distance(actor.pos),
-                        point.x,
-                        point.y,
-                    ),
-                )
-                proposed_moves[best_at_range] = (
-                    f"Range {attack_range} of {enemy.name} {enemy.id} for {self.name}"
-                )
+            if self.valence in (Valence.BAD, Valence.MIXED):
+                for enemy in enemies:
+                    best_at_range = min(
+                        reachable_points,
+                        key=lambda point: (
+                            abs(point.get_distance(enemy.pos) - attack_range) * 100
+                            + point.get_distance(actor.pos),
+                            point.x,
+                            point.y,
+                        ),
+                    )
+                    proposed_moves[best_at_range] = (
+                        f"Range {attack_range} of {enemy.name} {enemy.id} for {self.name}"
+                    )
+            if self.valence in (Valence.GOOD, Valence.MIXED):
+                for ally in allies:
+                    best_at_range = min(
+                        reachable_points,
+                        key=lambda point: (
+                            abs(point.get_distance(ally.pos) - attack_range) * 100
+                            + point.get_distance(actor.pos),
+                            point.x,
+                            point.y,
+                        ),
+                    )
+                    proposed_moves[best_at_range] = (
+                        f"Range {attack_range} of {ally.name} {ally.id} for {self.name}"
+                    )
         return proposed_moves
 
     def is_plausible_reaction(self, engine: "Engine", event: "Event", actor: "Entity") -> bool:

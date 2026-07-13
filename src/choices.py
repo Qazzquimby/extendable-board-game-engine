@@ -125,40 +125,10 @@ def get_plausible_movements(
 
     proposed_moves = {actor.pos: "Stay"}
     if reachable_points:
-        # For each enemy, find a good position to approach
-        for enemy in enemies:
-            best_close_to_enemy = min(
-                reachable_points,
-                key=lambda point: (
-                    point.get_distance(enemy.pos) * 100 + point.get_distance(actor.pos),
-                    point.x,
-                    point.y,
-                ),
-            )
-            proposed_moves[best_close_to_enemy] = f"Approach {enemy.name} {enemy.id}"
-
         for ability in actor.abilities:
-            proposed_moves.update(
-                ability.get_movement(engine, actor, reachable_points, enemies, allies)
-            )
-
-        # For each ally, find a good position to "guard" them from nearest enemy
-        for ally in allies:
-            if enemies:
-                nearest_enemy_to_ally = min(
-                    enemies, key=lambda e: ally.pos.get_distance(e.pos)
-                )
-                ally_dist_to_enemy = ally.pos.get_distance(nearest_enemy_to_ally.pos)
-
-                def betweenness_score(point: Point):
-                    distance_to_ally = point.get_distance(ally.pos)
-                    distance_to_enemy = point.get_distance(nearest_enemy_to_ally.pos)
-                    detour = (distance_to_ally + distance_to_enemy) - ally_dist_to_enemy
-                    return detour * 10 + distance_to_enemy, point.x, point.y
-
-                best_guard_ally = min(reachable_points, key=betweenness_score)
-                proposed_moves[best_guard_ally] = (
-                    f"Guard {ally.name} {ally.id} from {nearest_enemy_to_ally.name} {nearest_enemy_to_ally.id}"
+            if ability.is_available():
+                proposed_moves.update(
+                    ability.get_movement(engine, actor, reachable_points, enemies, allies)
                 )
     return proposed_moves
 
