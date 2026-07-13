@@ -299,8 +299,6 @@ class Engine:
             )
             next_choices = self.advance_until_choice()
 
-            return  # todo
-
             is_done = self.is_done
             if is_done:
                 team_0_living_members = [e for e in self.living_entities if e.team == 0]

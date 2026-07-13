@@ -59,23 +59,25 @@ class BattleHungerToken(Token):
 class CullingBladeInstruction(Instruction):
     valence = Valence.BAD
 
-    def execute(self, ctx: ActionContext) -> None:
-        if not ctx.target or not hasattr(ctx.target, "hp"):
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        target = ctx.get_target(engine)
+        if not target or not hasattr(target, "hp"):
             return
+        source = engine.get_entity_by_id(ctx.source_id)
         event = DamageEvent(
-            source=ctx.source,
-            subject=ctx.target,
+            source=source,
+            subject=target,
             amount=3,
             ability=ctx.ability,
         )
         event.amount.is_irreducible = True
-        event.resolve()
-        if ctx.target.hp <= 0:
-            RefreshAbilityInstruction().execute(ctx)
+        engine.event_queue.enqueue(event)
+        if target.hp <= 0:
+            RefreshAbilityInstruction().execute(engine=engine, ctx=ctx)
             if ctx.ability and ctx.ability.charges is not None:
                 ctx.ability.charges += 1
-            if isinstance(ctx.target, Hero):
-                ctx.source.add_modifier(Armor())
+            if isinstance(target, Hero):
+                source.add_modifier(engine, Armor())
 
 
 @dataclass(kw_only=True)
