@@ -85,7 +85,7 @@ def get_plausible_move_and_actions(
     engine: "Engine",
 ) -> List[PlausibleMoveAndAction]:
     proposed_moves = get_plausible_movements(actor=actor, engine=engine)
-    
+
     actions_map = {}
     for move_pos, movement_name in proposed_moves.items():
         actions_map.update(
@@ -109,7 +109,7 @@ def get_plausible_movements(
     living = engine.living_entities
     enemies = [e for e in living if e.team != actor.team]
     allies = [e for e in living if e.team == actor.team and e != actor]
-    
+
     reachable_points = engine.grid.get_movable_spaces(
         engine=engine,
         actor=actor,
@@ -124,8 +124,20 @@ def get_plausible_movements(
         for ability in actor.abilities:
             if ability.is_available():
                 proposed_moves.update(
-                    ability.get_movement(engine, actor, reachable_points, enemies, allies)
+                    ability.get_movement(
+                        engine, actor, reachable_points, enemies, allies
+                    )
                 )
+
+        if len(proposed_moves) == 1:
+            pref_pos = actor.get_preferred_position(engine)
+            if pref_pos:
+                best_move = min(
+                    reachable_points, key=lambda p: (p.get_distance(pref_pos), p.x, p.y)
+                )
+                if best_move != actor.pos:
+                    proposed_moves = {best_move: "Move towards preferred position"}
+
     return proposed_moves
 
 
@@ -158,7 +170,7 @@ def get_plausible_actions_after_movement(
         for v in non_passing_actions.values()
     ):
         actions = non_passing_actions
-        
+
     assert actions
     return actions
 

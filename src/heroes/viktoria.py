@@ -255,9 +255,10 @@ class DragonsBreathAbility(Ability):
                 ],
                 default=999,
             )
-            score += (
+            decreased_distance = (
                 old_distance_to_nearest_enemy - new_distance_to_nearest_enemy
-            ) // viktoria.get_speed(engine)
+            )
+            score += decreased_distance // viktoria.get_speed(engine)
 
         return score
 
