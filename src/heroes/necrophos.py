@@ -1,10 +1,14 @@
 from dataclasses import dataclass
+from typing import Union
 
 from aimings import (
     TargetEntity,
     TargetSelf,
     IncludeArea,
+    MultipleAiming,
     is_enemy_aim_condition,
+    AimingResult,
+    MultipleAimingResults,
 )
 from areas import Burst
 from engine import (
@@ -92,7 +96,9 @@ class NecroStartTurnAura(Modifier):
                     )
                 )
             for ally in allies_in_range:
-                HealEvent(subject=ally, amount=ModInt(num_kill_counters))
+                engine.event_queue.enqueue(
+                    HealEvent(subject=ally, amount=ModInt(num_kill_counters))
+                )
 
 
 @dataclass(kw_only=True)
@@ -154,9 +160,11 @@ class DeathPulse(Instruction):
             if entity:
                 source = engine.get_entity_by_id(ctx.source_id)
                 if entity.team == source.team:
-                    HealEvent(subject=entity, amount=1)
+                    engine.event_queue.enqueue(HealEvent(subject=entity, amount=1))
                 else:
-                    DamageEvent(source=source, subject=entity, amount=1)
+                    engine.event_queue.enqueue(
+                        DamageEvent(source=source, subject=entity, amount=1)
+                    )
 
 
 @dataclass
@@ -169,9 +177,12 @@ class NecroTeleportAdjacentInstruction(Instruction):
             points_adjacent = engine.grid.get_points_in_range(
                 start=target.pos, max_range=1
             )
-            if points_adjacent:
+            empty_adjacent = [p for p in points_adjacent if not engine.entity_at(p)]
+            if empty_adjacent:
                 source = engine.get_entity_by_id(ctx.source_id)
-                ChangeLocationEvent(subject=source, new_pos=list(points_adjacent)[0])
+                engine.event_queue.enqueue(
+                    ChangeLocationEvent(subject=source, new_pos=empty_adjacent[0])
+                )
 
 
 @dataclass(kw_only=True)
@@ -182,8 +193,122 @@ class ReapersScythe(Token):
     valence = Valence.BAD
 
     @after(TurnStartEvent)
-    def trigger(self, engine: "Engine", q: "TurnStartEvent"):
-        pass
+    def trigger(self, engine: "Engine", event: "TurnStartEvent"):
+        subject = engine.get_entity_by_id(event.subject_id)
+        if subject.id == self.owner_id:
+            with self.log_trigger(engine=engine, event=event):
+                missing_hp = subject.max_hp - subject.hp
+                if missing_hp > 0:
+                    damage_event = DamageEvent(
+                        source=self.source,
+                        subject=subject,
+                        amount=ModInt(missing_hp, is_irreducible=True),
+                    )
+                    engine.event_queue.enqueue(damage_event)
+                subject.remove_token(engine, ReapersScythe)
+
+    @after(DeathEvent)
+    def on_death(self, engine: "Engine", event: "DeathEvent"):
+        if event.subject_id == self.owner_id and event.killer_id == self.source.id:
+            engine.event_queue.enqueue(
+                AddTokenEvent(subject=self.source, token_class=KillCounter, amount=2)
+            )
+
+
+class DeathPulseAbility(Ability):
+    def get_movement(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        reachable_points: set["Point"],
+        enemies: list["Entity"],
+        allies: list["Entity"],
+    ) -> dict["Point", str]:
+        proposed_moves = {}
+        if not reachable_points:
+            return proposed_moves
+
+        def score_pt(pt: Point) -> int:
+            score = 0
+            for e in enemies:
+                if pt.get_distance(e.pos) <= 3:
+                    score += 1
+            for a in allies:
+                if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp:
+                    score += 1
+            return score
+
+        best_pt = max(
+            reachable_points,
+            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+        )
+        if score_pt(best_pt) > 0:
+            proposed_moves[best_pt] = "Maximize Death Pulse targets"
+        return proposed_moves
+
+    def _get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        included = aiming_result.included_points
+        score = 0
+        for pt in included:
+            entity = engine.entity_at(pt)
+            if entity:
+                if entity.team != actor.team:
+                    score += 1
+                else:
+                    if entity.hp < entity.max_hp:
+                        score += 1
+        return float(score)
+
+
+class GhostShroudAbility(Ability):
+    def _get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        if actor.hp <= actor.max_hp / 2:
+            return 3.0
+        return 1.0
+
+
+class DeathSeekerAbility(Ability):
+    def _get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 2.5
+
+
+class ReapersScytheAbility(Ability):
+    def _get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        target = engine.entity_at(aiming_result.target_points[0])
+        if not target:
+            return 0.0
+
+        score = 0
+        missing_hp = target.max_hp - target.hp
+        half_hp = target.max_hp // 2
+        if missing_hp >= half_hp:
+            score += 2  # likely to get extra kill counters
+        expected_damage = min(target.hp, missing_hp)
+        return expected_damage + 1  # immobilize
 
 
 class Necrophos(Hero):
@@ -196,7 +321,7 @@ class Necrophos(Hero):
         self.add_modifier(engine, NecroGetKillCounter())
 
         self.abilities.append(
-            Ability(
+            DeathPulseAbility(
                 name="Death Pulse",
                 text="Enemies in burst 3, 1dmg. You and allies in burst 3, heal 1.",
                 aiming=IncludeArea(area=Burst(radius=3)),
@@ -207,7 +332,7 @@ class Necrophos(Hero):
         )
 
         self.abilities.append(
-            Ability(
+            GhostShroudAbility(
                 name="Ghost Shroud",
                 text="""\
         1/Game, Instant +3
@@ -227,18 +352,24 @@ Until the end of your next turn:
         )
 
         self.abilities.append(
-            Ability(
+            DeathSeekerAbility(
                 name="Death Seeker",
                 text="""\
                1/Game
 Teleport to a space adjacent to an enemy in range 3.
 Use a default ability.
                 """,
-                # todo should be multiple aiming. Teleport next to them, but *you* use ability.
-                aiming=TargetEntity(in_range=3, condition=is_enemy_aim_condition),
+                aiming=MultipleAiming(
+                    {
+                        "enemy": TargetEntity(
+                            in_range=3, condition=is_enemy_aim_condition
+                        ),
+                        "self": TargetSelf(),
+                    }
+                ),
                 instructions=[
-                    NecroTeleportAdjacentInstruction(),
-                    UseAnAbilityInstruction(default_only=True),
+                    NecroTeleportAdjacentInstruction(aiming_name="enemy"),
+                    UseAnAbilityInstruction(aiming_name="self", default_only=True),
                 ],
                 max_charges=1,
                 owner_id=self.id,
@@ -246,7 +377,7 @@ Use a default ability.
         )
 
         self.abilities.append(
-            Ability(
+            ReapersScytheAbility(
                 name="Reaper's Scythe",
                 text="""\
                 1/Game
@@ -263,5 +394,7 @@ On kill, gain 2 additional Kill counters.
                         token_class=ReapersScythe, token_kwargs={"source": self}
                     ),
                 ],
+                max_charges=1,
+                owner_id=self.id,
             )
         )
