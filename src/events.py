@@ -21,6 +21,9 @@ class EventQueue:
         self._queue: List["Event"] = []
         self.is_processing = False
 
+    def enqueue_front(self, event: "Event"):
+        self._queue.insert(0, event)
+
     def enqueue(self, event: "Event"):
         if self.is_processing:
             self._queue.insert(0, event)

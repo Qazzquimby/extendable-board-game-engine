@@ -220,7 +220,7 @@ class HealEvent(Event):
     def _resolve(self, engine: "Engine") -> None:
         final_heal = max(0, self.amount.value)
         subject = engine.get_entity_by_id(self.subject_id)
-        subject.hp = max(subject.max_hp, subject.hp + final_heal)
+        subject.hp = min(subject.max_hp, subject.hp + final_heal)
         log(f"{subject.name} healed {final_heal} HP.")
 
 

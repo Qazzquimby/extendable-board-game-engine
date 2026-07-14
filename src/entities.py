@@ -121,7 +121,7 @@ class Entity:
         return QueryCanMove(self).resolve(engine)
 
     def get_speed(self, engine: "Engine") -> int:
-        return QueryCanMove(self).resolve(engine)
+        return QuerySpeed(self).resolve(engine).value
 
     # todo Seems not used now but should be?
     # def get_legal_actions(self) -> List[Ability]:

@@ -326,17 +326,38 @@ class Ability:
         source: "Entity",
         aiming_result: Union[AimingResult, MultipleAimingResults],
     ) -> None:
-        if self.charges is not None:
-            self.charges -= 1
-        if self.taps:
-            self.is_tapped = True
-            self.tapped_this_turn = True
+        self._mark_usage()
 
         from events import AbilityUseEvent
 
         engine.event_queue.enqueue(
             AbilityUseEvent(source=source, ability=self, aiming_result=aiming_result)
         )
+
+    def react(
+        self,
+        engine: "Engine",
+        source: "Entity",
+        aiming_result: Union[AimingResult, MultipleAimingResults],
+    ):
+
+        from events import AbilityUseEvent
+
+        engine.event_queue.enqueue_front(
+            AbilityUseEvent(
+                source=source,
+                ability=self,
+                aiming_result=aiming_result,
+                is_reaction=True,
+            ),
+        )
+
+    def _mark_usage(self):
+        if self.charges is not None:
+            self.charges -= 1
+        if self.taps:
+            self.is_tapped = True
+            self.tapped_this_turn = True
 
     def execute_instructions(
         self,

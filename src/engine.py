@@ -79,6 +79,7 @@ class RuleBasedAgent(Agent):
         if actor:
             pref_pos = actor.get_preferred_position(env)
             if pref_pos:
+
                 def get_distance(choice_idx: int) -> int:
                     choice = choices[choice_idx]
                     pos = getattr(choice, "move_pos", actor.pos)
@@ -381,13 +382,11 @@ class Engine:
                 event.declined_entities.add(react_actor.id)
                 if not action.features.get("pass_reaction"):
                     with log(f"Reaction from {react_actor.name}:"):
-                        reaction_event = AbilityUseEvent(
+                        action.ability.react(
+                            engine=self,
                             source=react_actor,
-                            ability=action.ability,
                             aiming_result=action.aiming_result,
-                            is_reaction=True,
                         )
-                        self.event_queue._queue.insert(0, reaction_event)
                 return
             elif isinstance(first_event, DecisionEvent):
                 event: DecisionEvent = first_event
@@ -413,12 +412,8 @@ class Engine:
 
             if hasattr(action, "ability"):
                 with log(f"{actor.name} used {action.ability.name}{target_str}."):
-                    self.event_queue.enqueue(
-                        AbilityUseEvent(
-                            source=actor,
-                            ability=action.ability,
-                            aiming_result=action.aiming_result,
-                        )
+                    action.ability.execute(
+                        engine=self, source=actor, aiming_result=action.aiming_result
                     )
 
             if isinstance(action, PlausibleMoveAndAction):
