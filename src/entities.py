@@ -179,6 +179,15 @@ class Entity:
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 
+    def get_preferred_position(self, engine: "Engine") -> Optional[Point]:
+        if not self.pos:
+            return None
+        enemies = [e for e in engine.living_entities if e.team != self.team and e.pos]
+        if not enemies:
+            return None
+        nearest_enemy = min(enemies, key=lambda e: self.pos.get_distance(e.pos))
+        return nearest_enemy.pos
+
     def add_modifier(
         self,
         engine: "Engine",

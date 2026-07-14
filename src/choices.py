@@ -84,20 +84,18 @@ def get_plausible_move_and_actions(
     actor: "Entity",
     engine: "Engine",
 ) -> List[PlausibleMoveAndAction]:
-    proposed_moves = get_plausible_movements(
-        actor=actor,
-        engine=engine,
-    )
-    # 2. For each move position, find all possible actions
-    actions_map = {}  # Use dict to store unique actions
+    proposed_moves = get_plausible_movements(actor=actor, engine=engine)
+    
+    actions_map = {}
     for move_pos, movement_name in proposed_moves.items():
-        plausible_actions_after_movement = get_plausible_actions_after_movement(
-            actor=actor,
-            engine=engine,
-            move_pos=move_pos,
-            movement_name=movement_name,
+        actions_map.update(
+            get_plausible_actions_after_movement(
+                actor=actor,
+                engine=engine,
+                move_pos=move_pos,
+                movement_name=movement_name,
+            )
         )
-        actions_map.update(plausible_actions_after_movement)
 
     actions = list(actions_map.values())
     assert actions
@@ -108,19 +106,17 @@ def get_plausible_movements(
     actor: "Entity",
     engine: "Engine",
 ) -> Dict[Point, str]:
-    enemies = [e for e in engine.entities if e.team != actor.team and e.hp > 0]
-    allies = [
-        e for e in engine.entities if e.team == actor.team and e != actor and e.hp > 0
-    ]
+    living = engine.living_entities
+    enemies = [e for e in living if e.team != actor.team]
+    allies = [e for e in living if e.team == actor.team and e != actor]
+    
     reachable_points = engine.grid.get_movable_spaces(
         engine=engine,
         actor=actor,
         max_movement=QuerySpeed(actor).resolve(engine).value,
     )
 
-    occupied_points = {
-        e.pos for e in engine.entities if e != actor and e.pos is not None and e.hp > 0
-    }
+    occupied_points = {e.pos for e in living if e != actor and e.pos is not None}
     reachable_points = {p for p in reachable_points if p not in occupied_points}
 
     proposed_moves = {actor.pos: "Stay"}
@@ -139,11 +135,11 @@ def get_plausible_actions_after_movement(
     move_pos: Point,
     movement_name: str,
 ) -> dict[tuple, PlausibleMoveAndAction]:
-    plausible_actions_after_movement = {}
+    actions = {}
     for ability in actor.abilities:
         if not ability.is_available():
             continue
-        plausible_uses_of_ability_after_movement = (
+        actions.update(
             get_plausible_uses_of_ability_after_movement(
                 actor=actor,
                 engine=engine,
@@ -152,25 +148,19 @@ def get_plausible_actions_after_movement(
                 ability=ability,
             )
         )
-        plausible_actions_after_movement.update(
-            plausible_uses_of_ability_after_movement
-        )
 
     # If any without name "Do Nothing" available, remove "Do Nothing"
-    non_passing_plausible_actions_after_movement: dict[
-        tuple, PlausibleMoveAndAction
-    ] = {
-        k: v
-        for (k, v) in plausible_actions_after_movement.items()
-        if v.ability.name != DO_NOTHING
+    non_passing_actions = {
+        k: v for k, v in actions.items() if v.ability.name != DO_NOTHING
     }
-    if non_passing_plausible_actions_after_movement and any(
+    if non_passing_actions and any(
         v.ability.valence in (Valence.GOOD, Valence.BAD)
-        for v in non_passing_plausible_actions_after_movement.values()
+        for v in non_passing_actions.values()
     ):
-        plausible_actions_after_movement = non_passing_plausible_actions_after_movement
-    assert plausible_actions_after_movement
-    return plausible_actions_after_movement
+        actions = non_passing_actions
+        
+    assert actions
+    return actions
 
 
 class PlausibleFreeAction(Choice):

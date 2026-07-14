@@ -75,6 +75,18 @@ class RuleBasedAgent(Agent):
         max_priority = max(c.priority for c in choices)
         best_choices = [i for i, c in enumerate(choices) if c.priority == max_priority]
 
+        actor = env.get_current_actor()
+        if actor:
+            pref_pos = actor.get_preferred_position(env)
+            if pref_pos:
+                def get_distance(choice_idx: int) -> int:
+                    choice = choices[choice_idx]
+                    pos = getattr(choice, "move_pos", actor.pos)
+                    return pos.get_distance(pref_pos) if pos else 0
+
+                min_dist = min(get_distance(i) for i in best_choices)
+                best_choices = [i for i in best_choices if get_distance(i) == min_dist]
+
         return env.rng.choice(best_choices)
 
 
@@ -313,12 +325,7 @@ class Engine:
 
             is_done = self.is_done
             if is_done:
-                team_0_living_members = [e for e in self.living_entities if e.team == 0]
-                team_1_living_members = [e for e in self.living_entities if e.team == 1]
-                if len(team_0_living_members) > len(team_1_living_members):
-                    winner_team = 0
-                elif len(team_1_living_members) > len(team_0_living_members):
-                    winner_team = 1
+                winner_team = self.get_winning_player()
 
             after_state = self.to_model()
             log_entry = LogEntry(
@@ -523,8 +530,8 @@ class Engine:
     def get_winning_player(self) -> Optional[int]:
         if not self.is_done:
             return None
-        team_0 = [e for e in self.entities if e.team == 0 and e.hp > 0]
-        team_1 = [e for e in self.entities if e.team == 1 and e.hp > 0]
+        team_0 = [e for e in self.living_entities if e.team == 0]
+        team_1 = [e for e in self.living_entities if e.team == 1]
         if len(team_0) > len(team_1):
             return 0
         elif len(team_1) > len(team_0):
