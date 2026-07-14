@@ -46,18 +46,6 @@ from queries import QueryLegalAimings, QueryAvoidInclusion
 from valence import Valence
 
 
-class DamageOverTimeToken(Token):
-    valence = Valence.BAD
-
-    @before(TurnEndEvent)
-    def take_damage(self, engine: "Engine", event: TurnEndEvent) -> None:
-        with self.log_trigger(engine=engine, event=event):
-            owner = engine.get_entity_by_id(self.owner_id)
-            engine.event_queue.enqueue(
-                DamageEvent(source=None, subject=owner, amount=self.amount)
-            )
-
-
 class KillCounter(Token):
     valence = Valence.GOOD
 
@@ -147,7 +135,7 @@ class NecroGhostShroud(Modifier):
 
     @before(DamageEvent)
     def take_1_more_damage(self, engine: "Engine", event: "DamageEvent"):
-        event.amount.add(1)  # seems like a query
+        event.amount.add(1)  # todo should be a query on damage taken
 
 
 @dataclass
@@ -155,16 +143,16 @@ class DeathPulse(Instruction):
     valence = Valence.MIXED
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
-        for point in ctx.included_points:
-            entity = engine.entity_at(point)
-            if entity:
-                source = engine.get_entity_by_id(ctx.source_id)
-                if entity.team == source.team:
-                    engine.event_queue.enqueue(HealEvent(subject=entity, amount=1))
-                else:
-                    engine.event_queue.enqueue(
-                        DamageEvent(source=source, subject=entity, amount=1)
-                    )
+        point = ctx.subject_point
+        entity = engine.entity_at(point)
+        if entity:
+            source = engine.get_entity_by_id(ctx.source_id)
+            if entity.team == source.team:
+                engine.event_queue.enqueue(HealEvent(subject=entity, amount=1))
+            else:
+                engine.event_queue.enqueue(
+                    DamageEvent(source=source, subject=entity, amount=1)
+                )
 
 
 @dataclass

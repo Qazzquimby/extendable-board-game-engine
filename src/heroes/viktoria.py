@@ -241,9 +241,12 @@ class DragonsBreathAbility(Ability):
                 ],
                 default=999,
             )
-            dest_point = engine.grid.get_pull_path(
+            pull_path = engine.grid.get_pull_path(
                 subject=viktoria, pull_to=target_pt, distance=4
-            )[-1]
+            )
+            if not pull_path:
+                continue
+            dest_point = pull_path[-1]
             new_distance_to_nearest_enemy = min(
                 [
                     dest_point.get_distance(enemy.pos)

@@ -49,6 +49,9 @@ class Event(abc.ABC):
         self.canceled = False
         self.state = "BEFORE"
 
+    def __str__(self):
+        return f"{self.__class__.__name__} {self.state}"
+
     def process(self, engine: "Engine") -> None:
         if self.state == "BEFORE":
             self.state = "RESOLVE"
@@ -204,9 +207,9 @@ class AbilityUseEvent(Event):
                 )
             engine.router.publish(engine=engine, event=self, phase=EventPhase.BEFORE)
         elif self.state == "RESOLVE":
-            self.state = "AFTER"
-            engine.event_queue.enqueue(self)
             if not self.canceled:
+                self.state = "AFTER"
+                engine.event_queue.enqueue(self)
                 self._resolve(engine=engine)
         elif self.state == "AFTER":
             self.state = "DONE"

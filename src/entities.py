@@ -118,14 +118,10 @@ class Entity:
         return QueryHasArmor(subject=self).resolve(engine)
 
     def can_move(self, engine: "Engine") -> bool:
-        q = QueryCanMove(self)
-        engine.router.publish(q, EventPhase.QUERY)
-        return q.result
+        return QueryCanMove(self).resolve(engine)
 
     def get_speed(self, engine: "Engine") -> int:
-        q = QuerySpeed(self)
-        engine.router.publish(q, EventPhase.QUERY)
-        return q.result.value
+        return QueryCanMove(self).resolve(engine)
 
     # todo Seems not used now but should be?
     # def get_legal_actions(self) -> List[Ability]:

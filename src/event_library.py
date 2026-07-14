@@ -305,5 +305,7 @@ class RemoveTokenEvent(Event):
         log(f"{subject.name} lost {self.amount} {self.token_class.__name__}.")
         for modifier in subject.modifiers:
             if isinstance(modifier, self.token_class):
-                modifier.remove(self.amount)  # safe because is token
+                modifier.remove(
+                    engine=engine, amount=self.amount
+                )  # safe because is token
                 return
