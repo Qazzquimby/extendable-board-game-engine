@@ -11,6 +11,7 @@ from queries import (
     QueryDefense,
     QueryCrit,
     GetTokenCountQuery,
+    QuerySpeed,
 )
 from schemas import EntityState
 from util import DO_NOTHING
@@ -22,8 +23,20 @@ if TYPE_CHECKING:
 
 class Entity:
     __slots__ = (
-        "id", "set", "name", "max_hp", "hp", "speed", "_pos", "team", "activator",
-        "modifiers", "abilities", "move_actions", "standard_actions", "free_actions"
+        "id",
+        "set",
+        "name",
+        "max_hp",
+        "hp",
+        "_speed",
+        "_pos",
+        "team",
+        "activator",
+        "modifiers",
+        "abilities",
+        "move_actions",
+        "standard_actions",
+        "free_actions",
     )
 
     def __init__(
@@ -35,7 +48,7 @@ class Entity:
 
         self.max_hp = hp  # todo prevent healing over max
         self.hp = hp
-        self.speed = speed
+        self._speed = speed  # use get_speed
 
         self._pos: Optional[Point] = None
         self.team = team
@@ -104,10 +117,15 @@ class Entity:
     def has_armor(self, engine: "Engine") -> bool:
         return QueryHasArmor(subject=self).resolve(engine)
 
-    def can_move(self, engine: "Engine" = None) -> bool:
+    def can_move(self, engine: "Engine") -> bool:
         q = QueryCanMove(self)
         engine.router.publish(q, EventPhase.QUERY)
         return q.result
+
+    def get_speed(self, engine: "Engine") -> int:
+        q = QuerySpeed(self)
+        engine.router.publish(q, EventPhase.QUERY)
+        return q.result.value
 
     # todo Seems not used now but should be?
     # def get_legal_actions(self) -> List[Ability]:
@@ -201,8 +219,15 @@ class Entity:
 
 
 class DoNothingAbility(Ability):
-    def get_priority(self, engine: "Engine", actor: "Entity", pos: "Point", aiming_result: "AimingResult") -> float:
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: "AimingResult",
+    ) -> float:
         return 0.0
+
 
 class Hero(Entity):
     __slots__ = ()
