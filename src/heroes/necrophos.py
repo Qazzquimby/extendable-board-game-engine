@@ -203,92 +203,175 @@ class ReapersScythe(Token):
             )
 
 
-def death_pulse_movement(
-    engine: "Engine",
-    actor: "Entity",
-    reachable_points: set["Point"],
-    enemies: list["Entity"],
-    allies: list["Entity"],
-) -> dict["Point", str]:
-    proposed_moves = {}
-    if not reachable_points:
+class DeathPulseAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Death Pulse",
+            text="Enemies in burst 3, 1dmg. You and allies in burst 3, heal 1.",
+            aiming=IncludeArea(area=Burst(radius=3)),
+            instructions=[DeathPulse()],
+            is_default=True,
+            owner_id=owner_id,
+        )
+
+    def get_movement(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        reachable_points: set["Point"],
+        enemies: list["Entity"],
+        allies: list["Entity"],
+    ) -> dict["Point", str]:
+        proposed_moves = {}
+        if not reachable_points:
+            return proposed_moves
+
+        def score_pt(pt: Point) -> int:
+            score = 0
+            for e in enemies:
+                if pt.get_distance(e.pos) <= 3:
+                    score += 1
+            for a in allies:
+                if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp:
+                    score += 1
+            return score
+
+        best_pt = max(
+            reachable_points,
+            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+        )
+        if score_pt(best_pt) > 0:
+            proposed_moves[best_pt] = "Maximize Death Pulse targets"
         return proposed_moves
 
-    def score_pt(pt: Point) -> int:
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        included = aiming_result.included_points
         score = 0
-        for e in enemies:
-            if pt.get_distance(e.pos) <= 3:
-                score += 1
-        for a in allies:
-            if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp:
-                score += 1
-        return score
-
-    best_pt = max(
-        reachable_points,
-        key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
-    )
-    if score_pt(best_pt) > 0:
-        proposed_moves[best_pt] = "Maximize Death Pulse targets"
-    return proposed_moves
-
-
-def death_pulse_priority(
-    engine: "Engine",
-    actor: "Entity",
-    pos: "Point",
-    aiming_result: Union["AimingResult", "MultipleAimingResults"],
-) -> float:
-    included = aiming_result.included_points
-    score = 0
-    for pt in included:
-        entity = engine.entity_at(pt)
-        if entity:
-            if entity.team != actor.team:
-                score += 1
-            else:
-                if entity.hp < entity.max_hp:
+        for pt in included:
+            entity = engine.entity_at(pt)
+            if entity:
+                if entity.team != actor.team:
                     score += 1
-    return float(score)
+                else:
+                    if entity.hp < entity.max_hp:
+                        score += 1
+        return float(score)
 
 
-def ghost_shroud_priority(
-    engine: "Engine",
-    actor: "Entity",
-    pos: "Point",
-    aiming_result: Union["AimingResult", "MultipleAimingResults"],
-) -> float:
-    if actor.hp <= actor.max_hp / 2:
-        return 3.0
-    return 1.0
+class GhostShroudAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Ghost Shroud",
+            text="""\
+        1/Game, Instant +3
+Until the end of your next turn:
+  You cannot be affected by default abilities.
+  You deal +100% healing.
+  You receive +1 damage..""",
+            aiming=TargetSelf(),
+            instructions=[
+                AddModifierInstruction(modifier_class=NecroGhostShroud),
+            ],
+            owner_id=owner_id,
+            action_cost=ActionCost.INSTANT,
+            instant_speed=3,
+            max_charges=1,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        if actor.hp <= actor.max_hp / 2:
+            return 3.0
+        return 1.0
 
 
-def death_seeker_priority(
-    engine: "Engine",
-    actor: "Entity",
-    pos: "Point",
-    aiming_result: Union["AimingResult", "MultipleAimingResults"],
-) -> float:
-    return 2.5
+class DeathSeekerAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Death Seeker",
+            text="""\
+               1/Game
+Teleport to a space adjacent to an enemy in range 3.
+Use a default ability.
+                """,
+            aiming=MultipleAiming(
+                {
+                    "enemy": TargetEntity(
+                        in_range=3, condition=is_enemy_aim_condition
+                    ),
+                    "self": TargetSelf(),
+                }
+            ),
+            instructions=[
+                NecroTeleportAdjacentInstruction(aiming_name="enemy"),
+                UseAnAbilityInstruction(aiming_name="self", default_only=True),
+            ],
+            max_charges=1,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 2.5
 
 
-def reapers_scythe_priority(
-    engine: "Engine",
-    actor: "Entity",
-    pos: "Point",
-    aiming_result: Union["AimingResult", "MultipleAimingResults"],
-) -> float:
-    target = engine.entity_at(aiming_result.target_points[0])
-    if not target:
-        return 0.0
+class ReapersScytheAbility(Ability):
+    def __init__(self, owner_id: str, source_entity: "Entity"):
+        super().__init__(
+            name="Reaper's Scythe",
+            text="""\
+                1/Game
+Range 3, immobilize.
+At the start of your next turn, deal irreducible damage the target equal to their missing health.
+On kill, gain 2 additional Kill counters.
+                """,
+            aiming=TargetEntity(in_range=3),
+            instructions=[
+                AddTokenInstruction(
+                    token_class=ImmobileToken,
+                ),
+                AddTokenInstruction(
+                    token_class=ReapersScythe, token_kwargs={"source": source_entity}
+                ),
+            ],
+            max_charges=1,
+            owner_id=owner_id,
+        )
 
-    score = 0
-    missing_hp = target.max_hp - target.hp
-    half_hp = target.max_hp // 2
-    if missing_hp >= half_hp:
-        score += 2  # likely to get extra kill counters
-    expected_damage = min(target.hp, missing_hp)
-    return float(expected_damage + 1)  # immobilize
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        target = engine.entity_at(aiming_result.target_points[0])
+        if not target:
+            return 0.0
+
+        score = 0
+        missing_hp = target.max_hp - target.hp
+        half_hp = target.max_hp // 2
+        if missing_hp >= half_hp:
+            score += 2  # likely to get extra kill counters
+        expected_damage = min(target.hp, missing_hp)
+        return float(expected_damage + 1)  # immobilize
 
 
 class Necrophos(Hero):
@@ -300,86 +383,7 @@ class Necrophos(Hero):
         self.add_modifier(engine, NecroStartTurnAura())
         self.add_modifier(engine, NecroGetKillCounter())
 
-        self.abilities.append(
-            Ability(
-                name="Death Pulse",
-                text="Enemies in burst 3, 1dmg. You and allies in burst 3, heal 1.",
-                aiming=IncludeArea(area=Burst(radius=3)),
-                instructions=[DeathPulse()],
-                is_default=True,
-                owner_id=self.id,
-                custom_movement_fn=death_pulse_movement,
-                custom_priority_fn=death_pulse_priority,
-            )
-        )
-
-        self.abilities.append(
-            Ability(
-                name="Ghost Shroud",
-                text="""\
-        1/Game, Instant +3
-Until the end of your next turn:
-  You cannot be affected by default abilities.
-  You deal +100% healing.
-  You receive +1 damage..""",
-                aiming=TargetSelf(),
-                instructions=[
-                    AddModifierInstruction(modifier_class=NecroGhostShroud),
-                ],
-                owner_id=self.id,
-                action_cost=ActionCost.INSTANT,
-                instant_speed=3,
-                max_charges=1,
-                custom_priority_fn=ghost_shroud_priority,
-            )
-        )
-
-        self.abilities.append(
-            Ability(
-                name="Death Seeker",
-                text="""\
-               1/Game
-Teleport to a space adjacent to an enemy in range 3.
-Use a default ability.
-                """,
-                aiming=MultipleAiming(
-                    {
-                        "enemy": TargetEntity(
-                            in_range=3, condition=is_enemy_aim_condition
-                        ),
-                        "self": TargetSelf(),
-                    }
-                ),
-                instructions=[
-                    NecroTeleportAdjacentInstruction(aiming_name="enemy"),
-                    UseAnAbilityInstruction(aiming_name="self", default_only=True),
-                ],
-                max_charges=1,
-                owner_id=self.id,
-                custom_priority_fn=death_seeker_priority,
-            )
-        )
-
-        self.abilities.append(
-            Ability(
-                name="Reaper's Scythe",
-                text="""\
-                1/Game
-Range 3, immobilize.
-At the start of your next turn, deal irreducible damage the target equal to their missing health.
-On kill, gain 2 additional Kill counters.
-                """,
-                aiming=TargetEntity(in_range=3),
-                instructions=[
-                    AddTokenInstruction(
-                        token_class=ImmobileToken,
-                    ),
-                    AddTokenInstruction(
-                        token_class=ReapersScythe, token_kwargs={"source": self}
-                    ),
-                ],
-                max_charges=1,
-                owner_id=self.id,
-                custom_priority_fn=reapers_scythe_priority,
-            )
-        )
+        self.abilities.append(DeathPulseAbility(owner_id=self.id))
+        self.abilities.append(GhostShroudAbility(owner_id=self.id))
+        self.abilities.append(DeathSeekerAbility(owner_id=self.id))
+        self.abilities.append(ReapersScytheAbility(owner_id=self.id, source_entity=self))
