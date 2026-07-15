@@ -172,6 +172,29 @@ class Ability:
     ] = default_reaction_condition
     requires_target: bool = True
 
+    custom_target_fn: Optional[
+        Callable[
+            ["Engine", "Entity", List["Entity"], List["Entity"]], Optional["Entity"]
+        ]
+    ] = None
+    custom_movement_fn: Optional[
+        Callable[
+            ["Engine", "Entity", set["Point"], List["Entity"], List["Entity"]],
+            dict["Point", str],
+        ]
+    ] = None
+    custom_priority_fn: Optional[
+        Callable[
+            [
+                "Engine",
+                "Entity",
+                "Point",
+                Union["AimingResult", "MultipleAimingResults"],
+            ],
+            float,
+        ]
+    ] = None
+
     def get_target(
         self,
         engine: "Engine",
@@ -179,6 +202,8 @@ class Ability:
         enemies: List["Entity"],
         allies: List["Entity"],
     ) -> Optional["Entity"]:
+        if self.custom_target_fn:
+            return self.custom_target_fn(engine, actor, enemies, allies)
         if self.valence == Valence.MIXED:
             raise ValueError(f"Ability {self.name} needs a custom get_target")
         targets = []
@@ -199,6 +224,10 @@ class Ability:
         enemies: List["Entity"],
         allies: List["Entity"],
     ) -> dict["Point", str]:
+        if self.custom_movement_fn:
+            return self.custom_movement_fn(
+                engine, actor, reachable_points, enemies, allies
+            )
         proposed_moves = {}
         attack_range = 0
         from aimings import TargetEntity, IncludeArea
@@ -261,6 +290,8 @@ class Ability:
         if self.requires_target and getattr(aiming_result, "target_points", None):
             if not any(engine.entity_at(pt) for pt in aiming_result.target_points):
                 return 0.0
+        if self.custom_priority_fn:
+            return self.custom_priority_fn(engine, actor, pos, aiming_result)
         return self._get_priority(
             engine=engine, actor=actor, pos=pos, aiming_result=aiming_result
         )
@@ -272,7 +303,7 @@ class Ability:
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        return 1
+        return 1.0
 
     def get_hash_info(self):
         return (

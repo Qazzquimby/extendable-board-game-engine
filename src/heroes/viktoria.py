@@ -134,133 +134,129 @@ class DragonsBreathPull(Instruction):
                 )
 
 
-class EnchantedKatanaAbility(Ability):
-    def get_movement(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        reachable_points: set["Point"],
-        enemies: list["Entity"],
-        allies: list["Entity"],
-    ) -> dict["Point", str]:
-        proposed_moves = {}
-        if not reachable_points or not enemies:
-            return proposed_moves
-
-        def score_pt(pt: Point) -> int:
-            score = 0
-            for e in enemies:
-                dist = pt.get_distance(e.pos)
-                if dist == 1:
-                    score += 2
-            return score
-
-        best_pt = max(
-            reachable_points,
-            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
-        )
-        if score_pt(best_pt) > 0:
-            proposed_moves[best_pt] = "Maximize Enchanted Katana targets"
+def enchanted_katana_movement(
+    engine: "Engine",
+    actor: "Entity",
+    reachable_points: set["Point"],
+    enemies: list["Entity"],
+    allies: list["Entity"],
+) -> dict["Point", str]:
+    proposed_moves = {}
+    if not reachable_points or not enemies:
         return proposed_moves
 
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        target_points = aiming_result.sub_aimings["target"].target_points
-        if not target_points:
-            return 0.0
-        target = engine.entity_at(target_points[0])
-        score = 2.0
-
-        included = aiming_result.sub_aimings["burst"].included_points
-        for pt in included:
-            e = engine.entity_at(pt)
-            if e and e.team != actor.team and e != target:
-                score += 1.0
-                if e.hp <= 1:
-                    score += 1
-        return score
-
-
-class DragonsBreathAbility(Ability):
-    def get_movement(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        reachable_points: set["Point"],
-        enemies: list["Entity"],
-        allies: list["Entity"],
-    ) -> dict["Point", str]:
-        proposed_moves = {}
-        if not reachable_points or not enemies:
-            return proposed_moves
-
-        def score_pt(pt: Point) -> int:
-            score = 0
-            for e in enemies:
-                if pt.get_distance(e.pos) <= 4:
-                    score += 1
-            return score
-
-        best_pt = max(
-            reachable_points,
-            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
-        )
-        if score_pt(best_pt) > 0:
-            proposed_moves[best_pt] = "In range for Dragon's Breath"
-        return proposed_moves
-
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        target_points = aiming_result.target_points
-        if not target_points:
-            return 0.0
-        target_pt = target_points[0]
-
-        viktorias_in_range = []
-        for e in engine.living_entities:
-            if e.name == VIKTORIA_NAME and e.pos and e.pos.get_distance(target_pt) <= 5:
-                viktorias_in_range.append(e)
-
+    def score_pt(pt: Point) -> int:
         score = 0
-        for viktoria in viktorias_in_range:
-            old_distance_to_nearest_enemy = min(
-                [
-                    viktoria.pos.get_distance(enemy.pos)
-                    for enemy in engine.living_entities
-                    if enemy.team != viktoria.team
-                ],
-                default=999,
-            )
-            pull_path = engine.grid.get_pull_path(
-                subject=viktoria, pull_to=target_pt, distance=4
-            )
-            if not pull_path:
-                continue
-            dest_point = pull_path[-1]
-            new_distance_to_nearest_enemy = min(
-                [
-                    dest_point.get_distance(enemy.pos)
-                    for enemy in engine.living_entities
-                    if enemy.team != viktoria.team
-                ],
-                default=999,
-            )
-            decreased_distance = (
-                old_distance_to_nearest_enemy - new_distance_to_nearest_enemy
-            )
-            score += decreased_distance // viktoria.get_speed(engine)
-
+        for e in enemies:
+            dist = pt.get_distance(e.pos)
+            if dist == 1:
+                score += 2
         return score
+
+    best_pt = max(
+        reachable_points,
+        key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+    )
+    if score_pt(best_pt) > 0:
+        proposed_moves[best_pt] = "Maximize Enchanted Katana targets"
+    return proposed_moves
+
+
+def enchanted_katana_priority(
+    engine: "Engine",
+    actor: "Entity",
+    pos: "Point",
+    aiming_result: Union["AimingResult", "MultipleAimingResults"],
+) -> float:
+    target_points = aiming_result.sub_aimings["target"].target_points
+    if not target_points:
+        return 0.0
+    target = engine.entity_at(target_points[0])
+    score = 2.0
+
+    included = aiming_result.sub_aimings["burst"].included_points
+    for pt in included:
+        e = engine.entity_at(pt)
+        if e and e.team != actor.team and e != target:
+            score += 1.0
+            if e.hp <= 1:
+                score += 1
+    return score
+
+
+def dragons_breath_movement(
+    engine: "Engine",
+    actor: "Entity",
+    reachable_points: set["Point"],
+    enemies: list["Entity"],
+    allies: list["Entity"],
+) -> dict["Point", str]:
+    proposed_moves = {}
+    if not reachable_points or not enemies:
+        return proposed_moves
+
+    def score_pt(pt: Point) -> int:
+        score = 0
+        for e in enemies:
+            if pt.get_distance(e.pos) <= 4:
+                score += 1
+        return score
+
+    best_pt = max(
+        reachable_points,
+        key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+    )
+    if score_pt(best_pt) > 0:
+        proposed_moves[best_pt] = "In range for Dragon's Breath"
+    return proposed_moves
+
+
+def dragons_breath_priority(
+    engine: "Engine",
+    actor: "Entity",
+    pos: "Point",
+    aiming_result: Union["AimingResult", "MultipleAimingResults"],
+) -> float:
+    target_points = aiming_result.target_points
+    if not target_points:
+        return 0.0
+    target_pt = target_points[0]
+
+    viktorias_in_range = []
+    for e in engine.living_entities:
+        if e.name == VIKTORIA_NAME and e.pos and e.pos.get_distance(target_pt) <= 5:
+            viktorias_in_range.append(e)
+
+    score = 0
+    for viktoria in viktorias_in_range:
+        old_distance_to_nearest_enemy = min(
+            [
+                viktoria.pos.get_distance(enemy.pos)
+                for enemy in engine.living_entities
+                if enemy.team != viktoria.team
+            ],
+            default=999,
+        )
+        pull_path = engine.grid.get_pull_path(
+            subject=viktoria, pull_to=target_pt, distance=4
+        )
+        if not pull_path:
+            continue
+        dest_point = pull_path[-1]
+        new_distance_to_nearest_enemy = min(
+            [
+                dest_point.get_distance(enemy.pos)
+                for enemy in engine.living_entities
+                if enemy.team != viktoria.team
+            ],
+            default=999,
+        )
+        decreased_distance = (
+            old_distance_to_nearest_enemy - new_distance_to_nearest_enemy
+        )
+        score += decreased_distance // viktoria.get_speed(engine)
+
+    return float(score)
 
 
 class Viktoria(Hero):
@@ -274,7 +270,7 @@ class Viktoria(Hero):
         self.add_modifier(engine, OnDeathOtherViktoriasHealAndGainDef())
 
         self.abilities.append(
-            EnchantedKatanaAbility(
+            Ability(
                 name="Enchanted Katana",
                 text="Range 1, 2dmg +2Crit. Other enemies in burst 1, 1dmg",
                 aiming=MultipleAiming(
@@ -295,14 +291,18 @@ class Viktoria(Hero):
                 crit_chance=2,
                 is_default=True,
                 owner_id=self.id,
+                custom_movement_fn=enchanted_katana_movement,
+                custom_priority_fn=enchanted_katana_priority,
             )
         )
         self.abilities.append(
-            DragonsBreathAbility(
+            Ability(
                 name="Dragon's Breath",
                 text="Target enemy in range 4. All Viktorias in range 6 of the target pull 4 towards it.",
                 aiming=TargetEntity(in_range=4),
                 instructions=[DragonsBreathPull()],
                 owner_id=self.id,
+                custom_movement_fn=dragons_breath_movement,
+                custom_priority_fn=dragons_breath_priority,
             )
         )

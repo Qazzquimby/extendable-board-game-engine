@@ -203,100 +203,92 @@ class ReapersScythe(Token):
             )
 
 
-class DeathPulseAbility(Ability):
-    def get_movement(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        reachable_points: set["Point"],
-        enemies: list["Entity"],
-        allies: list["Entity"],
-    ) -> dict["Point", str]:
-        proposed_moves = {}
-        if not reachable_points:
-            return proposed_moves
-
-        def score_pt(pt: Point) -> int:
-            score = 0
-            for e in enemies:
-                if pt.get_distance(e.pos) <= 3:
-                    score += 1
-            for a in allies:
-                if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp:
-                    score += 1
-            return score
-
-        best_pt = max(
-            reachable_points,
-            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
-        )
-        if score_pt(best_pt) > 0:
-            proposed_moves[best_pt] = "Maximize Death Pulse targets"
+def death_pulse_movement(
+    engine: "Engine",
+    actor: "Entity",
+    reachable_points: set["Point"],
+    enemies: list["Entity"],
+    allies: list["Entity"],
+) -> dict["Point", str]:
+    proposed_moves = {}
+    if not reachable_points:
         return proposed_moves
 
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        included = aiming_result.included_points
+    def score_pt(pt: Point) -> int:
         score = 0
-        for pt in included:
-            entity = engine.entity_at(pt)
-            if entity:
-                if entity.team != actor.team:
+        for e in enemies:
+            if pt.get_distance(e.pos) <= 3:
+                score += 1
+        for a in allies:
+            if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp:
+                score += 1
+        return score
+
+    best_pt = max(
+        reachable_points,
+        key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+    )
+    if score_pt(best_pt) > 0:
+        proposed_moves[best_pt] = "Maximize Death Pulse targets"
+    return proposed_moves
+
+
+def death_pulse_priority(
+    engine: "Engine",
+    actor: "Entity",
+    pos: "Point",
+    aiming_result: Union["AimingResult", "MultipleAimingResults"],
+) -> float:
+    included = aiming_result.included_points
+    score = 0
+    for pt in included:
+        entity = engine.entity_at(pt)
+        if entity:
+            if entity.team != actor.team:
+                score += 1
+            else:
+                if entity.hp < entity.max_hp:
                     score += 1
-                else:
-                    if entity.hp < entity.max_hp:
-                        score += 1
-        return float(score)
+    return float(score)
 
 
-class GhostShroudAbility(Ability):
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        if actor.hp <= actor.max_hp / 2:
-            return 3.0
-        return 1.0
+def ghost_shroud_priority(
+    engine: "Engine",
+    actor: "Entity",
+    pos: "Point",
+    aiming_result: Union["AimingResult", "MultipleAimingResults"],
+) -> float:
+    if actor.hp <= actor.max_hp / 2:
+        return 3.0
+    return 1.0
 
 
-class DeathSeekerAbility(Ability):
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        return 2.5
+def death_seeker_priority(
+    engine: "Engine",
+    actor: "Entity",
+    pos: "Point",
+    aiming_result: Union["AimingResult", "MultipleAimingResults"],
+) -> float:
+    return 2.5
 
 
-class ReapersScytheAbility(Ability):
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        target = engine.entity_at(aiming_result.target_points[0])
-        if not target:
-            return 0.0
+def reapers_scythe_priority(
+    engine: "Engine",
+    actor: "Entity",
+    pos: "Point",
+    aiming_result: Union["AimingResult", "MultipleAimingResults"],
+) -> float:
+    target = engine.entity_at(aiming_result.target_points[0])
+    if not target:
+        return 0.0
 
-        score = 0
-        missing_hp = target.max_hp - target.hp
-        half_hp = target.max_hp // 2
-        if missing_hp >= half_hp:
-            score += 2  # likely to get extra kill counters
-        expected_damage = min(target.hp, missing_hp)
-        return expected_damage + 1  # immobilize
+    score = 0
+    missing_hp = target.max_hp - target.hp
+    half_hp = target.max_hp // 2
+    if missing_hp >= half_hp:
+        score += 2  # likely to get extra kill counters
+    expected_damage = min(target.hp, missing_hp)
+    return float(expected_damage + 1)  # immobilize
 
 
 class Necrophos(Hero):
@@ -309,18 +301,20 @@ class Necrophos(Hero):
         self.add_modifier(engine, NecroGetKillCounter())
 
         self.abilities.append(
-            DeathPulseAbility(
+            Ability(
                 name="Death Pulse",
                 text="Enemies in burst 3, 1dmg. You and allies in burst 3, heal 1.",
                 aiming=IncludeArea(area=Burst(radius=3)),
                 instructions=[DeathPulse()],
                 is_default=True,
                 owner_id=self.id,
+                custom_movement_fn=death_pulse_movement,
+                custom_priority_fn=death_pulse_priority,
             )
         )
 
         self.abilities.append(
-            GhostShroudAbility(
+            Ability(
                 name="Ghost Shroud",
                 text="""\
         1/Game, Instant +3
@@ -336,11 +330,12 @@ Until the end of your next turn:
                 action_cost=ActionCost.INSTANT,
                 instant_speed=3,
                 max_charges=1,
+                custom_priority_fn=ghost_shroud_priority,
             )
         )
 
         self.abilities.append(
-            DeathSeekerAbility(
+            Ability(
                 name="Death Seeker",
                 text="""\
                1/Game
@@ -361,11 +356,12 @@ Use a default ability.
                 ],
                 max_charges=1,
                 owner_id=self.id,
+                custom_priority_fn=death_seeker_priority,
             )
         )
 
         self.abilities.append(
-            ReapersScytheAbility(
+            Ability(
                 name="Reaper's Scythe",
                 text="""\
                 1/Game
@@ -384,5 +380,6 @@ On kill, gain 2 additional Kill counters.
                 ],
                 max_charges=1,
                 owner_id=self.id,
+                custom_priority_fn=reapers_scythe_priority,
             )
         )
