@@ -1,39 +1,22 @@
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-from aimings import (
-    TargetEntity,
-    TargetSelf,
-    MultipleAiming,
-    IncludeArea,
-    is_enemy_aim_condition,
-)
-from areas import Burst
-from engine import (
-    Engine,
-    Hero,
-)
-from logger import log
-from modifiers import Modifier, Token, ArmorToken, StunnedToken, Armor, SlowToken
-from events import after, before
-from event_library import TurnEndEvent, DamageEvent, DeathEvent
-from abilities import (
-    Ability,
-    DamageInstruction,
-    AddTokenInstruction,
-    RefreshAbilityInstruction,
-    ActionCost,
-    Instruction,
-    ActionContext,
-    UseAnAbilityInstruction,
-)
-from mod_value import div
-from point import Point
-from valence import Valence
-
-
-class Tracer(Hero):
-    def __init__(self, engine: Engine, pos: Point, team: int):
-        super().__init__(
-            engine=engine, name="Tracer", hp=6, speed=4, pos=pos, team=team
-        )
+# Tracer - 6 health, 4 speed
+# - Fast, fragile, instant speed dodges
+# - High close range damage
+# ---
+#
+# Pulse Pistols
+# Range 1, 4dmg.
+# Blink
+# Blink
+# 3/Game, Instant +2:
+# Teleport up to 3.
+# Recall
+# Recall
+# 1/Game, Instant +3:
+# Reset your health to what it was at the end of your last turn.
+# Teleport as close as possible to where you were at the end of your last turn.
+# Pulse Bomb
+# Pulse Bomb
+# Ultimate 5:
+#   Target a space in range 1. If there's a character in the space, attach the pulse bomb to them with +2def.
+#   If it doesn't attach to someone, it drops in that space.
+#   At the start of your next turn, destroy the pulse bomb. It deals 9dmg to anyone in its space and 3dmg to anyone else in burst 1.
