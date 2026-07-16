@@ -285,17 +285,52 @@ class Ability:
     ) -> Optional["Entity"]:
         if self.custom_target_fn:
             return self.custom_target_fn(engine, actor, enemies, allies)
-        if self.valence == Valence.MIXED:
-            raise ValueError(f"Ability {self.name} needs a custom get_target")
-        targets = []
-        if self.valence == Valence.BAD:
-            targets.extend(enemies)
-        if self.valence == Valence.GOOD:
-            targets.extend(allies)
 
-        if not targets:
+        # Collect candidates by valence
+        candidates = []
+        if self.valence in (Valence.BAD, Valence.MIXED):
+            candidates.extend(enemies)
+        if self.valence in (Valence.GOOD, Valence.MIXED):
+            candidates.extend(allies)
+
+        if not candidates:
             return None
-        return min(targets, key=lambda e: e.hp)
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # Pick the target with highest priority at current position
+        best = None
+        best_score = -float("inf")
+        for candidate in candidates:
+            if not candidate.pos:
+                continue
+            score = self._target_priority(engine, actor, candidate)
+            if score > best_score:
+                best_score = score
+                best = candidate
+
+        return best or candidates[0]
+
+    def _target_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        target: "Entity",
+    ) -> float:
+        """Estimate priority if this entity were the target.
+
+        Creates a minimal AimingResult for the target and evaluates it.
+        Override in subclasses for complex aiming types.
+        """
+        from aimings import AimingResult
+
+        # Build a minimal aiming result
+        aiming = AimingResult(
+            target_points=[target.pos],
+            included_points=[],
+            sub_aimings={},
+        )
+        return self.evaluate_priority(engine, actor, actor.pos, aiming)
 
     def get_movement(
         self,

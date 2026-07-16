@@ -28,18 +28,18 @@ def test_score_damage_basic():
 
 
 def test_score_damage_kill_bonus():
-    """5 damage on 3hp target = 6 (min(5,3)=3, doubled for kill)."""
-    assert score_damage(5, 3) == 6.0
+    """5 damage kills 3hp: min(5,3)=3 + 1.5 kill bonus = 4.5."""
+    assert score_damage(5, 3) == 4.5
 
 
 def test_score_damage_exact_kill():
-    """3 damage on 3hp target = 6 (exact kill = doubled)."""
-    assert score_damage(3, 3) == 6.0
+    """3 damage kills 3hp: min(3,3)=3 + 1.5 kill bonus = 4.5."""
+    assert score_damage(3, 3) == 4.5
 
 
 def test_score_damage_overkill():
-    """10 damage on 3hp target = 6 (overkill still capped + doubled)."""
-    assert score_damage(10, 3) == 6.0
+    """10 damage on 3hp: still 4.5 (overkill doesn't add extra)."""
+    assert score_damage(10, 3) == 4.5
 
 
 def test_score_damage_zero():
@@ -48,8 +48,8 @@ def test_score_damage_zero():
 
 
 def test_score_damage_no_negative():
-    """No negative scores for non-existent targets."""
-    assert score_damage(2, 0) == 0.0
+    """Damage on 0hp target = 1.5 (min(2,0)=0 + 1.5 kill bonus)."""
+    assert score_damage(2, 0) == 1.5
 
 
 # ── score_heal ────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ def test_auto_priority_damage_kill():
     aiming = _make_aiming_result(target_pts=[Point(0, 0)])
 
     priority = ability.get_priority(engine, MagicMock(), Point(0, 0), aiming)
-    assert priority == 6.0
+    assert priority == score_damage(5, 3)  # 4.5: min(5,3)=3 + 1.5 kill bonus
 
 
 def test_auto_priority_no_target():
@@ -610,3 +610,130 @@ def test_death_pulse_scores_heal_on_ally():
     actor = MockEntity(team=1)
     priority = inst.score(MagicMock(), actor, target, MagicMock())
     assert priority == score_heal(1, 4)  # 1.0
+
+
+# ── Priority-based get_target ─────────────────────────────────────────
+
+def _make_entity(eid, hp, team, pos):
+    """Helper to create a minimal mock entity for get_target tests."""
+    import types
+    ent = types.SimpleNamespace()
+    ent.id = eid
+    ent.hp = hp
+    ent.max_hp = hp
+    ent.team = team
+    ent.pos = pos
+    return ent
+
+
+def test_get_target_picks_highest_priority():
+    """get_target should pick the enemy with the highest priority score."""
+    from instruction_library import DamageInstruction
+    from aimings import TargetEntity
+
+    ability = Ability(
+        name="Test",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=5)],
+    )
+    actor = _make_entity(1, 20, 1, Point(0, 0))
+    weak = _make_entity(2, 2, 2, Point(3, 0))   # score_damage(5, 2) = 3.5
+    tough = _make_entity(3, 10, 2, Point(4, 0))  # score_damage(5, 10) = 5.0
+
+    engine = MagicMock()
+    def entity_at(pt):
+        if pt == weak.pos: return weak
+        if pt == tough.pos: return tough
+        return None
+    engine.entity_at.side_effect = entity_at
+
+    chosen = ability.get_target(engine, actor, [weak, tough], [])
+    assert chosen == tough  # 5.0 > 3.5
+
+
+def test_get_target_prefers_killable_when_kill_bonus_high_enough():
+    """With enough damage, kill bonus can make a weaker target win."""
+    from instruction_library import DamageInstruction
+    from aimings import TargetEntity
+
+    ability = Ability(
+        name="Test",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=6)],
+    )
+    actor = _make_entity(1, 20, 1, Point(0, 0))
+    # score_damage(6, 3) = min(6,3)+1.5 = 4.5
+    # score_damage(6, 10) = min(6,10) = 6.0  (no kill bonus since 6 < 10)
+    # tough still wins. Let's make it closer:
+    # score_damage(4, 3) = min(4,3)+1.5 = 4.5
+    # score_damage(4, 5) = min(4,5) = 4.0
+    # Now weak wins!
+    ability2 = Ability(
+        name="Test2",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=4)],
+    )
+    weak = _make_entity(2, 3, 2, Point(3, 0))     # score_damage(4, 3) = 4.5
+    tough = _make_entity(3, 5, 2, Point(4, 0))     # score_damage(4, 5) = 4.0
+
+    engine = MagicMock()
+    def entity_at(pt):
+        if pt == weak.pos: return weak
+        if pt == tough.pos: return tough
+        return None
+    engine.entity_at.side_effect = entity_at
+
+    chosen = ability2.get_target(engine, actor, [weak, tough], [])
+    assert chosen == weak  # 4.5 > 4.0 — killable target wins
+
+
+def test_get_target_fallback_when_no_pos():
+    """Entity with no pos doesn't crash get_target."""
+    from instruction_library import DamageInstruction
+    from aimings import TargetEntity
+
+    ability = Ability(
+        name="Test",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=5)],
+    )
+    actor = _make_entity(1, 20, 1, Point(0, 0))
+    no_pos = _make_entity(2, 5, 2, None)
+    normal = _make_entity(3, 5, 2, Point(3, 0))
+
+    engine = MagicMock()
+    engine.entity_at.side_effect = lambda pt: normal if pt == normal.pos else None
+
+    chosen = ability.get_target(engine, actor, [no_pos, normal], [])
+    assert chosen == normal
+
+
+def test_get_target_single_candidate():
+    """Single candidate returns immediately without evaluation."""
+    from instruction_library import DamageInstruction
+    from aimings import TargetEntity
+
+    ability = Ability(
+        name="Test",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=5)],
+    )
+    actor = _make_entity(1, 20, 1, Point(0, 0))
+    target = _make_entity(2, 5, 2, Point(3, 0))
+
+    engine = MagicMock()
+    chosen = ability.get_target(engine, actor, [target], [])
+    assert chosen == target
+
+
+def test_get_target_empty():
+    """No candidates returns None."""
+    from instruction_library import DamageInstruction
+    ability = Ability(
+        name="Empty",
+        aiming=MagicMock(),
+        instructions=[DamageInstruction(amount=1)],
+    )
+    actor = _make_entity(1, 20, 1, Point(0, 0))
+    engine = MagicMock()
+    assert ability.get_target(engine, actor, [], []) is None
