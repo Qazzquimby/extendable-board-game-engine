@@ -217,6 +217,7 @@ def _make_aiming_result(target_pts=None, incl_pts=None):
 class MockEntity:
     """Minimal entity stub for priority testing."""
     def __init__(self, hp=10, max_hp=10, team=1):
+        self.id = 42
         self.hp = hp
         self.max_hp = max_hp
         self.team = team

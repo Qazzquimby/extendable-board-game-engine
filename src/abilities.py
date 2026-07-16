@@ -124,7 +124,7 @@ def score_damage(amount: int, target_hp: int) -> float:
     """
     effective = min(amount, target_hp)
     if amount >= target_hp:
-        effective *= 2  # kill bonus
+        effective += 1.5  # killing is better than leaving low health
     return float(effective)
 
 
@@ -143,6 +143,7 @@ def score_add_token(token_class: "Type"):
     Bad tokens on enemies = +2, Good tokens on allies = +1.
     """
     from valence import Valence
+
     if token_class.valence == Valence.BAD:
         return 2.0
     elif token_class.valence == Valence.GOOD:
@@ -162,6 +163,16 @@ class Instruction:
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         pass
+
+    def score(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        target: "Entity",
+        ctx: ActionContext,
+    ) -> float:
+        """Priority contribution of this instruction for a single target entity."""
+        raise NotImplemented
 
 
 def default_reaction_condition(
@@ -379,96 +390,35 @@ class Ability:
         actor: "Entity",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        """Auto-score from instructions: damage, heals, tokens.
+        """Score each instruction against each target/included point.
 
-        Inspects the ability's instructions and computes a reasonable priority.
-        Subclasses override get_priority for abilities where this heuristic
-        is insufficient (multi-target, complex conditionals, etc.).
+        Each instruction's .score() method handles its own contribution.
+        Sums across all points and all instructions.
         """
         score = 0.0
-
-        # Collect all target + included points and score per-entity
-        all_points = []
-        if aiming_result.target_points:
-            all_points.extend(aiming_result.target_points)
-        if aiming_result.included_points:
-            all_points.extend(aiming_result.included_points)
-
-        if not all_points:
-            return 0.0
-
         for instruction in self.instructions:
-            score += self._score_instruction(
-                instruction, engine, actor, all_points, aiming_result
-            )
+            # Determine which aiming result applies to this instruction
+            if instruction.aiming_name and isinstance(
+                aiming_result, MultipleAimingResults
+            ):
+                inst_aiming = aiming_result.sub_aimings[instruction.aiming_name]
+            else:
+                inst_aiming = aiming_result
 
+            for pt in list(inst_aiming.target_points) + list(
+                inst_aiming.included_points
+            ):
+                target = engine.entity_at(pt)
+                if target:
+                    ctx = ActionContext(
+                        source_id=actor.id,
+                        subject_point=pt,
+                        target_points=inst_aiming.target_points,
+                        included_points=inst_aiming.included_points,
+                        ability=self,
+                    )
+                    score += instruction.score(engine, actor, target, ctx)
         return score
-
-    def _score_instruction(
-        self,
-        instruction: "Instruction",
-        engine: "Engine",
-        actor: "Entity",
-        all_points: List["Point"],
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        from instruction_library import (
-            DamageInstruction,
-            HealInstruction,
-            AddTokenInstruction,
-            AddModifierInstruction,
-        )
-
-        if isinstance(instruction, DamageInstruction):
-            total = 0.0
-            for pt in all_points:
-                target = engine.entity_at(pt)
-                if target and target.team != actor.team:
-                    # Resolve amount if int; fall back to 1 for callables
-                    dmg = instruction.amount
-                    if isinstance(dmg, int):
-                        total += score_damage(dmg, target.hp)
-                    else:
-                        total += 1.0
-            return total
-
-        elif isinstance(instruction, HealInstruction):
-            total = 0.0
-            for pt in all_points:
-                target = engine.entity_at(pt)
-                if target and target.team == actor.team:
-                    amt = instruction.amount
-                    if isinstance(amt, int):
-                        missing = target.max_hp - target.hp
-                        total += score_heal(amt, missing)
-                    else:
-                        total += 1.0
-            return total
-
-        elif isinstance(instruction, AddTokenInstruction):
-            total = 0.0
-            for pt in all_points:
-                target = engine.entity_at(pt)
-                if target:
-                    # Only score if valence matches target team
-                    if instruction.token_class.valence == Valence.BAD and target.team != actor.team:
-                        total += score_add_token(instruction.token_class)
-                    elif instruction.token_class.valence == Valence.GOOD and target.team == actor.team:
-                        total += score_add_token(instruction.token_class)
-            return total
-
-        elif isinstance(instruction, AddModifierInstruction):
-            total = 0.0
-            for pt in all_points:
-                target = engine.entity_at(pt)
-                if target:
-                    if instruction.modifier_class.valence == Valence.BAD and target.team != actor.team:
-                        total += score_add_token(instruction.modifier_class)
-                    elif instruction.modifier_class.valence == Valence.GOOD and target.team == actor.team:
-                        total += score_add_token(instruction.modifier_class)
-            return total
-
-        return 0.0
 
     def get_hash_info(self):
         return (

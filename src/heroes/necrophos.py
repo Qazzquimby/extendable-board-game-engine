@@ -36,6 +36,8 @@ from abilities import (
     Instruction,
     ActionContext,
     best_move_for_score,
+    score_damage,
+    score_heal,
 )
 from instruction_library import (
     AddModifierInstruction,
@@ -155,6 +157,12 @@ class DeathPulse(Instruction):
                 engine.event_queue.enqueue(
                     DamageEvent(source=source, subject=entity, amount=1)
                 )
+
+    def score(self, engine, actor, target, ctx) -> float:
+        if target.team == actor.team:
+            return score_heal(1, target.max_hp - target.hp)
+        else:
+            return score_damage(1, target.hp)
 
 
 @dataclass

@@ -25,6 +25,7 @@ from abilities import (
     Instruction,
     ActionContext,
     best_move_for_score,
+    score_damage,
 )
 from instruction_library import (
     DamageInstruction,
@@ -85,6 +86,12 @@ class CullingBladeInstruction(Instruction):
                 ctx.ability.charges += 1
             if isinstance(target, Hero):
                 source.add_modifier(engine, Armor())
+
+    def score(self, engine, actor, target, ctx) -> float:
+        base = score_damage(3, target.hp)
+        if target.hp <= 3:
+            base += 2.0  # refresh + potential armor
+        return base
 
 
 @dataclass(kw_only=True)

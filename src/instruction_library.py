@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Type, Optional
 
 from abilities import Instruction, DynamicInt, ActionContext, resolve_int, DynamicPoint
+from abilities import score_damage, score_heal, score_add_token
 from engine import Engine
 from event_library import (
     DamageEvent,
@@ -43,6 +44,12 @@ class DamageInstruction(Instruction):
                 )
             )
 
+    def score(self, engine, actor, target, ctx) -> float:
+        if target.team == actor.team:
+            return 0.0
+        dmg = resolve_int(self.amount, ctx) if callable(self.amount) else self.amount
+        return score_damage(dmg, target.hp) if isinstance(dmg, int) else 1.0
+
 
 @dataclass
 class HealInstruction(Instruction):
@@ -54,6 +61,14 @@ class HealInstruction(Instruction):
         if subject:
             amount = resolve_int(self.amount, ctx)
             engine.event_queue.enqueue(HealEvent(subject=subject, amount=amount))
+
+    def score(self, engine, actor, target, ctx) -> float:
+        if target.team != actor.team:
+            return 0.0
+        amt = resolve_int(self.amount, ctx) if callable(self.amount) else self.amount
+        if isinstance(amt, int):
+            return score_heal(amt, target.max_hp - target.hp)
+        return 1.0
 
 
 @dataclass
@@ -74,6 +89,9 @@ class AddModifierInstruction(Instruction):
                     modifier_kwargs=self.modifier_kwargs,
                 )
             )
+
+    def score(self, engine, actor, target, ctx) -> float:
+        return score_add_token(self.modifier_class)
 
 
 @dataclass
@@ -121,6 +139,15 @@ class AddTokenInstruction(Instruction):
                 )
             )
 
+    def score(self, engine, actor, target, ctx) -> float:
+        value = score_add_token(self.token_class) * resolve_int(self.amount, ctx)
+        on_ally = target.team == actor.team
+        if (on_ally and self.token_class.valence == Valence.BAD) or (
+            not on_ally and self.token_class.valence == Valence.GOOD
+        ):
+            value = -value
+        return value
+
 
 @dataclass
 class RemoveTokenInstruction(Instruction):
@@ -145,6 +172,15 @@ class RemoveTokenInstruction(Instruction):
                     amount=self.amount,
                 )
             )
+
+    def score(self, engine, actor, target, ctx) -> float:
+        # todo can add a value property on tokens rather than flat 2
+        # Removing a bad token from ally = good, removing good token from enemy = good
+        if self.token_class.valence == Valence.BAD and target.team == actor.team:
+            return 2.0
+        if self.token_class.valence == Valence.GOOD and target.team != actor.team:
+            return 2.0
+        return 0.0
 
 
 @dataclass
@@ -230,6 +266,9 @@ class RefreshAbilityInstruction(Instruction):
                 ctx.ability.tapped_this_turn = False
                 ctx.ability.charges = ctx.ability.max_charges  # todo should be event
 
+    def score(self, engine, actor, target, ctx) -> float:
+        return 2.0  # refreshing an ability has fixed value
+
 
 @dataclass
 class TeleportInstruction(Instruction):
@@ -255,6 +294,10 @@ class ApplyModifierInstruction(Instruction):
 
     def __post__init__(self):
         self.valence = self.modifier_class.valence
+
+    def score(self, engine, actor, target, ctx) -> float:
+        return score_add_token(self.modifier_class)
+
 
 # @dataclass
 # class PushInstruction(Instruction):
