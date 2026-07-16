@@ -150,15 +150,6 @@ class PulsePistols(Ability):
             owner_id=owner_id,
         )
 
-    def get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        return 4.0
-
 
 class PulseBombAttached(Modifier):
     def __init__(self, source_id: str):

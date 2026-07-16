@@ -155,15 +155,6 @@ class AxeSwing(Ability):
             owner_id=owner_id,
         )
 
-    def get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        return 2.0
-
 
 class BerserkersCall(Ability):
     def __init__(self, owner_id: str):
@@ -284,21 +275,6 @@ class CullingBlade(Ability):
             owner_id=owner_id,
         )
 
-    def get_target(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        enemies: list["Entity"],
-        allies: list["Entity"],
-    ) -> Optional["Entity"]:
-        killable_enemies = [e for e in enemies if e.hp <= 3]
-        if killable_enemies:
-            return max(killable_enemies, key=lambda e: e.hp)
-        if enemies:
-            return min(enemies, key=lambda e: e.hp)
-        return None
-
-    # todo this seems contraditory. get_target should (always?) take the  target with highest priority.
     def get_priority(
         self,
         engine: "Engine",

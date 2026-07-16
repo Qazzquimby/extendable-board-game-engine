@@ -384,3 +384,229 @@ def test_subclass_override_takes_precedence():
         MagicMock(), MagicMock(), Point(0, 0), _make_aiming_result()
     )
     assert priority == 5.0
+
+
+# ── Instruction-level scoring ──────────────────────────────────────────
+
+def test_damage_instruction_score():
+    """DamageInstruction.score uses score_damage with kill bonus."""
+    from instruction_library import DamageInstruction
+
+    inst = DamageInstruction(amount=3)
+    target = MockEntity(hp=5, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_damage(3, 5)  # 3.0
+
+
+def test_damage_instruction_kill():
+    """DamageInstruction on killable target gets doubled."""
+    from instruction_library import DamageInstruction
+
+    inst = DamageInstruction(amount=5)
+    target = MockEntity(hp=3, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_damage(5, 3)  # 6.0
+
+
+def test_damage_instruction_friendly():
+    """DamageInstruction on ally = 0."""
+    from instruction_library import DamageInstruction
+
+    inst = DamageInstruction(amount=5)
+    target = MockEntity(hp=10, team=1)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == 0.0
+
+
+def test_heal_instruction_score():
+    """HealInstruction.score uses score_heal."""
+    from instruction_library import HealInstruction
+
+    inst = HealInstruction(amount=3)
+    target = MockEntity(hp=6, max_hp=10, team=1)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_heal(3, 4)  # 3.0
+
+
+def test_heal_instruction_enemy():
+    """HealInstruction on enemy = 0."""
+    from instruction_library import HealInstruction
+
+    inst = HealInstruction(amount=3)
+    target = MockEntity(hp=6, max_hp=10, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == 0.0
+
+
+def test_add_token_instruction_bad():
+    """AddTokenInstruction with bad token on enemy = score_add_token."""
+    from instruction_library import AddTokenInstruction
+    from valence import Valence
+
+    class BadToken:
+        valence = Valence.BAD
+
+    inst = AddTokenInstruction(token_class=BadToken)
+    target = MockEntity(hp=10, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_add_token(BadToken)  # 2.0
+
+
+def test_add_token_instruction_good_on_ally():
+    """AddTokenInstruction with good token on ally = score_add_token."""
+    from instruction_library import AddTokenInstruction
+    from valence import Valence
+
+    class GoodToken:
+        valence = Valence.GOOD
+
+    inst = AddTokenInstruction(token_class=GoodToken)
+    target = MockEntity(hp=10, team=1)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_add_token(GoodToken)  # 1.0
+
+
+def test_add_token_instruction_wrong_team():
+    """Bad token on ally = negative priority (actively harmful)."""
+    from instruction_library import AddTokenInstruction
+    from valence import Valence
+
+    class BadToken:
+        valence = Valence.BAD
+
+    inst = AddTokenInstruction(token_class=BadToken)
+    target = MockEntity(hp=10, team=1)  # ally
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == -score_add_token(BadToken)  # -2.0
+
+
+# ── Auto-priority for previously-overridden abilities ─────────────────
+
+def test_auto_priority_axe_swing():
+    """AxeSwing (2dmg) scores damage automatically."""
+    from instruction_library import DamageInstruction
+
+    ability = Ability(
+        name="Axe Swing",
+        aiming=TargetEntity(in_range=1),
+        instructions=[DamageInstruction(amount=2)],
+        is_default=True,
+    )
+    target = MockEntity(hp=5, team=2)
+    actor = MockEntity(team=1)
+    engine = _make_mock_engine(target)
+    aiming = _make_aiming_result(target_pts=[Point(0, 0)])
+
+    priority = ability.get_priority(engine, actor, Point(0, 0), aiming)
+    assert priority == 2.0
+
+
+def test_auto_priority_axe_swing_kill():
+    """AxeSwing on 1hp target: kill bonus makes it 4.0 (not flat 2.0)."""
+    from instruction_library import DamageInstruction
+
+    ability = Ability(
+        name="Axe Swing",
+        aiming=TargetEntity(in_range=1),
+        instructions=[DamageInstruction(amount=2)],
+        is_default=True,
+    )
+    target = MockEntity(hp=1, team=2)
+    actor = MockEntity(team=1)
+    engine = _make_mock_engine(target)
+    aiming = _make_aiming_result(target_pts=[Point(0, 0)])
+
+    priority = ability.get_priority(engine, actor, Point(0, 0), aiming)
+    assert priority == score_damage(2, 1)  # min(2,1) * 2 = 2.0
+
+
+def test_auto_priority_photon_orb():
+    """PhotonOrb (4dmg) scores damage automatically."""
+    from instruction_library import DamageInstruction
+
+    ability = Ability(
+        name="Photon Orb",
+        aiming=TargetEntity(in_range=4),
+        instructions=[DamageInstruction(amount=4)],
+        is_default=True,
+    )
+    target = MockEntity(hp=10, team=2)
+    actor = MockEntity(team=1)
+    engine = _make_mock_engine(target)
+    aiming = _make_aiming_result(target_pts=[Point(0, 0)])
+
+    priority = ability.get_priority(engine, actor, Point(0, 0), aiming)
+    assert priority == 4.0
+
+
+def test_auto_priority_pulse_pistols():
+    """PulsePistols (4dmg) scores damage automatically."""
+    from instruction_library import DamageInstruction
+
+    ability = Ability(
+        name="Pulse Pistols",
+        aiming=TargetEntity(in_range=1),
+        instructions=[DamageInstruction(amount=4)],
+        is_default=True,
+    )
+    target = MockEntity(hp=10, team=2)
+    actor = MockEntity(team=1)
+    engine = _make_mock_engine(target)
+    aiming = _make_aiming_result(target_pts=[Point(0, 0)])
+
+    priority = ability.get_priority(engine, actor, Point(0, 0), aiming)
+    assert priority == 4.0
+
+
+# ── CullingBladeInstruction scoring ───────────────────────────────────
+
+def test_culling_blade_instruction_scores_damage():
+    """CullingBladeInstruction uses score_damage + kill bonus."""
+    from heroes.axe import CullingBladeInstruction
+
+    inst = CullingBladeInstruction()
+    target = MockEntity(hp=10, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_damage(3, 10)  # 3.0
+
+
+def test_culling_blade_instruction_kill_bonus():
+    """CullingBladeInstruction adds 2.0 for refresh on kill."""
+    from heroes.axe import CullingBladeInstruction
+
+    inst = CullingBladeInstruction()
+    target = MockEntity(hp=3, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_damage(3, 3) + 2.0  # 6.0 + 2.0 = 8.0
+
+
+def test_death_pulse_scores_damage_on_enemy():
+    """DeathPulse scores 1 damage on enemies."""
+    from heroes.necrophos import DeathPulse
+
+    inst = DeathPulse()
+    target = MockEntity(hp=5, team=2)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_damage(1, 5)  # 1.0
+
+
+def test_death_pulse_scores_heal_on_ally():
+    """DeathPulse scores 1 heal on allies."""
+    from heroes.necrophos import DeathPulse
+
+    inst = DeathPulse()
+    target = MockEntity(hp=6, max_hp=10, team=1)
+    actor = MockEntity(team=1)
+    priority = inst.score(MagicMock(), actor, target, MagicMock())
+    assert priority == score_heal(1, 4)  # 1.0
