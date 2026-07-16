@@ -12,8 +12,8 @@ from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# Ensure src/ is on the path so we can import engine modules
-_src_path = str(Path(__file__).resolve().parent.parent / "src")
+# Ensure backend/src/ is on the path so we can import engine modules
+_src_path = str(Path(__file__).resolve().parent / "src")
 if _src_path not in sys.path:
     sys.path.insert(0, _src_path)
 
@@ -24,16 +24,17 @@ from grid import Grid
 from point import Point
 from schemas import GameLog
 
-
 # ── Discover hero classes ──────────────────────────────────────────────
+
 
 def _discover_hero_classes() -> Dict[str, type]:
     """Import all hero modules and return {class_name: class} mapping."""
     heroes = {}
 
+    # todo automate dont duplicate
     # Known hero modules to scan
     hero_modules = [
-        "heroes",           # __init__.py has MeleeHero, RangedHero
+        "heroes",  # __init__.py has MeleeHero, RangedHero
         "heroes.axe",
         "heroes.necrophos",
         "heroes.reinhardt",
@@ -60,6 +61,7 @@ _HERO_CLASSES = _discover_hero_classes()
 
 
 # ── Request / Response schemas ─────────────────────────────────────────
+
 
 class HeroPlacement(BaseModel):
     class_name: str = Field(alias="class")
@@ -145,3 +147,8 @@ def run_game(req: RunGameRequest) -> GameLog:
     game_log = engine.run_game()
 
     return game_log
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

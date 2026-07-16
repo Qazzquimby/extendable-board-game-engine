@@ -1,4 +1,8 @@
 import json
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend", "src"))
+
 from ai.mcts import MCTSAgent
 from game_setup import GameSetup
 from heroes import MeleeHero, RangedHero

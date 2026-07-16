@@ -4,7 +4,7 @@ import os
 
 # Add src to path to allow importing schemas
 sys.path.insert(
-    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend", "src"))
 )
 
 from schemas import GameLog
