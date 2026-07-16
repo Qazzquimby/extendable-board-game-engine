@@ -13,8 +13,8 @@
 	"devDependencies": {
 		"@testing-library/jest-dom": "^6",
 		"@testing-library/react": "^16",
-		"vitest": "^2",
-		"jsdom": "^25"
+		"vitest": "^4",
+		"jsdom": "^29"
 	},
 	"dependencies": {
 		"@types/react": "^19.2.14",
