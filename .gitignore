@@ -1,7 +1,8 @@
+__pycache__/
+*.pyc
 .aider*
 .venv
 *_key.txt
-__py_cache__
 node_modules
 
 game_logs.json
