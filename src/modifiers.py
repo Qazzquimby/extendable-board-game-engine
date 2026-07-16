@@ -2,7 +2,7 @@ from dataclasses import field, dataclass
 from typing import TYPE_CHECKING
 
 from events import query, before
-from event_library import TurnEndEvent
+from event_library import TurnEndEvent, TurnStartEvent
 from logger import log
 from queries import QueryCanMove, QueryLegalActions, QuerySpeed, QueryHasArmor
 from valence import Valence
@@ -53,6 +53,14 @@ class Token(Modifier):
 
     def __str__(self):
         return f"{self.name} x {self.amount}"
+
+
+class ClearAtStartOfTurnMixin:
+    @before(TurnStartEvent)
+    def clear_at_end_of_turn(self, engine: "Engine", event: TurnStartEvent) -> None:
+        owner = engine.get_entity_by_id(self.owner_id)
+        if self in owner.modifiers:
+            owner.remove_modifier(engine=engine, modifier=self)
 
 
 class ClearAtEndOfTurnMixin:
