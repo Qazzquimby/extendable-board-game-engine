@@ -354,23 +354,8 @@ def test_auto_priority_empty_target_points():
     assert priority == 0.0
 
 
-def test_custom_priority_fn_overrides_auto():
-    """If custom_priority_fn is set, it takes precedence over auto-scoring."""
-    ability = Ability(
-        name="Custom",
-        aiming=TargetEntity(in_range=1),
-        custom_priority_fn=lambda e, a, p, r: 42.0,
-    )
-    priority = ability.get_priority(
-        MagicMock(), MagicMock(), Point(0, 0), _make_aiming_result()
-    )
-    assert priority == 42.0
-
-
-# ── Subclass override preserves original behavior ────────────────────
-
 def test_subclass_override_takes_precedence():
-    """A subclass that overrides get_priority is still called directly."""
+    """A subclass that overrides get_priority is called directly."""
     class AlwaysFive(Ability):
         def get_priority(self, engine, actor, pos, aiming_result):
             return 5.0

@@ -253,29 +253,6 @@ class Ability:
     ] = default_reaction_condition
     requires_target: bool = True
 
-    custom_target_fn: Optional[
-        Callable[
-            ["Engine", "Entity", List["Entity"], List["Entity"]], Optional["Entity"]
-        ]
-    ] = None
-    custom_movement_fn: Optional[
-        Callable[
-            ["Engine", "Entity", set["Point"], List["Entity"], List["Entity"]],
-            dict["Point", str],
-        ]
-    ] = None
-    custom_priority_fn: Optional[
-        Callable[
-            [
-                "Engine",
-                "Entity",
-                "Point",
-                Union["AimingResult", "MultipleAimingResults"],
-            ],
-            float,
-        ]
-    ] = None
-
     def get_target(
         self,
         engine: "Engine",
@@ -283,9 +260,6 @@ class Ability:
         enemies: List["Entity"],
         allies: List["Entity"],
     ) -> Optional["Entity"]:
-        if self.custom_target_fn:
-            return self.custom_target_fn(engine, actor, enemies, allies)
-
         # Collect candidates by valence
         candidates = []
         if self.valence in (Valence.BAD, Valence.MIXED):
@@ -340,10 +314,6 @@ class Ability:
         enemies: List["Entity"],
         allies: List["Entity"],
     ) -> dict["Point", str]:
-        if self.custom_movement_fn:
-            return self.custom_movement_fn(
-                engine, actor, reachable_points, enemies, allies
-            )
         proposed_moves = {}
         attack_range = 0
         from aimings import TargetEntity, IncludeArea
@@ -415,8 +385,6 @@ class Ability:
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        if self.custom_priority_fn:
-            return self.custom_priority_fn(engine, actor, pos, aiming_result)
         return self._auto_priority(engine, actor, aiming_result)
 
     def _auto_priority(
