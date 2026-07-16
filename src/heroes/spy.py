@@ -1,9 +1,7 @@
 from aimings import TargetEntity
-from engine import (
-    Engine,
-    Hero,
-    ActionContext,
-)
+from engine import Engine
+from entities import Hero
+from abilities import ActionContext
 from abilities import (
     Ability,
 )

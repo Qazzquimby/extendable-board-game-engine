@@ -12,16 +12,12 @@ from instruction_library import (
 )
 from aimings import IncludeArea
 from areas import Square, PathArea, Line
-from engine import (
-    Immobile,
-    Engine,
-    Hero,
-    before,
-    ImmobileToken,
-    ActionContext,
-    Instruction,
-)
-from modifiers import Modifier
+from engine import Engine
+from entities import Hero
+from events import before
+from modifiers import Immobile, ImmobileToken, Modifier
+from abilities import ActionContext, Instruction
+
 from event_library import PushEvent, PullEvent, DamageEvent
 from grid import Grid
 from point import Point
