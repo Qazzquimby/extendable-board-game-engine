@@ -26,6 +26,8 @@ from abilities import (
     Ability,
     Instruction,
     ActionContext,
+    best_move_for_score,
+    displacement_value,
 )
 from instruction_library import DamageInstruction
 from point import Point
@@ -167,25 +169,14 @@ class EnchantedKatana(Ability):
         enemies: list["Entity"],
         allies: list["Entity"],
     ) -> dict["Point", str]:
-        proposed_moves = {}
         if not reachable_points or not enemies:
-            return proposed_moves
-
-        def score_pt(pt: Point) -> int:
-            score = 0
-            for e in enemies:
-                dist = pt.get_distance(e.pos)
-                if dist == 1:
-                    score += 2
-            return score
-
-        best_pt = max(
+            return {}
+        return best_move_for_score(
             reachable_points,
-            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+            actor.pos,
+            score_fn=lambda pt: sum(2 for e in enemies if pt.get_distance(e.pos) == 1),
+            reason="Maximize Enchanted Katana targets",
         )
-        if score_pt(best_pt) > 0:
-            proposed_moves[best_pt] = "Maximize Enchanted Katana targets"
-        return proposed_moves
 
     def get_priority(
         self,
@@ -228,24 +219,14 @@ class DragonsBreath(Ability):
         enemies: list["Entity"],
         allies: list["Entity"],
     ) -> dict["Point", str]:
-        proposed_moves = {}
         if not reachable_points or not enemies:
-            return proposed_moves
-
-        def score_pt(pt: Point) -> int:
-            score = 0
-            for e in enemies:
-                if pt.get_distance(e.pos) <= 4:
-                    score += 1
-            return score
-
-        best_pt = max(
+            return {}
+        return best_move_for_score(
             reachable_points,
-            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+            actor.pos,
+            score_fn=lambda pt: sum(1 for e in enemies if pt.get_distance(e.pos) <= 4),
+            reason="In range for Dragon's Breath",
         )
-        if score_pt(best_pt) > 0:
-            proposed_moves[best_pt] = "In range for Dragon's Breath"
-        return proposed_moves
 
     def get_priority(
         self,
@@ -259,41 +240,20 @@ class DragonsBreath(Ability):
             return 0.0
         target_pt = target_points[0]
 
-        viktorias_in_range = []
+        score = 0.0
         for e in engine.living_entities:
             if e.name == VIKTORIA_NAME and e.pos and e.pos.get_distance(target_pt) <= 5:
-                viktorias_in_range.append(e)
+                pull_path = engine.grid.get_pull_path(
+                    subject=e, pull_to=target_pt, distance=4
+                )
+                if not pull_path:
+                    continue
+                dest_point = pull_path[-1]
+                value = displacement_value(e, e.pos, dest_point, engine)
+                if value > 0:
+                    score += value
 
-        score = 0
-        for viktoria in viktorias_in_range:
-            old_distance_to_nearest_enemy = min(
-                [
-                    viktoria.pos.get_distance(enemy.pos)
-                    for enemy in engine.living_entities
-                    if enemy.team != viktoria.team
-                ],
-                default=999,
-            )
-            pull_path = engine.grid.get_pull_path(
-                subject=viktoria, pull_to=target_pt, distance=4
-            )
-            if not pull_path:
-                continue
-            dest_point = pull_path[-1]
-            new_distance_to_nearest_enemy = min(
-                [
-                    dest_point.get_distance(enemy.pos)
-                    for enemy in engine.living_entities
-                    if enemy.team != viktoria.team
-                ],
-                default=999,
-            )
-            decreased_distance = (
-                old_distance_to_nearest_enemy - new_distance_to_nearest_enemy
-            )
-            score += decreased_distance // viktoria.get_speed(engine)
-
-        return float(score)
+        return score
 
 
 class Viktoria(Hero):

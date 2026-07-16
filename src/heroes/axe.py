@@ -24,6 +24,7 @@ from abilities import (
     ActionCost,
     Instruction,
     ActionContext,
+    best_move_for_score,
 )
 from instruction_library import (
     DamageInstruction,
@@ -195,20 +196,14 @@ class BerserkersCall(Ability):
         enemies: list["Entity"],
         allies: list["Entity"],
     ) -> dict["Point", str]:
-        proposed_moves = {}
         if not reachable_points or not enemies:
-            return proposed_moves
-
-        def enemies_in_burst(pt: Point) -> int:
-            return sum(1 for e in enemies if pt.get_distance(e.pos) <= 1)
-
-        best_pt = max(
+            return {}
+        return best_move_for_score(
             reachable_points,
-            key=lambda pt: (enemies_in_burst(pt), -pt.get_distance(actor.pos)),
+            actor.pos,
+            score_fn=lambda pt: sum(1 for e in enemies if pt.get_distance(e.pos) <= 1),
+            reason="Maximize Berserker's Call targets",
         )
-        if enemies_in_burst(best_pt) > 0:
-            proposed_moves[best_pt] = "Maximize Berserker's Call targets"
-        return proposed_moves
 
     def get_priority(
         self,
@@ -291,11 +286,12 @@ class CullingBlade(Ability):
     ) -> Optional["Entity"]:
         killable_enemies = [e for e in enemies if e.hp <= 3]
         if killable_enemies:
-            return min(killable_enemies, key=lambda e: e.hp)
+            return max(killable_enemies, key=lambda e: e.hp)
         if enemies:
             return min(enemies, key=lambda e: e.hp)
         return None
 
+    # todo this seems contraditory. get_target should (always?) take the  target with highest priority.
     def get_priority(
         self,
         engine: "Engine",

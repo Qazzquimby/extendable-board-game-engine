@@ -69,6 +69,52 @@ def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
     return val(ctx) if callable(val) else val
 
 
+def best_move_for_score(
+    reachable_points: set["Point"],
+    actor_pos: "Point",
+    score_fn: Callable[["Point"], float],
+    reason: str,
+) -> dict["Point", str]:
+    """Score each reachable point and return the best one with a reason string.
+
+    Uses the standard tiebreaker: prefer the point closest to the actor.
+    Returns an empty dict if no point scores > 0.
+    """
+    if not reachable_points:
+        return {}
+    best = max(
+        reachable_points,
+        key=lambda pt: (score_fn(pt), -pt.get_distance(actor_pos)),
+    )
+    if score_fn(best) > 0:
+        return {best: reason}
+    return {}
+
+
+def displacement_value(
+    entity: "Entity",
+    from_pos: "Point",
+    to_pos: "Point",
+    engine: "Engine",
+) -> float:
+    """How many movement-actions this displacement saves (or costs if negative).
+
+    Positive = the entity ends up closer to its preferred position
+    (its nearest enemy), saving future movement actions.
+    Negative = the entity ends up farther away, needing extra actions to get back.
+
+    Value = (old_distance - new_distance) / speed.
+    """
+    pref = entity.get_preferred_position(engine)
+    if pref is None:
+        return 0.0
+    saved_distance = from_pos.get_distance(pref) - to_pos.get_distance(pref)
+    speed = entity.get_speed(engine)
+    if speed == 0:
+        return 0.0
+    return saved_distance / speed
+
+
 @dataclass(kw_only=True)  # Not frozen
 class Instruction:
     """Base class for all ability effects."""
@@ -193,9 +239,6 @@ class Ability:
     ) -> Optional["Entity"]:
         if self.custom_target_fn:
             return self.custom_target_fn(engine, actor, enemies, allies)
-        # Allow subclasses to override get_target directly
-        if type(self).get_target != Ability.get_target:
-            return self._subclass_get_target(engine, actor, enemies, allies)
         if self.valence == Valence.MIXED:
             raise ValueError(f"Ability {self.name} needs a custom get_target")
         targets = []
@@ -208,25 +251,6 @@ class Ability:
             return None
         return min(targets, key=lambda e: e.hp)
 
-    def _subclass_get_target(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        enemies: List["Entity"],
-        allies: List["Entity"],
-    ) -> Optional["Entity"]:
-        return None
-
-    def _subclass_get_movement(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        reachable_points: set["Point"],
-        enemies: List["Entity"],
-        allies: List["Entity"],
-    ) -> dict["Point", str]:
-        return {}
-
     def get_movement(
         self,
         engine: "Engine",
@@ -237,10 +261,6 @@ class Ability:
     ) -> dict["Point", str]:
         if self.custom_movement_fn:
             return self.custom_movement_fn(
-                engine, actor, reachable_points, enemies, allies
-            )
-        if type(self).get_movement != Ability.get_movement:
-            return self._subclass_get_movement(
                 engine, actor, reachable_points, enemies, allies
             )
         proposed_moves = {}
@@ -295,7 +315,7 @@ class Ability:
     ) -> bool:
         return True
 
-    def get_priority(
+    def evaluate_priority(
         self,
         engine: "Engine",
         actor: "Entity",
@@ -305,30 +325,17 @@ class Ability:
         if self.requires_target and getattr(aiming_result, "target_points", None):
             if not any(engine.entity_at(pt) for pt in aiming_result.target_points):
                 return 0.0
+        return self.get_priority(engine, actor, pos, aiming_result)
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
         if self.custom_priority_fn:
             return self.custom_priority_fn(engine, actor, pos, aiming_result)
-        if type(self).get_priority != Ability.get_priority:
-            return self._subclass_get_priority(engine, actor, pos, aiming_result)
-        return self._get_priority(
-            engine=engine, actor=actor, pos=pos, aiming_result=aiming_result
-        )
-
-    def _subclass_get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
-        return 1.0
-
-    def _get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
         return 1.0
 
     def get_hash_info(self):

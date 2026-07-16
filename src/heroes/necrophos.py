@@ -25,7 +25,6 @@ from events import (
 from event_library import (
     ChangeLocationEvent,
     TurnStartEvent,
-    TurnEndEvent,
     DamageEvent,
     DeathEvent,
     HealEvent,
@@ -36,6 +35,7 @@ from abilities import (
     ActionCost,
     Instruction,
     ActionContext,
+    best_move_for_score,
 )
 from instruction_library import (
     AddModifierInstruction,
@@ -224,27 +224,19 @@ class DeathPulseAbility(Ability):
         enemies: list["Entity"],
         allies: list["Entity"],
     ) -> dict["Point", str]:
-        proposed_moves = {}
         if not reachable_points:
-            return proposed_moves
-
-        def score_pt(pt: Point) -> int:
-            score = 0
-            for e in enemies:
-                if pt.get_distance(e.pos) <= 3:
-                    score += 1
-            for a in allies:
-                if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp:
-                    score += 1
-            return score
-
-        best_pt = max(
+            return {}
+        return best_move_for_score(
             reachable_points,
-            key=lambda pt: (score_pt(pt), -pt.get_distance(actor.pos)),
+            actor.pos,
+            score_fn=lambda pt: (
+                sum(1 for e in enemies if pt.get_distance(e.pos) <= 3)
+                + sum(
+                    1 for a in allies if pt.get_distance(a.pos) <= 3 and a.hp < a.max_hp
+                )
+            ),
+            reason="Maximize Death Pulse targets",
         )
-        if score_pt(best_pt) > 0:
-            proposed_moves[best_pt] = "Maximize Death Pulse targets"
-        return proposed_moves
 
     def get_priority(
         self,

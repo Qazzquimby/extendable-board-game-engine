@@ -322,7 +322,7 @@ def _get_plausible_uses_of_ability_at_pos(
         )
 
         for aiming_res in legal_aimings:
-            priority = ability.get_priority(engine, actor, pos, aiming_res)
+            priority = ability.evaluate_priority(engine, actor, pos, aiming_res)
             if priority <= 0 and ability.name != DO_NOTHING:
                 continue
 
