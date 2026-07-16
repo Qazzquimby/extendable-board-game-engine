@@ -6,6 +6,7 @@ from typing import (
     TYPE_CHECKING,
     Union,
     Callable,
+    Type,
 )
 
 from aimings import Aiming, AimingResult, MultipleAimingResults
@@ -113,6 +114,40 @@ def displacement_value(
     if speed == 0:
         return 0.0
     return saved_distance / speed
+
+
+def score_damage(amount: int, target_hp: int) -> float:
+    """Score for dealing `amount` damage to a target with `target_hp`.
+
+    Automatically values kills: damage is doubled if amount >= target_hp.
+    Capped at target_hp (can't overkill for extra score).
+    """
+    effective = min(amount, target_hp)
+    if amount >= target_hp:
+        effective *= 2  # kill bonus
+    return float(effective)
+
+
+def score_heal(amount: int, missing_hp: int) -> float:
+    """Score for healing `amount` on a target missing `missing_hp` HP.
+
+    Capped at missing_hp (can't overheal for extra score).
+    """
+    return float(min(amount, missing_hp))
+
+
+def score_add_token(token_class: "Type"):
+    """Base priority for applying a token/modifier to a single target.
+
+    Returns a simple default — specific abilities may want custom values.
+    Bad tokens on enemies = +2, Good tokens on allies = +1.
+    """
+    from valence import Valence
+    if token_class.valence == Valence.BAD:
+        return 2.0
+    elif token_class.valence == Valence.GOOD:
+        return 1.0
+    return 0.0
 
 
 @dataclass(kw_only=True)  # Not frozen
@@ -336,7 +371,104 @@ class Ability:
     ) -> float:
         if self.custom_priority_fn:
             return self.custom_priority_fn(engine, actor, pos, aiming_result)
-        return 1.0
+        return self._auto_priority(engine, actor, aiming_result)
+
+    def _auto_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        """Auto-score from instructions: damage, heals, tokens.
+
+        Inspects the ability's instructions and computes a reasonable priority.
+        Subclasses override get_priority for abilities where this heuristic
+        is insufficient (multi-target, complex conditionals, etc.).
+        """
+        score = 0.0
+
+        # Collect all target + included points and score per-entity
+        all_points = []
+        if aiming_result.target_points:
+            all_points.extend(aiming_result.target_points)
+        if aiming_result.included_points:
+            all_points.extend(aiming_result.included_points)
+
+        if not all_points:
+            return 0.0
+
+        for instruction in self.instructions:
+            score += self._score_instruction(
+                instruction, engine, actor, all_points, aiming_result
+            )
+
+        return score
+
+    def _score_instruction(
+        self,
+        instruction: "Instruction",
+        engine: "Engine",
+        actor: "Entity",
+        all_points: List["Point"],
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        from instruction_library import (
+            DamageInstruction,
+            HealInstruction,
+            AddTokenInstruction,
+            AddModifierInstruction,
+        )
+
+        if isinstance(instruction, DamageInstruction):
+            total = 0.0
+            for pt in all_points:
+                target = engine.entity_at(pt)
+                if target and target.team != actor.team:
+                    # Resolve amount if int; fall back to 1 for callables
+                    dmg = instruction.amount
+                    if isinstance(dmg, int):
+                        total += score_damage(dmg, target.hp)
+                    else:
+                        total += 1.0
+            return total
+
+        elif isinstance(instruction, HealInstruction):
+            total = 0.0
+            for pt in all_points:
+                target = engine.entity_at(pt)
+                if target and target.team == actor.team:
+                    amt = instruction.amount
+                    if isinstance(amt, int):
+                        missing = target.max_hp - target.hp
+                        total += score_heal(amt, missing)
+                    else:
+                        total += 1.0
+            return total
+
+        elif isinstance(instruction, AddTokenInstruction):
+            total = 0.0
+            for pt in all_points:
+                target = engine.entity_at(pt)
+                if target:
+                    # Only score if valence matches target team
+                    if instruction.token_class.valence == Valence.BAD and target.team != actor.team:
+                        total += score_add_token(instruction.token_class)
+                    elif instruction.token_class.valence == Valence.GOOD and target.team == actor.team:
+                        total += score_add_token(instruction.token_class)
+            return total
+
+        elif isinstance(instruction, AddModifierInstruction):
+            total = 0.0
+            for pt in all_points:
+                target = engine.entity_at(pt)
+                if target:
+                    if instruction.modifier_class.valence == Valence.BAD and target.team != actor.team:
+                        total += score_add_token(instruction.modifier_class)
+                    elif instruction.modifier_class.valence == Valence.GOOD and target.team == actor.team:
+                        total += score_add_token(instruction.modifier_class)
+            return total
+
+        return 0.0
 
     def get_hash_info(self):
         return (
