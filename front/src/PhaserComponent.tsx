@@ -9,9 +9,9 @@ interface PhaserComponentProps {
   action?: ActionState;
 }
 
-const GRID_WIDTH = 20;
-const GRID_HEIGHT = 20;
-const TILE_SIZE = 50;
+const GRID_WIDTH = 10;
+const GRID_HEIGHT = 10;
+const TILE_SIZE = 70;
 
 const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action }) => {
   const gameContainer = useRef<HTMLDivElement>(null);
@@ -24,7 +24,7 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action }
         width: GRID_WIDTH * TILE_SIZE,
         height: GRID_HEIGHT * TILE_SIZE,
         parent: gameContainer.current,
-        backgroundColor: '#cccccc',
+        backgroundColor: '#1a1a1a',
         scene: GameScene,
       };
       gameInstance.current = new Phaser.Game(config);
