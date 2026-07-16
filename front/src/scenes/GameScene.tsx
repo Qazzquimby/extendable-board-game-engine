@@ -166,7 +166,8 @@ export class GameScene extends Phaser.Scene {
             const tweens = path.map((point: any) => ({
                 x: this.gridOffsetX + point[0] * this.tileSize + this.tileSize / 2,
                 y: this.gridOffsetY + point[1] * this.tileSize + this.tileSize / 2,
-                duration: 150,
+                duration: 200,
+                ease: 'Sine.easeInOut',
             }));
 
             this.tweens.chain({
@@ -175,12 +176,39 @@ export class GameScene extends Phaser.Scene {
                 onComplete: () => {
                     if (targetPos) {
                         this.drawAttackArrow(actor.x, actor.y, this.gridOffsetX + targetPos[0] * this.tileSize + this.tileSize / 2, this.gridOffsetY + targetPos[1] * this.tileSize + this.tileSize / 2);
+                        this.showDamagePop(actor.x, actor.y, targetPos);
                     }
                 },
             });
         } else if (targetPos) {
             this.drawAttackArrow(actor.x, actor.y, this.gridOffsetX + targetPos[0] * this.tileSize + this.tileSize / 2, this.gridOffsetY + targetPos[1] * this.tileSize + this.tileSize / 2);
+            this.showDamagePop(actor.x, actor.y, targetPos);
         }
+    }
+
+    private showDamagePop(fromX: number, fromY: number, toPos: [number, number]) {
+        const toX = this.gridOffsetX + toPos[0] * this.tileSize + this.tileSize / 2;
+        const toY = this.gridOffsetY + toPos[1] * this.tileSize + this.tileSize / 2;
+        const midX = (fromX + toX) / 2;
+        const midY = Math.min(fromY, toY) - this.tileSize * 0.4;
+
+        const pop = this.add.text(midX, midY, '⚔', {
+            fontSize: `${this.tileSize * 0.4}px`,
+            color: '#ff4444',
+            fontFamily: 'monospace',
+            stroke: '#000',
+            strokeThickness: 3,
+        }).setOrigin(0.5).setAlpha(1);
+        this.overlaysGroup.add(pop);
+
+        this.tweens.add({
+            targets: pop,
+            y: midY - 30,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Quad.easeOut',
+            onComplete: () => pop.destroy(),
+        });
     }
 
     private drawAttackArrow(fromX: number, fromY: number, toX: number, toY: number) {
