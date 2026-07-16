@@ -19,15 +19,9 @@ def test_target_area_instantiation():
 
 
 def test_ability_hashing():
-    engine = Engine()
-    warrior = Entity(
-        engine=engine, name="Warrior", hp=10, speed=3, pos=Point(0, 0), team=1
-    )
-    mage = Entity(engine=engine, name="Mage", hp=10, speed=3, pos=Point(1, 1), team=1)
-
-    ability1 = Ability(name="Slash", aiming=TargetSelf(), owner=warrior)
-    ability2 = Ability(name="Shoot", aiming=TargetSelf(), owner=warrior)
-    ability3 = Ability(name="Slash", aiming=TargetSelf(), owner=mage)
+    ability1 = Ability(name="Slash", aiming=TargetSelf())
+    ability2 = Ability(name="Shoot", aiming=TargetSelf())
+    ability3 = Ability(name="Slash", aiming=TargetSelf())
 
     hash1 = ability1.get_hash()
     hash2 = ability2.get_hash()
@@ -35,5 +29,5 @@ def test_ability_hashing():
 
     assert isinstance(hash1, float)
     assert hash1 != hash2
-    assert hash1 != hash3
+    assert hash1 == hash3
     assert hash1 == ability1.get_hash()  # Deterministic

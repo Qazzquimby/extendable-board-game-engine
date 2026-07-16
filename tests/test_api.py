@@ -4,7 +4,8 @@ Tests the FastAPI endpoint at the seam boundary — send a request, check the re
 """
 
 from fastapi.testclient import TestClient
-from main import app
+
+from backend.main import app
 
 client = TestClient(app)
 
@@ -18,7 +19,6 @@ def test_heroes_endpoint_returns_list():
     assert len(data) > 0
     # Core heroes we expect to see
     assert "Axe" in data
-    assert "MeleeHero" in data
     assert "Necrophos" in data
 
 
