@@ -20,6 +20,23 @@ if TYPE_CHECKING:
 AimingCondition = Callable[["Engine", "Entity", Point], bool]
 
 
+def get_blocked_points(engine: "Engine", actor: "Entity") -> set[Point]:
+    blocked_points = set()
+    for ent in engine.entities:
+        if ent.pos and any(
+            getattr(mod, "blocks_los_for", lambda e, a: False)(engine, actor)
+            for mod in ent.modifiers
+        ):
+            blocked_points.add(ent.pos)
+    for marker in getattr(engine, "markers", []):
+        if marker.pos and any(
+            getattr(mod, "blocks_los_for", lambda e, a: False)(engine, actor)
+            for mod in marker.modifiers
+        ):
+            blocked_points.add(marker.pos)
+    return blocked_points
+
+
 def is_enemy_aim_condition(engine: "Engine", actor: "Entity", point: "Point") -> bool:
     entity = engine.entity_at(point)
     return entity is not None and entity.team != actor.team
@@ -287,7 +304,10 @@ class TargetEntity(Aiming):
                     continue
 
             if require_los:
-                visible, _has_cover = engine.grid.get_line_of_sight(start_pos, e.pos)
+                blocked_points = get_blocked_points(engine, actor)
+                visible, _has_cover = engine.grid.get_line_of_sight(
+                    start_pos, e.pos, blocked_points=blocked_points
+                )
                 if not visible:
                     continue
 
@@ -343,7 +363,10 @@ class TargetPoint(Aiming):
                     if engine.grid.get_range(start_pos, p) > self.in_range:
                         continue
                 if require_los:
-                    visible, _ = engine.grid.get_line_of_sight(start_pos, p)
+                    blocked_points = get_blocked_points(engine, actor)
+                    visible, _ = engine.grid.get_line_of_sight(
+                        start_pos, p, blocked_points=blocked_points
+                    )
                     if not visible:
                         continue
                 res.append(AimingResult(target_points=[p]))

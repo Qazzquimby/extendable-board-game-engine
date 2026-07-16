@@ -297,14 +297,17 @@ class Object(Summon):
 
 
 class Marker:
-    __slots__ = ("id", "name", "_pos", "team", "modifiers")
+    __slots__ = ("id", "name", "_pos", "team", "summoner_id", "modifiers")
 
-    def __init__(self, engine: "Engine", name: str, pos: Point, team: int):
+    def __init__(
+        self, engine: "Engine", name: str, pos: Point, team: int, summoner_id: int
+    ):
         engine = engine
         self.id = engine.generate_id()
         self.name = name
         self._pos: Optional[Point] = None
         self.team = team
+        self.summoner_id = summoner_id
         self.modifiers: List["Modifier"] = []
         engine.markers.append(self)
         self.pos = pos  # runs setter

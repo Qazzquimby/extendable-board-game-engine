@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Union, Optional
 
 from abilities import (
     Ability,
@@ -7,12 +8,20 @@ from abilities import (
     Instruction,
 )
 from instruction_library import DamageInstruction, TeleportInstruction
-from aimings import TargetEntity, MultipleAiming, TargetPoint, TargetSelf
+from aimings import (
+    TargetEntity,
+    MultipleAiming,
+    TargetPoint,
+    TargetSelf,
+    AimingResult,
+    MultipleAimingResults,
+)
 from engine import Engine
 from entities import (
     Entity,
     Object,
     Hero,
+    Marker,
 )
 from modifiers import (
     Modifier,
@@ -44,11 +53,32 @@ class PhotonOrbMissChance(Modifier, ClearAtStartOfTurnMixin):
     @before(QueryDefense)
     def add_miss_chance(self, engine: "Engine", event: QueryDefense):
         if (
-                event.ability
-                and event.ability.name == "Photon Orb"
-                and event.ability.owner_id == self.owner_id
+            event.ability
+            and event.ability.name == "Photon Orb"
+            and event.ability.owner_id == self.owner_id
         ):
             event.result += 2
+
+
+class PhotonOrb(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Photon Orb",
+            text="Range 4: +2 miss, 4dmg.",
+            aiming=TargetEntity(in_range=4),
+            instructions=[DamageInstruction(amount=4)],
+            is_default=True,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 2.0
 
 
 # endregion
@@ -74,7 +104,7 @@ class PhotonBeamManager(Modifier):
     def fade_tokens_on_turn_end(self, engine: "Engine", event: TurnEndEvent):
         for entity in engine.living_entities:
             if (
-                    entity.get_token_count(engine, PhotonBeamToken) > 0
+                entity.get_token_count(engine, PhotonBeamToken) > 0
                 and entity not in self.entities_hit_this_turn
             ):
                 entity.remove_token(engine, PhotonBeamToken, amount=1)
@@ -112,6 +142,33 @@ class GivePhotonBeamTokenAndTrack(Instruction):
         if subject:
             subject.add_token(engine, PhotonBeamToken)
             self.tracker.entities_hit_this_turn.add(subject)
+
+
+class PhotonBeam(Ability):
+    def __init__(self, owner_id: str, tracker: PhotonBeamManager):
+        super().__init__(
+            name="Photon Beam",
+            aiming=TargetEntity(in_range=2),
+            instructions=[
+                PhotonBeamDamageInstruction(),
+                GivePhotonBeamTokenAndTrack(tracker=tracker),
+            ],
+            is_default=True,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        target = engine.entity_at(aiming_result.target_points[0])
+        if not target:
+            return 0.0
+        token_count = target.get_token_count(engine, PhotonBeamToken)
+        return 2.0 + token_count * 2.0
 
 
 # endregion
@@ -184,22 +241,6 @@ class SentryTurret(Object):
         self.add_modifier(engine, TurretAttack())
 
 
-def grant_sentry_turret_ability(engine: "Engine", owner_entity: Entity):
-    if not owner_entity.get_modifier(SentryTurretManager):
-        owner_entity.add_modifier(engine, SentryTurretManager())
-
-    create_turret_ability = Ability(
-        name="Create Sentry Turret",
-        aiming=MultipleAiming(
-            [TargetPoint(in_range=None, empty=True) for _i in range(3)]
-        ),
-        instructions=[CreateSentryTurretInstruction()],
-        max_charges=1,
-        owner_id=owner_entity.id,
-    )
-    owner_entity.abilities.append(create_turret_ability)
-
-
 @dataclass
 class CreateSentryTurretInstruction(Instruction):
     valence = Valence.GOOD
@@ -214,6 +255,28 @@ class CreateSentryTurretInstruction(Instruction):
                     team=source.team,
                     summoner=source,
                 )
+
+
+class CreateSentryTurret(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Create Sentry Turret",
+            aiming=MultipleAiming(
+                [TargetPoint(in_range=None, empty=True) for _i in range(3)]
+            ),
+            instructions=[CreateSentryTurretInstruction()],
+            max_charges=1,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 5.0
 
 
 # endregion
@@ -234,9 +297,9 @@ class TeleporterModifier(Modifier):
         other_teleporter = None
         for entity in engine.living_entities:
             if (
-                    isinstance(entity, Teleporter)
-                    and entity != owner
-                    and entity.team == owner.team
+                isinstance(entity, Teleporter)
+                and entity != owner
+                and entity.team == owner.team
             ):
                 other_teleporter = entity
                 break
@@ -265,9 +328,9 @@ class TeleporterModifier(Modifier):
                 on_other = (
                     (entity.pos == other_teleporter.pos)
                     if (
-                            other_teleporter
-                            and other_teleporter.pos is not None
-                            and entity.pos is not None
+                        other_teleporter
+                        and other_teleporter.pos is not None
+                        and entity.pos is not None
                     )
                     else False
                 )
@@ -302,6 +365,31 @@ class CreateTeleporterInstruction(Instruction):
                     team=source.team,
                     summoner=source,
                 )
+
+
+class CreateTeleporter(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Create Teleporter",
+            aiming=MultipleAiming(
+                [
+                    TargetPoint(in_range=1, empty=True),
+                    TargetPoint(in_range=None, empty=True),
+                ]
+            ),
+            instructions=[CreateTeleporterInstruction()],
+            max_charges=1,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 3.0
 
 
 # endregion
@@ -364,6 +452,211 @@ class CreateShieldGeneratorInstruction(Instruction):
                         engine.event_queue.enqueue(HealEvent(subject=entity, amount=4))
 
 
+class CreateShieldGenerator(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Create Shield Generator",
+            aiming=TargetPoint(in_range=1, empty=True),
+            instructions=[CreateShieldGeneratorInstruction()],
+            is_ultimate=True,
+            ultimate_turn=3,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 10.0
+
+
+# endregion
+
+
+# region Floating Barrier
+class FloatingBarrierModifier(Modifier):
+    valence = Valence.GOOD
+
+    def __init__(self, direction: Point):
+        self.direction = direction
+
+    def blocks_los_for(self, engine: "Engine", viewer: "Entity") -> bool:
+        owner = next(
+            (m for m in getattr(engine, "markers", []) if m.id == self.owner_id), None
+        )
+        if not owner:
+            return False
+        creator = (
+            engine.get_entity_by_id(owner.summoner_id)
+            if hasattr(owner, "summoner_id")
+            else None
+        )
+        if creator and viewer.team != creator.team:
+            return True
+        return False
+
+    @after(TurnStartEvent)
+    def move_forward(self, engine: "Engine", event: TurnStartEvent):
+        owner = next(
+            (m for m in getattr(engine, "markers", []) if m.id == self.owner_id), None
+        )
+        if not owner or not owner.pos:
+            return
+        creator = (
+            engine.get_entity_by_id(owner.summoner_id)
+            if hasattr(owner, "summoner_id")
+            else None
+        )
+        if creator and event.subject_id == creator.id:
+            for _ in range(2):
+                next_pos = owner.pos + self.direction
+                if (
+                    0 <= next_pos.x < engine.grid.width
+                    and 0 <= next_pos.y < engine.grid.height
+                ):
+                    if not engine.grid.is_movement_blocked(owner.pos, next_pos):
+                        owner.pos = next_pos
+
+
+@dataclass
+class CreateFloatingBarrierInstruction(Instruction):
+    valence = Valence.GOOD
+
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        source = engine.get_entity_by_id(ctx.source_id)
+        target_point = ctx.target_points[0]
+        direction = Point(target_point.x - source.pos.x, target_point.y - source.pos.y)
+        if direction.x != 0:
+            direction.x = 1 if direction.x > 0 else -1
+        if direction.y != 0:
+            direction.y = 1 if direction.y > 0 else -1
+
+        marker = Marker(
+            engine=engine, name="Floating Barrier", pos=target_point, team=source.team
+        )
+        marker.summoner_id = source.id
+        mod = FloatingBarrierModifier(direction=direction)
+        mod.owner_id = marker.id
+        marker.modifiers.append(mod)
+        engine.router.subscribe(mod)
+
+
+class CreateFloatingBarrier(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Create Floating Barrier",
+            text="""1/game:
+Create a **Floating Barrier** marker in an edge in range 1, facing away from you.
+It has:
+  This blocks line of sight for the creator's enemies.
+  At start of creator's activation: This moves forward 2 spaces.""",
+            aiming=TargetPoint(in_range=1, empty=True),
+            instructions=[CreateFloatingBarrierInstruction()],
+            max_charges=1,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 4.0
+
+
+# endregion
+
+
+# region Photon Barrier
+class BlocksLOSModifier(Modifier):
+    valence = Valence.GOOD
+
+    def blocks_los_for(self, engine: "Engine", viewer: "Entity") -> bool:
+        owner = engine.get_entity_by_id(self.owner_id)
+        if not owner:
+            return False
+        creator = (
+            engine.get_entity_by_id(owner.summoner_id)
+            if hasattr(owner, "summoner_id")
+            else None
+        )
+        if creator and viewer.team != creator.team:
+            return True
+        return False
+
+
+class PhotonBarrier(Object):
+    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity):
+        super().__init__(
+            engine=engine,
+            name="Photon Barrier",
+            hp=12,
+            pos=pos,
+            team=team,
+            summoner=summoner,
+        )
+        self.add_modifier(engine, BlocksLOSModifier())
+
+
+@dataclass
+class CreatePhotonBarrierInstruction(Instruction):
+    valence = Valence.GOOD
+
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        source = engine.get_entity_by_id(ctx.source_id)
+        center = ctx.target_points[0]
+        dir_pt = ctx.target_points[1]
+
+        dx = dir_pt.x - center.x
+        dy = dir_pt.y - center.y
+
+        if abs(dx) > abs(dy):
+            points = [Point(x, center.y) for x in range(engine.grid.width)]
+        else:
+            points = [Point(center.x, y) for y in range(engine.grid.height)]
+
+        for pt in points:
+            if not engine.entity_at(pt):
+                PhotonBarrier(engine=engine, pos=pt, team=source.team, summoner=source)
+
+
+class CreatePhotonBarrier(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Create Photon Barrier",
+            text="""*Ultimate* 4:
+Choose any edge across the map.
+Create a **Photon Barrier** object along that edge.
+It has:
+  12hp.
+  This blocks line of sight for the creator's enemies.""",
+            aiming=MultipleAiming(
+                [
+                    TargetPoint(in_range=None, empty=True),
+                    TargetPoint(in_range=None, empty=False),
+                ]
+            ),
+            instructions=[CreatePhotonBarrierInstruction()],
+            is_ultimate=True,
+            ultimate_turn=4,
+            owner_id=owner_id,
+        )
+
+    def get_priority(
+        self,
+        engine: "Engine",
+        actor: "Entity",
+        pos: "Point",
+        aiming_result: Union["AimingResult", "MultipleAimingResults"],
+    ) -> float:
+        return 8.0
+
+
 # endregion
 
 
@@ -373,96 +666,16 @@ class Symmetra(Hero):
             engine=engine, name="Symmetra", hp=8, speed=3, pos=pos, team=team
         )
         photon_beam_manager = PhotonBeamManager()
-        self.gain_ability(
-            engine,
-            Ability(
-                name="Photon Beam",
-                aiming=TargetEntity(in_range=2),
-                instructions=[
-                    PhotonBeamDamageInstruction(),
-                    GivePhotonBeamTokenAndTrack(tracker=photon_beam_manager),
-                ],
-                modifiers=[photon_beam_manager],
-                is_default=True,
-            ),
-        )
+        self.add_modifier(engine, photon_beam_manager)
+        self.abilities.append(PhotonBeam(owner_id=self.id, tracker=photon_beam_manager))
 
-        # todo, dumb, many attacks need to have a miss chance and sometimes only in some situations.
-        # Reimplement
         self.add_modifier(engine, PhotonOrbMissChance())
-        self.abilities.append(
-            Ability(
-                name="Photon Orb",
-                aiming=TargetEntity(in_range=4),
-                instructions=[DamageInstruction(amount=2)],
-                is_default=True,
-                owner_id=self.id,
-            )
-        )
+        self.abilities.append(PhotonOrb(owner_id=self.id))
 
-        # todo At the beginning of your next activation, pick target in ⌖Range 4: +2 *miss*, 4dmg.
-        # self.abilities.append(
-        #     Ability(
-        #         name="Charge Photon Orb",
-        #         is_default=True,
-        #         owner_id=self.id,
-        #     )
-        # )
+        self.add_modifier(engine, SentryTurretManager())
+        self.abilities.append(CreateSentryTurret(owner_id=self.id))
 
-        grant_sentry_turret_ability(engine, self)
-
-        self.abilities.append(
-            Ability(
-                name="Create Teleporter",
-                aiming=MultipleAiming(
-                    [
-                        TargetPoint(in_range=1, empty=True),
-                        TargetPoint(in_range=None, empty=True),
-                    ]
-                ),
-                instructions=[CreateTeleporterInstruction()],
-                max_charges=1,
-                owner_id=self.id,
-            )
-        )
-
-        self.abilities.append(
-            Ability(
-                name="Create Shield Generator",
-                aiming=TargetPoint(in_range=1, empty=True),
-                instructions=[CreateShieldGeneratorInstruction()],
-                is_ultimate=True,
-                ultimate_turn=3,
-                owner_id=self.id,
-            )
-        )
-
-#  todo     - name: Create Floating Barrier
-#         art: floating_barrier.webp
-#         text: |-
-#           1/game:
-#           Create a **Floating Barrier** marker in an edge in range 1, facing away from you.
-#           It has:
-#             This blocks line of sight for the creator's enemies.
-#             At start of creator's activation: This moves forward 2 spaces.
-
-# todo      - name: Create Shield Generator
-#         art: shield_generator.webp
-#         text: |-
-#           *Ultimate* 3:
-#           Create a **Shield Generator** object in an empty space in range 1.
-#           Heal all allies 4.
-#           It has:
-#             4hp.
-#             Allies of the creator have +4 maximum health.
-#             When this is destroyed, allies of the creator lose 4 health.
-
-# todo       - name: Create Photon Barrier
-#         art: photon_barrier.jpg
-#         text: |-
-#           *Ultimate* 4:
-#           Choose any edge across the map.
-#           Create a **Photon Barrier** object along that edge.
-#           It has:
-#             12hp.
-#             This blocks line of sight for the creator's enemies.
+        self.abilities.append(CreateTeleporter(owner_id=self.id))
+        self.abilities.append(CreateShieldGenerator(owner_id=self.id))
+        self.abilities.append(CreateFloatingBarrier(owner_id=self.id))
+        self.abilities.append(CreatePhotonBarrier(owner_id=self.id))
