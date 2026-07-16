@@ -6,19 +6,14 @@ Adding a new hero = drop a .py file in backend/src/heroes/. That's it.
 import importlib
 import inspect
 import pkgutil
-import sys
 from pathlib import Path
 from typing import Dict, Type
 
-_src = str(Path(__file__).resolve().parent / "src")
-if _src not in sys.path:
-    sys.path.insert(0, _src)
-
-from entities import Hero
+from backend.src.entities import Hero
 
 
 def _discover() -> Dict[str, Type]:
-    heroes_pkg = Path(__file__).resolve().parent / "src" / "heroes"
+    heroes_pkg = Path(__file__).resolve() / "heroes"
     heroes = {}
 
     def _scan_module(mod_name):
@@ -47,9 +42,7 @@ HERO_CLASSES = _discover()
 
 def get_hero_class(name: str) -> Type:
     if name not in HERO_CLASSES:
-        raise KeyError(
-            f"Unknown hero '{name}'. Available: {list(HERO_CLASSES.keys())}"
-        )
+        raise KeyError(f"Unknown hero '{name}'. Available: {list(HERO_CLASSES.keys())}")
     return HERO_CLASSES[name]
 
 

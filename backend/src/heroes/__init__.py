@@ -1,4 +1,4 @@
-from aimings import TargetEntity, TargetSelf
+from aimings import TargetEntity
 from engine import Engine
 from abilities import Ability
 from instruction_library import DamageInstruction
