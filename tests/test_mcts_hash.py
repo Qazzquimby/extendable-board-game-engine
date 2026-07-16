@@ -2,7 +2,8 @@ from engine import Engine
 from entities import Entity
 from grid import Grid
 from point import Point
-from abilities import Ability, ActionCost, HealInstruction
+from abilities import Ability, ActionCost
+from instruction_library import HealInstruction
 from aimings import TargetSelf
 from ai.mcts import InterruptAgent, ChoiceRequest
 

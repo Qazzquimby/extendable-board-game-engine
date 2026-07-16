@@ -10,12 +10,11 @@ from engine import Engine
 from entities import Hero, Entity, Marker
 from abilities import (
     Ability,
-    DamageInstruction,
-    TeleportInstruction,
     ActionCost,
     Instruction,
     ActionContext,
 )
+from instruction_library import DamageInstruction, TeleportInstruction
 from events import after, before, query
 from event_library import (
     TurnEndEvent,

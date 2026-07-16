@@ -21,13 +21,15 @@ from events import after, before
 from event_library import TurnEndEvent, DamageEvent, DeathEvent
 from abilities import (
     Ability,
-    DamageInstruction,
-    AddTokenInstruction,
-    RefreshAbilityInstruction,
     ActionCost,
     Instruction,
     ActionContext,
+)
+from instruction_library import (
+    DamageInstruction,
+    AddTokenInstruction,
     UseAnAbilityInstruction,
+    RefreshAbilityInstruction,
 )
 from mod_value import div
 from point import Point
@@ -173,9 +175,7 @@ class BerserkersCall(Ability):
                 }
             ),
             instructions=[
-                AddTokenInstruction(
-                    aiming_name="self_target", token_class=ArmorToken
-                ),
+                AddTokenInstruction(aiming_name="self_target", token_class=ArmorToken),
                 UseAnAbilityInstruction(
                     aiming_name="nearby_enemies", default_only=True
                 ),

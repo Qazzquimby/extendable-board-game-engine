@@ -5,9 +5,8 @@ from event_library import TurnEndEvent, DamageEvent
 from engine import before, query
 from abilities import (
     Ability,
-    DamageInstruction,
-    RemoveTokenInstruction,
 )
+from instruction_library import DamageInstruction, RemoveTokenInstruction
 
 
 class PoisonToken(Token):

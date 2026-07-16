@@ -36,9 +36,11 @@ from abilities import (
     ActionCost,
     Instruction,
     ActionContext,
-    UseAnAbilityInstruction,
+)
+from instruction_library import (
     AddModifierInstruction,
     AddTokenInstruction,
+    UseAnAbilityInstruction,
 )
 from mod_value import ModInt
 from point import Point
@@ -307,9 +309,7 @@ Use a default ability.
                 """,
             aiming=MultipleAiming(
                 {
-                    "enemy": TargetEntity(
-                        in_range=3, condition=is_enemy_aim_condition
-                    ),
+                    "enemy": TargetEntity(in_range=3, condition=is_enemy_aim_condition),
                     "self": TargetSelf(),
                 }
             ),
@@ -386,4 +386,6 @@ class Necrophos(Hero):
         self.abilities.append(DeathPulseAbility(owner_id=self.id))
         self.abilities.append(GhostShroudAbility(owner_id=self.id))
         self.abilities.append(DeathSeekerAbility(owner_id=self.id))
-        self.abilities.append(ReapersScytheAbility(owner_id=self.id, source_entity=self))
+        self.abilities.append(
+            ReapersScytheAbility(owner_id=self.id, source_entity=self)
+        )

@@ -24,10 +24,10 @@ from events import after
 from event_library import PullEvent, DeployEvent, TurnStartEvent, DeathEvent, HealEvent
 from abilities import (
     Ability,
-    DamageInstruction,
     Instruction,
     ActionContext,
 )
+from instruction_library import DamageInstruction
 from point import Point
 from valence import Valence
 

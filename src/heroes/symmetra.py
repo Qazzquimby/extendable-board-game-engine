@@ -2,12 +2,11 @@ from dataclasses import dataclass, field
 
 from abilities import (
     Ability,
-    DamageInstruction,
-    TeleportInstruction,
     ActionCost,
     ActionContext,
     Instruction,
 )
+from instruction_library import DamageInstruction, TeleportInstruction
 from aimings import TargetEntity, MultipleAiming, TargetPoint, TargetSelf
 from engine import Engine
 from entities import (

@@ -6,9 +6,8 @@ from engine import (
 )
 from abilities import (
     Ability,
-    DamageInstruction,
-    RemoveTokenInstruction,
 )
+from instruction_library import DamageInstruction, RemoveTokenInstruction
 from point import Point
 
 

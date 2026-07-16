@@ -1,6 +1,7 @@
 from aimings import TargetEntity, TargetSelf
 from engine import Engine
-from abilities import Ability, DamageInstruction
+from abilities import Ability
+from instruction_library import DamageInstruction
 from entities import Hero
 from point import Point
 

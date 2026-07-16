@@ -2,11 +2,13 @@ from dataclasses import dataclass
 from typing import Iterator, Set
 
 from abilities import (
-    ApplyModifierInstruction,
     Ability,
-    DamageInstruction,
     ActionCost,
+)
+from instruction_library import (
+    DamageInstruction,
     AddTokenInstruction,
+    ApplyModifierInstruction,
 )
 from aimings import IncludeArea
 from areas import Square, PathArea, Line
