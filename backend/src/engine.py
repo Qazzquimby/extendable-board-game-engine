@@ -409,8 +409,13 @@ class Engine:
             )
             action_choice = next_choices[action_index]
 
-            # Capture previous logs before this action
-            prev_log_len = len(get_logs())
+            # Reset logger so we capture EXACTLY this action's hierarchical logs.
+            # step() emits the top-level "Axe used Battle Hunger..." log.
+            # _process_events_into_log processes events (BEFORE→RESOLVE→AFTER),
+            #   which triggers modifiers that emit logs like "dealt X damage...".
+            # advance_until_choice processes remaining events (damage, modifiers)
+            #   so their logs ("gained X Token", "dealt X damage") are included.
+            reset_logs()
 
             self.step(
                 action=action_choice,
@@ -421,17 +426,19 @@ class Engine:
             prev_entry_count = len(logs)
             self._process_events_into_log(logs)
 
-            # Attach the action's hierarchical logs to any newly emitted entries
-            current_logs = get_logs()
-            action_logs = current_logs[prev_log_len:]
-            for entry in logs[prev_entry_count:]:
-                entry.action_logs = action_logs[:]
-
             # Check for choices (reactions / decisions)
+            # This also processes remaining events (damage, modifiers), generating
+            # the "dealt X damage", "gained X Token" logs.
             if self.event_queue._queue:
                 next_choices = self.advance_until_choice()
             else:
                 next_choices = self.advance_until_choice()
+
+            # NOW capture all logs — includes everything from step() through
+            # event processing AND advance_until_choice()
+            action_logs = get_logs()
+            for entry in logs[prev_entry_count:]:
+                entry.action_logs = action_logs[:]
 
             if self.is_done:
                 winner_team = self.get_winning_player()

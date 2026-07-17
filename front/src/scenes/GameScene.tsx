@@ -166,6 +166,16 @@ export class GameScene extends Phaser.Scene {
         );
         this.gridGameObject.setDepth(0);
 
+        // Compute source positions from events — entities that move should start
+        // at their old (source) position so the tween animates visibly instead of
+        // jumping from the already-at-destination state.
+        const moveSourcePos: Map<number, [number, number]> = new Map();
+        for (const ev of events) {
+            if (ev.type === 'move' && ev.target_id != null && ev.source_pos) {
+                moveSourcePos.set(ev.target_id, [ev.source_pos[0], ev.source_pos[1]]);
+            }
+        }
+
         const posCounts: Record<string, number> = {};
         const posIndex: Record<number, number> = {};
 
@@ -189,7 +199,13 @@ export class GameScene extends Phaser.Scene {
                 totalAtPos = posCounts[key];
                 indexAtPos = posIndex[entityState.id];
             }
-            const container = this.drawEntity(entityState, isActive, totalAtPos, indexAtPos);
+            // If this entity has a move event, draw it at its source position
+            // (before the move) so the subsequent tween animates visibly.
+            let drawPos: [number, number] | null = null;
+            if (moveSourcePos.has(entityState.id)) {
+                drawPos = moveSourcePos.get(entityState.id)!;
+            }
+            const container = this.drawEntity(entityState, isActive, totalAtPos, indexAtPos, drawPos);
             if (container) entityContainers.set(entityState.id, container);
         });
 
@@ -219,7 +235,7 @@ export class GameScene extends Phaser.Scene {
 
                     // Place at source and tween to destination
                     container.setPosition(srcPixX, srcPixY);
-                    const dur = 250;
+                    const dur = 400;
                     this.tweens.add({
                         targets: container,
                         x: dstPixX,
@@ -402,9 +418,10 @@ export class GameScene extends Phaser.Scene {
         this.overlaysGroup.add(arrow);
     }
 
-    private drawEntity(entity: EntityState, isActive: boolean, totalAtPos: number, indexAtPos: number) {
-        if (!entity.pos) return null;
-        const [x, y] = entity.pos as [number, number];
+    private drawEntity(entity: EntityState, isActive: boolean, totalAtPos: number, indexAtPos: number, drawPos?: [number, number] | null) {
+        const pos = drawPos || entity.pos;
+        if (!pos) return null;
+        const [x, y] = pos;
         let pixelX = this.gridOffsetX + x * this.tileSize + this.tileSize / 2;
         let pixelY = this.gridOffsetY + y * this.tileSize + this.tileSize / 2;
 
