@@ -114,11 +114,18 @@ class PullEvent(Event):
                 distance=dist,
             )
             if path:
-                log(f"Pulling {subject.name} to {path[-1]}")
-                for point in path:
-                    engine.event_queue.enqueue(
-                        ChangeLocationEvent(subject=subject, new_pos=point)
-                    )
+                # Filter out positions that are already occupied by another entity
+                occupied = {
+                    e.pos for e in engine.living_entities
+                    if e.id != subject.id and e.pos
+                }
+                final_path = [p for p in path if p not in occupied]
+                if final_path:
+                    log(f"Pulling {subject.name} to {final_path[-1]}")
+                    for point in final_path:
+                        engine.event_queue.enqueue(
+                            ChangeLocationEvent(subject=subject, new_pos=point)
+                        )
 
 
 class DeployEvent(Event):
