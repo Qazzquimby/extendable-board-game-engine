@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The project has a working tactical game engine and a basic log visualizer, but there's no way to set up a game from the UI and watch it play out. Currently you must edit Python files to change teams, run a script, and drag-drop a JSON log file into a browser to step through it. The visualizer itself is functional but hard to follow — entities are text labels, there's no terrain or markers, reaction chains collapse into one frame, and the overall experience makes it difficult to study team synergies and counters.
+The project has a working tactical game engine and a basic log visualizer, but there's no way to set up a game from the UI and watch it play out. Currently you must edit Python files to change teams, run a script, and drag-drop a JSON log file into a browser to step through it. The visualizer itself is functional but hard to follow — entities are text labels, reaction chains collapse into one frame, and the overall experience makes it difficult to study team synergies and counters.
 
 ## Solution
 
@@ -11,7 +11,7 @@ A two-part system:
 1. **Python backend** (FastAPI) with a single endpoint `POST /run-game` that accepts a hero configuration and returns a complete game log.
 2. **Frontend** (React) with two screens:
    - **Setup screen** — select heroes for each team and place them on a grid
-   - **Playback screen** — step through the game log with arrow keys, showing animated movement, attack indicators, terrain, markers, entity facing, a written log, and per-action granularity so reaction chains are visible
+   - **Playback screen** — step through the game log with arrow keys, showing animated movement, attack indicators, a written log, and per-action granularity so reaction chains are visible
 
 This replaces the current drag-drop-log workflow entirely.
 
@@ -25,15 +25,12 @@ This replaces the current drag-drop-log workflow entirely.
 6. As a player, I want to step through the game turn by turn with arrow keys, so that I can understand each action.
 7. As a player, I want to see each individual action as its own step, so that I can follow chains of reactions.
 
-9. As a player, I want to see terrain rendered on the grid, so that the battlefield state is clear.
-10. As a player, I want to see markers (objects, barriers) rendered on the grid, so that I can track deployed objects.
-11. As a player, I want to see direction indicators for entities that have facing, so that I understand positioning.
-12. As a player, I want to see health bars and status effects on each entity, so that I can assess unit state quickly.
-13. As a player, I want to see damage numbers, ability names, and attack animations play out, so that combat is legible.
-14. As a player, I want to see a written log alongside the visual display, so that I can read a description of what happened.
-15. As a player, I want animated movement and attacks, so that the game is more visually engaging.
-16. As a player, I want to pause auto-play and step manually, so that I can examine key moments in detail.
-17. As a player, I want the game to run from a single button press without file management, so that the setup-to-watch loop is frictionless.
+8. As a player, I want to see health bars and status effects on each entity, so that I can assess unit state quickly.
+9. As a player, I want to see damage numbers, ability names, and attack animations play out, so that combat is legible.
+10. As a player, I want to see a written log alongside the visual display, so that I can read a description of what happened.
+11. As a player, I want animated movement and attacks, so that the game is more visually engaging.
+12. As a player, I want to pause auto-play and step manually, so that I can examine key moments in detail.
+13. As a player, I want the game to run from a single button press without file management, so that the setup-to-watch loop is frictionless.
 
 ## Implementation Decisions
 
@@ -71,7 +68,7 @@ Request body:
 Response: GameLog (the existing GameLog schema, unchanged)
 ```
 
-The `"class"` field maps to the hero class names in `src/heroes/`. Invalid class names or occupied positions return a 400 error.
+The `"class"` field maps to the hero class names in `src/heroes/`. The field can also be sent as `"class_name"` (the Pydantic model accepts both). Invalid class names return a 400 error. Occupied positions (across all teams — no two entities may share a grid cell) also return a 400. Markers may overlap entities but are out of scope for now.
 
 ### Setup Screen
 
@@ -86,9 +83,6 @@ The `"class"` field maps to the hero class names in `src/heroes/`. Invalid class
 - **Entity rendering**: Replace text labels with colored circles/shapes. Team color fills, distinct border for active entity.
 - **Health bars**: Bar + numeric HP display.
 - **Status effects**: Icons or abbreviated text above entity.
-- **Terrain rendering**: Phaser grid supports colored tiles/cell fills for walls and hazards.
-- **Marker rendering**: Objects rendered on the grid (e.g., turret icons, barrier lines).
-- **Facing indicators**: Arrow or wedge showing entity facing direction.
 - **Reaction granularity**: Each event in a reaction chain is a separate step. The written log side panel shows the full event chain.
 - **Attack animation**: Arrow/thrown projectile from attacker to target, damage number popup.
 - **Movement animation**: Tween entity across intermediate grid positions.
@@ -98,7 +92,7 @@ The `"class"` field maps to the hero class names in `src/heroes/`. Invalid class
 
 - A new `backend/` directory at repo root containing `main.py` (FastAPI app) and a `requirements.txt` adding `fastapi` and `uvicorn`.
 - The existing `src/` modules are imported directly — no restructuring.
-- A `POST /heroes` endpoint returns the list of available hero classes for the roster.
+- A `GET /heroes` endpoint returns the list of available hero classes for the roster.
 
 ### Setup Screen Data
 
@@ -115,15 +109,15 @@ Test external behavior at the seam boundary, not internal implementation details
 
 - **API integration test**: `POST /run-game` with a valid team config returns 200 and a valid `GameLog` with non-empty logs.
 - **API error case**: `POST /run-game` with an invalid hero class returns 400.
-- **API error case**: `POST /run-game` with overlapping positions returns 400.
+- **API error case**: `POST /run-game` with overlapping positions (same team or cross-team) returns 400.
 
 These sit in `tests/test_api.py` and use FastAPI's `TestClient`.
 
 ### Frontend tests
 
-- **Setup screen renders hero roster**: mock hero data renders the expected number of hero cards.
+- **Setup screen renders hero roster**: mock hero API response renders the expected hero names.
 - **Setup screen places hero on grid**: clicking a hero then clicking a grid cell places it.
-- **Setup screen removes hero**: clicking a placed hero returns it to roster.
+- **Setup screen removes hero**: clicking the × button on a team entry removes the hero and returns it to the roster.
 - **Visualizer renders game state**: given a mock `EngineState`, the playback screen shows the correct number of entities in the correct positions.
 
 These use Vitest + React Testing Library in the `front/` directory. Since the visualizer uses Phaser directly, visualizer tests may test at the React wrapper level rather than deep Phaser internals.

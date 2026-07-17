@@ -105,6 +105,32 @@ def test_run_game_overlapping_positions():
     assert "detail" in data
 
 
+def test_run_game_cross_team_overlap():
+    """POST /run-game with overlapping positions across teams returns 400."""
+    response = client.post(
+        "/run-game",
+        json={
+            "seed": 42,
+            "grid_size": 5,
+            "teams": [
+                {
+                    "heroes": [
+                        {"class": "Axe", "pos": [2, 2]},
+                    ]
+                },
+                {
+                    "heroes": [
+                        {"class": "Necrophos", "pos": [2, 2]},  # Same pos, different team
+                    ]
+                },
+            ],
+        },
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert "detail" in data
+
+
 def test_run_game_deterministic_seed():
     """Same seed + same config should produce identical game logs."""
     config = {
