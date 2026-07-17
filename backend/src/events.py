@@ -158,13 +158,20 @@ class ReactionOpportunityEvent(Event):
                         ):
                             continue
 
-                    plausible_uses = _get_plausible_uses_of_ability_at_pos(
-                        actor=entity,
-                        engine=engine,
-                        pos=entity.pos,
-                        ability=react_ability,
-                        choice_class=PlausibleFreeAction,
-                    )
+                    # Store trigger event on engine so abilities can compute
+                    # reaction-specific priorities (dodge value, etc.)
+                    old_trigger = getattr(engine, "_reaction_trigger_event", None)
+                    engine._reaction_trigger_event = self.triggering_event
+                    try:
+                        plausible_uses = _get_plausible_uses_of_ability_at_pos(
+                            actor=entity,
+                            engine=engine,
+                            pos=entity.pos,
+                            ability=react_ability,
+                            choice_class=PlausibleFreeAction,
+                        )
+                    finally:
+                        engine._reaction_trigger_event = old_trigger
                     entity_reactions.extend(plausible_uses.values())
 
             if entity_reactions:

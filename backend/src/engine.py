@@ -140,6 +140,7 @@ class Engine:
         "is_resolving_action",
         "event_queue",
         "_absorbing_ability",
+        "_reaction_trigger_event",
     )
 
     def __init__(
@@ -173,6 +174,7 @@ class Engine:
         self.activation_queue: List["Entity"] = []
         self.activation_index: int = -1
         self._absorbing_ability: bool = False
+        self._reaction_trigger_event: Optional[object] = None
         self._next_id: int = 1
         self.current_choices = None
         self.is_resolving_action = False
@@ -532,7 +534,9 @@ class Engine:
                 choices, react_actor = event.get_choices(engine=self)
                 event.declined_entities.add(react_actor.id)
                 if not action.features.get("pass_reaction"):
-                    with log(f"Reaction from {react_actor.name}:"):
+                    ability_name = getattr(action, "ability", None)
+                    aname = f" ({ability_name.name})" if ability_name else ""
+                    with log(f"{react_actor.name}{aname} reaction"):
                         action.ability.react(
                             engine=self,
                             source=react_actor,

@@ -185,12 +185,55 @@ class Blink(Ability):
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
+        from abilities import displacement_value, score_damage
         target_pt = aiming_result.target_points[0]
-        enemies = [e for e in engine.living_entities if e.team != actor.team]
-        if not enemies:
-            return 1.0
-        dist_to_enemies = min([target_pt.get_distance(e.pos) for e in enemies])
-        return dist_to_enemies * 0.5
+
+        # Base priority: displacement value (how much movement this saves)
+        base = displacement_value(actor, pos, target_pt, engine)
+
+        # If there's a reaction trigger event, compute dodge value
+        trigger = getattr(engine, "_reaction_trigger_event", None)
+        if trigger is not None:
+            from events import AbilityUseEvent
+            if isinstance(trigger, AbilityUseEvent):
+                # How much damage would this dodge?
+                total_damage = 0
+                from instruction_library import DamageInstruction
+                for inst in trigger.ability.instructions:
+                    if isinstance(inst, DamageInstruction):
+                        dmg = inst.amount if isinstance(inst.amount, int) else 0
+                        total_damage += dmg
+
+                # Check if blinking leaves the attacker's range
+                subject = engine.get_entity_by_id(trigger.subject_id)
+                if subject and subject.pos:
+                    attack_in_range = getattr(trigger.ability.aiming, "in_range", None)
+                    if attack_in_range is not None:
+                        new_dist = target_pt.get_distance(subject.pos)
+                        if new_dist > attack_in_range:
+                            # Dodged! Add value proportionate to damage prevented
+                            dodge_bonus = score_damage(total_damage, actor.hp) * 0.8
+                            base += dodge_bonus
+                        else:
+                            # Still in range but displacement has some value
+                            # Add small bonus for moving away from attacker
+                            old_dist = pos.get_distance(subject.pos)
+                            if new_dist > old_dist:
+                                base += 0.5 * (new_dist - old_dist)
+                    elif total_damage > 0:
+                        # No range info but it deals damage — still worth dodging
+                        base += score_damage(total_damage, actor.hp) * 0.5
+
+        # Resource conservation: if few charges remain and game is early, reduce priority
+        if self.charges is not None and self.max_charges and self.max_charges > 0:
+            charges_used = self.max_charges - self.charges
+            charges_left = self.charges
+            # More penalty for limited charges early in the game
+            game_progress = engine.round_num / 7.0  # 7 rounds max
+            conservation_penalty = max(0, (1.0 - game_progress) * (1.0 / charges_left) if charges_left > 0 else 0)
+            base -= conservation_penalty
+
+        return max(0.1, base)
 
 
 class PulsePistols(Ability):
@@ -330,5 +373,10 @@ class Tracer(Hero):
 
         self.abilities.append(PulsePistols(owner_id=self.id))
         self.abilities.append(Blink(owner_id=self.id))
-        self.abilities.append(Recall(owner_id=self.id))
+        def no_reaction(*args, **kwargs):
+            return False
+
+        recall = Recall(owner_id=self.id)
+        recall.reaction_condition = no_reaction
+        self.abilities.append(recall)
         self.abilities.append(PulseBomb(owner_id=self.id))
