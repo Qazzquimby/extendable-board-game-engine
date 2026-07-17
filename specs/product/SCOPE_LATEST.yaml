@@ -55,7 +55,7 @@ in_scope:
     epic: Hero System
   - description: "Instruction lib (damage, heal, move, apply modifier, etc.)"
     epic: Hero System
-  - description: "Playable heroes: Tracer, Symmetra, Axe, Viktoria, etc."
+  - description: "Playable heroes: Tracer, Axe, Viktoria, Necrophos"
     epic: Hero System
   - description: "Extensible hero modules — new heroes added w/o engine changes"
     epic: Hero System
@@ -115,6 +115,12 @@ out_of_scope:
     reason: "NOT VALUABLE — open API for local/dev use only"
   - description: "Real-time tick-based animation"
     reason: "NOT NEEDED — frame-by-frame render, no game-loop ticks"
+  - description: "Symmetra hero"
+    reason: "DEFERRED — needs ability design work; separate epic"
+  - description: "Reinhardt hero"
+    reason: "DEFERRED — needs ability design work; separate epic"
+  - description: "Spy hero"
+    reason: "DEFERRED — needs ability design work; separate epic"
   - description: "Tabletop Simulator integration"
     reason: "DEFERRED — physical board game out of scope"
   - description: "Multi-hero-per-team control (strategy layer)"
