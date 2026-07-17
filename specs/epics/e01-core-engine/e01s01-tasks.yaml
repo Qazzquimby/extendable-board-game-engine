@@ -1,26 +1,94 @@
 # Story: Grid places entities and validates positions
 story_id: e01s01
 title: "Grid places entities and validates positions"
-status: todo
+status: failing
 bcps: 1
 
 tasks:
   - id: e01s01t01
-    description: "Grid initializes with correct dimensions and boundaries"
-    verify: 'cd backend && python -c "from src.grid import Grid; g=Grid(5,5); assert g.width==5 and g.height==5"'
-    status: todo
+    description: "Write unit test for Grid initialization and is_valid"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_grid 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Unit"
+        - "Core Engine"
 
   - id: e01s01t02
-    description: "Entities can be placed at valid grid positions"
-    verify: 'cd backend && python -c "from src.grid import Grid; from src.point import Point; g=Grid(5,5); assert g.is_valid(Point(2,3))"'
-    status: todo
+    description: "Write unit test for get_range with diagonal-first semantics"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_get_range 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Unit"
+        - "Core Engine"
 
   - id: e01s01t03
-    description: "Invalid positions (out of bounds) are rejected"
-    verify: 'cd backend && python -c "from src.grid import Grid; from src.point import Point; g=Grid(5,5); assert not g.is_valid(Point(10,10))"'
-    status: todo
+    description: "Write unit test for get_path (open/blocked/full-block/start==target)"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_path 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Unit"
+        - "Core Engine"
 
   - id: e01s01t04
-    description: "Entity at position can be looked up"
-    verify: "cd backend && python -m pytest tests/test_grid.py -x -q 2>&1 | tail -5"
-    status: todo
+    description: "Write unit test for push/pull movement along grid"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_push_pull 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Unit"
+        - "Core Engine"
+
+  - id: e01s01t05
+    description: "Write unit test for line-of-sight (clear, blocked, cover)"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_line_of_sight 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Unit"
+        - "Core Engine"
+
+  - id: e01s01t06
+    description: "Write integration test for get_points_in_range w/ LOS blocking"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_blocked_by_los 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Integration"
+        - "Core Engine"
+
+  - id: e01s01t07
+    description: "Write integration test for get_movable_spaces w/ enemy blocking"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k test_movable 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Integration"
+        - "Core Engine"
+
+  - id: e01s01t08
+    description: "Run full test suite to confirm no regressions"
+    verify: "cd backend && python -m pytest tests/ -x -q 2>&1 | tail -5"
+    risk: P2
+    status: failing
+    allure:
+      severity: normal
+      categories:
+        - "Regression"
+        - "Core Engine"
