@@ -296,21 +296,65 @@ class Engine:
 
             return choices
 
-    def _log_event_type(self, event) -> Optional[str]:
-        """Map an event to a log type string for merging consecutive same-type events."""
+    def _event_merge_key(self, event) -> Optional[tuple]:
+        """
+        Return a merge key for consecutive-event grouping.
+        Events with the same key get merged into one frame.
+        Returns None for events that shouldn't be logged or break the merge.
+        """
         if isinstance(event, (ReactionOpportunityEvent, DecisionEvent)):
-            return None  # Never merge choice points, handle separately
+            return None
         desc = event.describe(self)
         if desc is None:
             return None
-        if desc.type == "ability_use":
-            # AbilityUseEvent always starts a new frame — never merge
-            return None
-        return desc.type
+        # Merge by (type, source_id) — different sources never merge
+        return (desc.type, desc.source_id)
+
+    def _describe_event_as_message(self, desc: EventDescription) -> str:
+        """Convert an EventDescription to a human-readable log message."""
+        t = desc.type
+        target_name = ""
+        if desc.target_id is not None:
+            target = self.get_entity_by_id(desc.target_id)
+            target_name = target.name if target else f"#{desc.target_id}"
+        source_name = ""
+        if desc.source_id is not None and desc.source_id != desc.target_id:
+            source = self.get_entity_by_id(desc.source_id)
+            source_name = source.name if source else f"#{desc.source_id}"
+
+        if t == "ability_use":
+            actor = self.get_entity_by_id(desc.actor_id) if desc.actor_id else None
+            aname = desc.ability_name or "?"
+            return f"{actor.name if actor else '?'} used {aname}"
+        elif t == "damage":
+            prefix = f"{source_name} " if source_name else ""
+            return f"{prefix}dealt {desc.amount} damage to {target_name}"
+        elif t == "heal":
+            return f"{target_name} healed {desc.amount} HP"
+        elif t == "move":
+            return f"{target_name} moved"
+        elif t == "death":
+            prefix = f"{source_name} killed " if source_name else ""
+            return f"{prefix}{target_name} died"
+        return f"{t}: {target_name}"
+
+    def _flush_events(self, logs: List[LogEntry], events: List[EventDescription]):
+        """Emit a LogEntry for a batch of events with generated messages."""
+        if not events:
+            return
+        msgs = [self._describe_event_as_message(e) for e in events]
+        state = self.to_model()
+        # Set active_entity from the first event's actor/source so the
+        # frontend can highlight who is doing the action
+        first = events[0]
+        active = first.actor_id or first.source_id
+        if active is not None:
+            state.active_entity = active
+        logs.append(LogEntry(state=state, events=events, messages=msgs))
 
     def _process_events_into_log(self, logs: List[LogEntry]):
-        """Process events from the queue, grouping consecutive same-type events into LogEntries."""
-        current_type = None
+        """Process events from the queue, merging consecutive same-key events into LogEntries."""
+        current_key = None
         current_events: List[EventDescription] = []
 
         while self.event_queue._queue:
@@ -319,22 +363,22 @@ class Engine:
             if isinstance(event, (ReactionOpportunityEvent, DecisionEvent)):
                 break
 
-            event_type = self._log_event_type(event)
-            desc = event.describe(self) if event_type is not None else None
+            key = self._event_merge_key(event)
+            desc = event.describe(self) if key is not None else None
 
-            # Type boundary? Emit what we have (unless it's just starting)
-            if current_events and event_type != current_type:
-                logs.append(LogEntry(state=self.to_model(), events=current_events))
+            # Key boundary? Emit what we have
+            if current_events and key != current_key:
+                self._flush_events(logs, current_events)
                 current_events = []
 
             if desc:
                 current_events.append(desc)
 
-            current_type = event_type
+            current_key = key
             self.event_queue.process_one(engine=self)
 
         if current_events:
-            logs.append(LogEntry(state=self.to_model(), events=current_events))
+            self._flush_events(logs, current_events)
 
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []

@@ -22,6 +22,7 @@ class ChangeLocationEvent(Event):
         subject = engine.get_entity_by_id(self.subject_id)
         return EventDescription(
             type="move",
+            source_id=self.subject_id,
             target_id=self.subject_id,
             target_pos=self.new_pos,
             source_pos=subject.pos if subject else None,

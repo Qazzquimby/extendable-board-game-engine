@@ -230,39 +230,52 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
             />
           </div>
 
-          {/* Event summary — show what happened in this frame */}
-          {currentLogEntry?.events && currentLogEntry.events.length > 0 && (
-            <div style={{
-              background: theme.bg.surface,
-              borderRadius: '6px',
-              padding: '8px 12px',
-              marginBottom: '8px',
-              fontSize: '13px',
-              color: theme.fg.secondary,
-              display: 'flex',
-              gap: '8px',
-              flexWrap: 'wrap',
-            }}>
-              {/* Show up to 3 event types as a compact summary */}
-              {Array.from(new Set(currentLogEntry.events.map(e => e.type))).slice(0, 3).map(type => {
-                const same = currentLogEntry.events.filter(e => e.type === type);
-                const first = same[0];
-                return (
-                  <span key={type}>
-                    <span style={{ color: theme.fg.dim, textTransform: 'capitalize' }}>{type}</span>
-                    {type === 'damage' && first.amount != null && (
-                      <> <span style={{ color: theme.accent.hit }}>{first.amount}</span>{same.length > 1 ? ` ×${same.length}` : ''}</>
-                    )}
-                    {type === 'move' && <span style={{ color: theme.fg.muted }}> {same.length}× tile</span>}
-                    {type === 'ability_use' && first.ability_name && (
-                      <> <span style={{ color: theme.accent.ability }}>{first.ability_name}</span></>
-                    )}
-                    {type === 'death' && <span style={{ color: theme.hp.dead }}> {same.length} died</span>}
-                  </span>
-                );
-              })}
-            </div>
-          )}
+          {/* Event summary — always present, shows what happened in this frame */}
+          <div style={{
+            background: theme.bg.surface,
+            borderRadius: '6px',
+            padding: '8px 12px',
+            marginBottom: '8px',
+            fontSize: '13px',
+            color: theme.fg.secondary,
+            display: 'flex',
+            gap: '8px',
+            flexWrap: 'wrap',
+            minHeight: '20px',
+          }}>
+            {currentLogEntry?.events && currentLogEntry.events.length > 0 ? (
+              (() => {
+                // Show unique event types with counts, grouped
+                const byType = new Map<string, typeof currentLogEntry.events>();
+                for (const e of currentLogEntry.events) {
+                  const arr = byType.get(e.type) || [];
+                  arr.push(e);
+                  byType.set(e.type, arr);
+                }
+                return Array.from(byType.entries()).slice(0, 4).map(([type, same]) => {
+                  const first = same[0];
+                  return (
+                    <span key={type}>
+                      <span style={{ color: theme.fg.dim, textTransform: 'capitalize' }}>{type}</span>
+                      {type === 'damage' && first.amount != null && (
+                        <> <span style={{ color: theme.accent.hit }}>{first.amount}</span>{same.length > 1 ? ` ×${same.length}` : ''}</>
+                      )}
+                      {type === 'heal' && first.amount != null && (
+                        <> <span style={{ color: theme.hp.high }}>+{first.amount}</span>{same.length > 1 ? ` ×${same.length}` : ''}</>
+                      )}
+                      {type === 'move' && <span style={{ color: theme.fg.muted }}> {same.length}× tile</span>}
+                      {type === 'ability_use' && first.ability_name && (
+                        <> <span style={{ color: theme.accent.ability }}>{first.ability_name}</span></>
+                      )}
+                      {type === 'death' && <span style={{ color: theme.hp.dead }}> {same.length} died</span>}
+                    </span>
+                  );
+                });
+              })()
+            ) : (
+              <span style={{ color: theme.fg.disabled, fontStyle: 'italic' }}>Initial board</span>
+            )}
+          </div>
 
           {stateToRender && (
             <PhaserComponent

@@ -69,6 +69,7 @@ class EventDescription(BaseModel):
 class LogEntry(BaseModel):
     state: EngineState
     events: List[EventDescription] = []
+    messages: List[str] = []
     done: bool = False
 
 

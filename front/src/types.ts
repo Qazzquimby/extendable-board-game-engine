@@ -28,6 +28,7 @@ export interface GameLog {
 export interface LogEntry {
   state: EngineState;
   events: EventDescription[];
+  messages?: string[];
   done: boolean;
   [k: string]: unknown;
 }

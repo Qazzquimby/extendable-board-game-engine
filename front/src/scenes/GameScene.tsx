@@ -341,21 +341,21 @@ export class GameScene extends Phaser.Scene {
 
         // --- HP bar (below name, within the disc) ---
         const hpColor = isDead ? 0x666666 : getHpColor(entity.hp);
-        const hpBarY = 10;
-        const hpBarWidth = radius * 1.2;
+        const hpBarY = 14;
+        const hpBarWidth = radius * 1.6;
         const hpBg = this.add.graphics();
         hpBg.fillStyle(0x222222, 0.8);
-        hpBg.fillRoundedRect(-hpBarWidth / 2, hpBarY, hpBarWidth, 6, 2);
+        hpBg.fillRoundedRect(-hpBarWidth / 2, hpBarY, hpBarWidth, 8, 3);
         entityContainer.add(hpBg);
 
         const hpFg = this.add.graphics();
         const hpWidth = Math.max(2, Math.min(hpBarWidth, (entity.hp / 12) * hpBarWidth));
         hpFg.fillStyle(hpColor, 1);
-        hpFg.fillRoundedRect(-hpBarWidth / 2, hpBarY, hpWidth, 6, 2);
+        hpFg.fillRoundedRect(-hpBarWidth / 2, hpBarY, hpWidth, 8, 3);
         entityContainer.add(hpFg);
 
-        const hpText = this.add.text(0, hpBarY + 3, `${entity.hp}`, {
-            fontSize: `${Math.max(10, Math.round(this.tileSize * 0.09))}px`,
+        const hpText = this.add.text(0, hpBarY + 9, `${entity.hp}`, {
+            fontSize: `${Math.max(11, Math.round(this.tileSize * 0.1))}px`,
             color: '#ffffff',
             fontFamily: 'Arial, sans-serif',
             fontStyle: 'bold',
