@@ -83,9 +83,6 @@ class RecallInstruction(Instruction):
                     )
 
 
-# todo prioritize reactions
-
-
 class Recall(Ability):
     def __init__(self, owner_id: str):
         super().__init__(
@@ -106,13 +103,42 @@ class Recall(Ability):
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
+        from abilities import (
+            score_heal,
+            displacement_value,
+            reaction_value_of_instructions,
+            reaction_escapes_area,
+            reaction_resource_conservation,
+        )
+
         tracker = actor.get_modifier(RecallTracker)
-        if not tracker:
-            return 0.0
-        hp_lost = tracker.recorded_hp - actor.hp
-        if hp_lost > 0:
-            return 5.0 + hp_lost
-        return 1.0
+        base = 0.0
+
+        # Heal value: how much HP would be restored
+        if tracker and tracker.recorded_hp:
+            hp_lost = tracker.recorded_hp - actor.hp
+            if hp_lost > 0:
+                base += score_heal(hp_lost, hp_lost)
+
+        # Displacement value: Recall moves to last turn's position
+        if tracker and tracker.recorded_pos:
+            base += displacement_value(actor, pos, tracker.recorded_pos, engine)
+
+        # Dodge value: if used as reaction, value of instructions avoided
+        trigger = getattr(engine, "_reaction_trigger_event", None)
+        if trigger is not None:
+            # Recall moves to a FIXED position, not a chosen one
+            # So we check if that position escapes the trigger
+            recall_pos = tracker.recorded_pos if tracker else None
+            if recall_pos:
+                base += reaction_value_of_instructions(trigger, actor, engine, recall_pos)
+                if reaction_escapes_area(pos, recall_pos, trigger):
+                    base += 2.0
+
+        # Universal resource conservation
+        base -= reaction_resource_conservation(self, engine)
+
+        return max(0.1, base)
 
 
 def blink_reaction_condition(
@@ -126,6 +152,7 @@ def blink_reaction_condition(
     """
     from events import AbilityUseEvent
     from instruction_library import DamageInstruction
+
     if not isinstance(event, AbilityUseEvent):
         return False
     subject = engine.get_entity_by_id(event.subject_id)
@@ -168,7 +195,9 @@ class Blink(Ability):
             text="3/Game, Instant +2: Teleport up to 3.",
             aiming=TargetPoint(in_range=3, empty=True),
             instructions=[
-                TeleportInstruction(destination=lambda ctx: ctx.subject_point, teleport_source=True)
+                TeleportInstruction(
+                    destination=lambda ctx: ctx.subject_point, teleport_source=True
+                )
             ],
             action_cost=ActionCost.INSTANT,
             instant_speed=2,
@@ -185,53 +214,27 @@ class Blink(Ability):
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        from abilities import displacement_value, score_damage
+        from abilities import (
+            displacement_value,
+            reaction_value_of_instructions,
+            reaction_escapes_area,
+            reaction_resource_conservation,
+        )
         target_pt = aiming_result.target_points[0]
 
-        # Base priority: displacement value (how much movement this saves)
         base = displacement_value(actor, pos, target_pt, engine)
 
-        # If there's a reaction trigger event, compute dodge value
         trigger = getattr(engine, "_reaction_trigger_event", None)
         if trigger is not None:
-            from events import AbilityUseEvent
-            if isinstance(trigger, AbilityUseEvent):
-                # How much damage would this dodge?
-                total_damage = 0
-                from instruction_library import DamageInstruction
-                for inst in trigger.ability.instructions:
-                    if isinstance(inst, DamageInstruction):
-                        dmg = inst.amount if isinstance(inst.amount, int) else 0
-                        total_damage += dmg
+            # Value of harmful instructions this blink avoids
+            base += reaction_value_of_instructions(trigger, actor, engine, target_pt)
 
-                # Check if blinking leaves the attacker's range
-                subject = engine.get_entity_by_id(trigger.subject_id)
-                if subject and subject.pos:
-                    attack_in_range = getattr(trigger.ability.aiming, "in_range", None)
-                    if attack_in_range is not None:
-                        new_dist = target_pt.get_distance(subject.pos)
-                        if new_dist > attack_in_range:
-                            # Dodged! Add value proportionate to damage prevented
-                            dodge_bonus = score_damage(total_damage, actor.hp) * 0.8
-                            base += dodge_bonus
-                        else:
-                            # Still in range but displacement has some value
-                            # Add small bonus for moving away from attacker
-                            old_dist = pos.get_distance(subject.pos)
-                            if new_dist > old_dist:
-                                base += 0.5 * (new_dist - old_dist)
-                    elif total_damage > 0:
-                        # No range info but it deals damage — still worth dodging
-                        base += score_damage(total_damage, actor.hp) * 0.5
+            # Bonus if we fully escape the trigger's area
+            if reaction_escapes_area(pos, target_pt, trigger):
+                base += 2.0
 
-        # Resource conservation: if few charges remain and game is early, reduce priority
-        if self.charges is not None and self.max_charges and self.max_charges > 0:
-            charges_used = self.max_charges - self.charges
-            charges_left = self.charges
-            # More penalty for limited charges early in the game
-            game_progress = engine.round_num / 7.0  # 7 rounds max
-            conservation_penalty = max(0, (1.0 - game_progress) * (1.0 / charges_left) if charges_left > 0 else 0)
-            base -= conservation_penalty
+        # Universal resource conservation for all charged abilities
+        base -= reaction_resource_conservation(self, engine)
 
         return max(0.1, base)
 
@@ -373,10 +376,5 @@ class Tracer(Hero):
 
         self.abilities.append(PulsePistols(owner_id=self.id))
         self.abilities.append(Blink(owner_id=self.id))
-        def no_reaction(*args, **kwargs):
-            return False
-
-        recall = Recall(owner_id=self.id)
-        recall.reaction_condition = no_reaction
-        self.abilities.append(recall)
+        self.abilities.append(Recall(owner_id=self.id))
         self.abilities.append(PulseBomb(owner_id=self.id))

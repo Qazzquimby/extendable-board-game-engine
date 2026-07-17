@@ -155,6 +155,129 @@ def score_add_token(token_class: "Type"):
     return 0.0
 
 
+def reaction_value_of_instructions(
+    trigger_event: object,
+    actor: "Entity",
+    engine: "Engine",
+    target_pos: "Point",
+) -> float:
+    """Total value of harmful instructions the trigger event would apply to `actor`.
+
+    Determines which instruction sub-aimings include `target_pos` (the actor's
+    original position), then scores each instruction by type. Composable so any
+    dodge ability (Blink, Recall, etc.) can use the same logic.
+    """
+    from instruction_library import (
+        DamageInstruction,
+        HealInstruction,
+        AddTokenInstruction,
+        AddModifierInstruction,
+        PullInstruction,
+        TeleportInstruction,
+    )
+    from events import AbilityUseEvent
+    if not isinstance(trigger_event, AbilityUseEvent):
+        return 0.0
+
+    total = 0.0
+    aiming = trigger_event.aiming_result
+
+    # Determine which points are targeted/included by each instruction
+    for inst in trigger_event.ability.instructions:
+        # Find the aiming result for this instruction
+        if inst.aiming_name and aiming.sub_aimings:
+            inst_aiming = aiming.sub_aimings.get(inst.aiming_name)
+        else:
+            inst_aiming = aiming
+
+        if inst_aiming is None:
+            continue
+
+        # Check if the actor's position is in this instruction's targets
+        all_pts = list(inst_aiming.target_points) + list(inst_aiming.included_points)
+        if actor.pos not in all_pts:
+            continue
+
+        if isinstance(inst, DamageInstruction):
+            dmg = inst.amount if isinstance(inst.amount, int) else 0
+            total += score_damage(dmg, actor.hp) * 0.8
+        elif isinstance(inst, AddTokenInstruction):
+            token_val = score_add_token(inst.token_class)
+            if token_val > 0 and inst.token_class.valence == Valence.BAD:
+                total += token_val
+        elif isinstance(inst, AddModifierInstruction):
+            mod_val = score_add_token(inst.modifier_class)
+            if mod_val > 0 and inst.modifier_class.valence == Valence.BAD:
+                total += mod_val
+        elif isinstance(inst, PullInstruction):
+            dist = inst.distance if isinstance(inst.distance, int) else 0
+            total += dist * 0.5
+        elif isinstance(inst, TeleportInstruction):
+            total += 0.5  # Being forcibly moved is disruptive
+
+    return total
+
+
+def reaction_escapes_area(from_pos: "Point", to_pos: "Point", trigger_event: object) -> bool:
+    """True if `to_pos` is outside ALL of the trigger event's target/included points.
+
+    This means the actor has fully escaped the attack's area and cannot be hit.
+    """
+    from events import AbilityUseEvent
+    if not isinstance(trigger_event, AbilityUseEvent):
+        return True
+
+    aiming = trigger_event.aiming_result
+
+    # Collect all points the trigger affects
+    all_trigger_points = set()
+    if aiming.sub_aimings:
+        for res in aiming.sub_aimings.values():
+            all_trigger_points.update(res.target_points)
+            all_trigger_points.update(res.included_points)
+    else:
+        all_trigger_points.update(aiming.target_points)
+        all_trigger_points.update(aiming.included_points)
+
+    if not all_trigger_points:
+        return True
+
+    return to_pos not in all_trigger_points
+
+
+def reaction_resource_conservation(
+    ability: "Ability",
+    engine: "Engine",
+) -> float:
+    """Penalty for using a charged/limited ability now vs saving for later.
+
+    Returns a value 0..N that should be subtracted from the ability's priority.
+    Higher when the ability is scarce (few charges) and the game is early.
+    Lower when the game is nearly over or the ability has many charges.
+    """
+    if ability.charges is None or ability.max_charges is None or ability.max_charges <= 0:
+        return 0.0
+
+    charges_left = ability.charges
+    # Game progress as fraction of 7 rounds
+    game_progress = min(engine.round_num / 7.0, 1.0)
+
+    # Scarcity: how much of the resource has been used
+    used_fraction = 1.0 - (charges_left / ability.max_charges)
+
+    # Penalty = low when game is late OR when we're hoarding (haven't used any yet)
+    # Peak penalty: mid-game with few charges left
+    if charges_left <= 1:
+        # Last charge — conserve unless late game
+        conservation_factor = max(0, 1.0 - game_progress)
+        return 1.5 * conservation_factor
+    elif charges_left <= 2:
+        conservation_factor = max(0, 1.0 - game_progress * 1.5)
+        return 0.8 * conservation_factor
+
+    return 0.0
+
+
 @dataclass(kw_only=True)  # Not frozen
 class Instruction:
     """Base class for all ability effects."""
