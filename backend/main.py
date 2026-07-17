@@ -1,11 +1,17 @@
+import sys
+from pathlib import Path
 from typing import List
+
+# Ensure backend/src is on sys.path so engine modules can be imported directly
+_src = str(Path(__file__).resolve().parent / "src")
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from hero_registry import get_hero_class, list_heroes
 
-# hero_registry adds backend/src to sys.path — engine imports below are safe
 from engine import Engine, RuleBasedAgent
 from grid import Grid
 from point import Point
@@ -67,21 +73,23 @@ def _resolve_hero_classes(req: RunGameRequest):
 
 
 def _validate_positions(req: RunGameRequest):
+    all_positions: dict[tuple[int, int], int] = {}  # pos -> team_idx
     for team_idx, team in enumerate(req.teams):
-        seen = set()
         for h in team.heroes:
             key = tuple(h.pos)
-            if key in seen:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Overlapping positions in team {team_idx} at {h.pos}",
-                )
-            seen.add(key)
             if not (0 <= h.pos[0] < req.grid_size and 0 <= h.pos[1] < req.grid_size):
                 raise HTTPException(
                     status_code=400,
                     detail=f"Position {h.pos} out of bounds for {req.grid_size}x{req.grid_size}",
                 )
+            if key in all_positions:
+                other_team = all_positions[key]
+                if other_team == team_idx:
+                    detail = f"Overlapping positions in team {team_idx} at {h.pos}"
+                else:
+                    detail = f"Overlapping positions across teams at {h.pos}"
+                raise HTTPException(status_code=400, detail=detail)
+            all_positions[key] = team_idx
 
 
 def _create_entities(engine, req, hero_classes):
