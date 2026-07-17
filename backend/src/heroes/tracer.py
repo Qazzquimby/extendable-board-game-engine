@@ -107,7 +107,7 @@ class Recall(Ability):
             score_heal,
             displacement_value,
             reaction_value_of_instructions,
-            reaction_escapes_area,
+            point_is_in_aiming_result,
             reaction_resource_conservation,
         )
 
@@ -130,14 +130,13 @@ class Recall(Ability):
             # Recall moves to a FIXED position, not a chosen one
             # So we check if that position escapes the trigger
             recall_pos = tracker.recorded_pos if tracker else None
-            if recall_pos:
-                base += reaction_value_of_instructions(
-                    trigger, actor, engine, recall_pos
-                )
-                if reaction_escapes_area(pos, recall_pos, trigger):
-                    base += 2.0
+            if recall_pos: # todo reuse this logic for any instant-movement effect
+                aiming_result = getattr(trigger, "aiming_result", None)
+                if aiming_result and point_is_in_aiming_result(point=recall_pos, aiming_result=aiming_result):
+                    base += reaction_value_of_instructions(
+                        trigger, actor, engine, recall_pos
+                    )
 
-        # Universal resource conservation
         base -= reaction_resource_conservation(self, engine)
 
         return max(0.1, base)
@@ -219,7 +218,7 @@ class Blink(Ability):
         from abilities import (
             displacement_value,
             reaction_value_of_instructions,
-            reaction_escapes_area,
+            point_is_in_aiming_result,
             reaction_resource_conservation,
         )
 
@@ -229,14 +228,10 @@ class Blink(Ability):
 
         trigger = getattr(engine, "_reaction_trigger_event", None)
         if trigger is not None:
-            # Value of harmful instructions this blink avoids
-            base += reaction_value_of_instructions(trigger, actor, engine, target_pt)
+            # Avoid harmful instructions
+            if hasattr(trigger, "aiming_result") and not point_is_in_aiming_result(point=target_pt, aiming_result=trigger.aiming_result):
+                base += reaction_value_of_instructions(trigger, actor, engine, target_pt)
 
-            # Bonus if we fully escape the trigger's area
-            if reaction_escapes_area(pos, target_pt, trigger):
-                base += 2.0
-
-        # Universal resource conservation for all charged abilities
         base -= reaction_resource_conservation(self, engine)
 
         return max(0.1, base)

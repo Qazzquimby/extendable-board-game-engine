@@ -169,13 +169,13 @@ def reaction_value_of_instructions(
     """
     from instruction_library import (
         DamageInstruction,
-        HealInstruction,
         AddTokenInstruction,
         AddModifierInstruction,
         PullInstruction,
         TeleportInstruction,
     )
     from events import AbilityUseEvent
+
     if not isinstance(trigger_event, AbilityUseEvent):
         return 0.0
 
@@ -218,31 +218,26 @@ def reaction_value_of_instructions(
     return total
 
 
-def reaction_escapes_area(from_pos: "Point", to_pos: "Point", trigger_event: object) -> bool:
+def point_is_in_aiming_result(
+    point: "Point", aiming_result: AimingResult
+) -> bool:
     """True if `to_pos` is outside ALL of the trigger event's target/included points.
 
     This means the actor has fully escaped the attack's area and cannot be hit.
     """
     from events import AbilityUseEvent
-    if not isinstance(trigger_event, AbilityUseEvent):
-        return True
-
-    aiming = trigger_event.aiming_result
 
     # Collect all points the trigger affects
     all_trigger_points = set()
-    if aiming.sub_aimings:
-        for res in aiming.sub_aimings.values():
+    if aiming_result.sub_aimings:
+        for res in aiming_result.sub_aimings.values():
             all_trigger_points.update(res.target_points)
             all_trigger_points.update(res.included_points)
     else:
-        all_trigger_points.update(aiming.target_points)
-        all_trigger_points.update(aiming.included_points)
+        all_trigger_points.update(aiming_result.target_points)
+        all_trigger_points.update(aiming_result.included_points)
 
-    if not all_trigger_points:
-        return True
-
-    return to_pos not in all_trigger_points
+    return point in all_trigger_points
 
 
 def reaction_resource_conservation(
@@ -255,8 +250,14 @@ def reaction_resource_conservation(
     Higher when the ability is scarce (few charges) and the game is early.
     Lower when the game is nearly over or the ability has many charges.
     """
-    if ability.charges is None or ability.max_charges is None or ability.max_charges <= 0:
+    if (
+        ability.charges is None
+        or ability.max_charges is None
+        or ability.max_charges <= 0
+    ):
         return 0.0
+
+    # todo factor in missing life, estimated turns to live
 
     charges_left = ability.charges
     # Game progress as fraction of 7 rounds
@@ -307,7 +308,7 @@ class Instruction:
         ctx: ActionContext,
     ) -> float:
         """Priority contribution of this instruction for a single target entity."""
-        raise NotImplemented
+        raise NotImplementedError
 
 
 def default_reaction_condition(
@@ -601,7 +602,11 @@ class Ability:
             return False
         if self.charges is not None and self.charges <= 0:
             return False
-        if self.is_ultimate and self.ultimate_turn is not None and round_num is not None:
+        if (
+            self.is_ultimate
+            and self.ultimate_turn is not None
+            and round_num is not None
+        ):
             if round_num < self.ultimate_turn:
                 return False
 
@@ -724,6 +729,7 @@ class Ability:
                 defense = target.get_defense(
                     engine=engine, attack_source=source, ability=self
                 )
+                defense += self.defense  # ability's inherent miss chance
                 defense = min(4, defense)
                 crit_chance = source.get_crit(
                     engine=engine, subject=target, ability=self
