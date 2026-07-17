@@ -9,11 +9,11 @@ import pkgutil
 from pathlib import Path
 from typing import Dict, Type
 
-from backend.src.entities import Hero
+from entities import Hero
 
 
 def _discover() -> Dict[str, Type]:
-    heroes_pkg = Path(__file__).resolve() / "heroes"
+    heroes_pkg = Path(__file__).resolve().parent / "heroes"
     heroes = {}
 
     def _scan_module(mod_name):
