@@ -54,20 +54,22 @@ class ActionState(BaseModel):
         )
 
 
-class ActionSim(BaseModel):
-    action: ActionState
-    after_state: EngineState
-    done: bool
-    winner_team: Optional[int] = None
+class EventDescription(BaseModel):
+    type: str = ""
+    actor_id: Optional[int] = None
+    target_id: Optional[int] = None
+    ability_name: Optional[str] = None
+    amount: Optional[int] = None
+    move_path: Optional[List[Point]] = None
+    source_id: Optional[int] = None
+    target_pos: Optional[Point] = None
+    source_pos: Optional[Point] = None
 
 
 class LogEntry(BaseModel):
-    before_state: EngineState
-    action: ActionState
-    after_state: EngineState
-    done: bool
-    simulations: List[ActionSim] = []
-    messages: List[str] = []
+    state: EngineState
+    events: List[EventDescription] = []
+    done: bool = False
 
 
 class GameLog(BaseModel):

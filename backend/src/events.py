@@ -4,6 +4,7 @@ from enum import Enum, auto
 from typing import Optional, Type, Callable, Any, List, TYPE_CHECKING
 
 from aimings import AimingResult
+from schemas import EventDescription
 from util import UniqueTuple, EntityId
 
 if TYPE_CHECKING:
@@ -51,6 +52,10 @@ class Event(abc.ABC):
         self.subject_id = subject.id if subject else None
         self.canceled = False
         self.state = "BEFORE"
+
+    def describe(self, engine: "Engine") -> Optional["EventDescription"]:
+        """Return an EventDescription for the game log, or None to skip."""
+        return None
 
     def __str__(self):
         return f"{self.__class__.__name__} {self.state}"
@@ -193,6 +198,15 @@ class AbilityUseEvent(Event):
         self.aiming_result = aiming_result
         self.roll_result = None
         self.is_reaction = is_reaction
+
+    def describe(self, engine: "Engine") -> Optional["EventDescription"]:
+        source_entity = engine.get_entity_by_id(self.subject_id)
+        return EventDescription(
+            type="ability_use",
+            actor_id=self.subject_id,
+            ability_name=self.ability.name,
+            source_pos=source_entity.pos if source_entity else None,
+        )
 
     def get_hash_info(self):
         return super().get_hash_info() + (

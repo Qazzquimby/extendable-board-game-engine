@@ -80,19 +80,10 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
   }, [currentStep]);
 
   const currentLogEntry = logs[currentStep];
-  const stateToRender: EngineState | undefined = currentLogEntry?.before_state;
-  // Merge after_state HP into before_state so death is visible immediately
-  const displayEntities = stateToRender?.entities.map(e => {
-    const after = currentLogEntry?.after_state?.entities.find(ae => ae.id === e.id);
-    return after ? { ...e, hp: after.hp } : e;
-  });
+  const stateToRender: EngineState | undefined = currentLogEntry?.state;
 
-  const getDestination = (logEntry: typeof currentLogEntry) => {
-    if (logEntry?.action.move_path?.length) {
-      return logEntry.action.move_path[logEntry.action.move_path.length - 1];
-    }
-    return 'same space';
-  };
+  // Find first ability_use event to show what ability triggered this frame
+  const mainAbilityEvent = currentLogEntry?.events.find(e => e.type === 'ability_use');
 
   const hpColor = (hp: number, dead: boolean) => {
     if (dead) return theme.hp.dead;
@@ -239,8 +230,8 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
             />
           </div>
 
-          {/* Current action details */}
-          {currentLogEntry && 'action' in currentLogEntry && currentLogEntry.action.actor !== -1 && (
+          {/* Event summary — show what happened in this frame */}
+          {currentLogEntry?.events && currentLogEntry.events.length > 0 && (
             <div style={{
               background: theme.bg.surface,
               borderRadius: '6px',
@@ -249,44 +240,33 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
               fontSize: '13px',
               color: theme.fg.secondary,
               display: 'flex',
-              gap: '12px',
+              gap: '8px',
               flexWrap: 'wrap',
             }}>
-              <span>
-                <span style={{ color: theme.fg.dim }}>Actor:</span>{' '}
-                <span style={{ color: theme.fg.bright }}>
-                  {stateToRender?.entities.find((e) => e.id === currentLogEntry.action.actor)?.name || currentLogEntry.action.actor}
-                </span>
-              </span>
-              <span>
-                <span style={{ color: theme.fg.dim }}>Ability:</span>{' '}
-                <span style={{ color: theme.accent.ability }}>{currentLogEntry.action.ability}</span>
-              </span>
-              <span>
-                <span style={{ color: theme.fg.dim }}>Move:</span>{' '}
-                <span style={{ color: theme.fg.muted }}>{currentLogEntry.action.movement_name} → [{String(getDestination(currentLogEntry))}]</span>
-              </span>
-              {currentLogEntry.action.target !== null && (
-                <span>
-                  <span style={{ color: theme.fg.dim }}>Target:</span>{' '}
-                  <span style={{ color: theme.accent.hit }}>
-                    {stateToRender?.entities.find((e) => e.id === currentLogEntry.action.target)?.name || currentLogEntry.action.target}
+              {/* Show up to 3 event types as a compact summary */}
+              {Array.from(new Set(currentLogEntry.events.map(e => e.type))).slice(0, 3).map(type => {
+                const same = currentLogEntry.events.filter(e => e.type === type);
+                const first = same[0];
+                return (
+                  <span key={type}>
+                    <span style={{ color: theme.fg.dim, textTransform: 'capitalize' }}>{type}</span>
+                    {type === 'damage' && first.amount != null && (
+                      <> <span style={{ color: theme.accent.hit }}>{first.amount}</span>{same.length > 1 ? ` ×${same.length}` : ''}</>
+                    )}
+                    {type === 'move' && <span style={{ color: theme.fg.muted }}> {same.length}× tile</span>}
+                    {type === 'ability_use' && first.ability_name && (
+                      <> <span style={{ color: theme.accent.ability }}>{first.ability_name}</span></>
+                    )}
+                    {type === 'death' && <span style={{ color: theme.hp.dead }}> {same.length} died</span>}
                   </span>
-                </span>
-              )}
-            </div>
-          )}
-
-          {currentLogEntry && 'action' in currentLogEntry && currentLogEntry.action.actor === -1 && (
-            <div style={{ textAlign: 'center', padding: '20px', fontSize: '18px', color: theme.accent.gold }}>
-              🏁 Game Over
+                );
+              })}
             </div>
           )}
 
           {stateToRender && (
             <PhaserComponent
-              engineState={{ ...stateToRender, entities: displayEntities || stateToRender.entities }}
-              action={currentLogEntry?.action}
+              engineState={stateToRender}
               onAnimationComplete={handleAnimationComplete}
             />
           )}
@@ -303,7 +283,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
               Entities
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(displayEntities || stateToRender?.entities || []).map((e) => {
+              {(stateToRender?.entities || []).map((e) => {
                 const teamColor = theme.team[e.team as 0 | 1];
                 const dead = e.hp <= 0;
                 return (

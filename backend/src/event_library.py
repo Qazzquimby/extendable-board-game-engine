@@ -3,6 +3,7 @@ from events import Event
 from logger import log
 from mod_value import ModInt
 from point import Point
+from schemas import EventDescription
 
 if TYPE_CHECKING:
     from abilities import Ability
@@ -16,6 +17,15 @@ class ChangeLocationEvent(Event):
     def __init__(self, subject: "Entity", new_pos: Optional["Point"]):
         super().__init__(subject=subject)
         self.new_pos = new_pos
+
+    def describe(self, engine: "Engine") -> Optional[EventDescription]:
+        subject = engine.get_entity_by_id(self.subject_id)
+        return EventDescription(
+            type="move",
+            target_id=self.subject_id,
+            target_pos=self.new_pos,
+            source_pos=subject.pos if subject else None,
+        )
 
     def _resolve(self, engine: "Engine") -> None:
         subject = engine.get_entity_by_id(self.subject_id)
@@ -179,6 +189,17 @@ class DamageEvent(Event):
         self.amount = ModInt(amount)
         self.ability = ability
 
+    def describe(self, engine: "Engine") -> Optional[EventDescription]:
+        target = engine.get_entity_by_id(self.subject_id)
+        return EventDescription(
+            type="damage",
+            source_id=self.source.id if self.source else None,
+            target_id=self.subject_id,
+            amount=self.amount.value,
+            target_pos=target.pos if target else None,
+            source_pos=self.source.pos if self.source else None,
+        )
+
     def _resolve(self, engine: "Engine") -> None:
         subject = engine.get_entity_by_id(self.subject_id)
         if subject.has_armor(engine=engine):
@@ -203,6 +224,15 @@ class DeathEvent(Event):
         super().__init__(subject=subject)
         self.killer_id = killer.id if killer else None
 
+    def describe(self, engine: "Engine") -> Optional[EventDescription]:
+        target = engine.get_entity_by_id(self.subject_id)
+        return EventDescription(
+            type="death",
+            target_id=self.subject_id,
+            source_id=self.killer_id,
+            target_pos=target.pos if target else None,
+        )
+
     def _resolve(self, engine: "Engine") -> None:
         subject = engine.get_entity_by_id(self.subject_id)
         log(f"{subject.name} died.")
@@ -223,6 +253,15 @@ class HealEvent(Event):
     def __init__(self, subject: "Entity", amount: int | ModInt):
         super().__init__(subject=subject)
         self.amount = ModInt(amount)
+
+    def describe(self, engine: "Engine") -> Optional[EventDescription]:
+        target = engine.get_entity_by_id(self.subject_id)
+        return EventDescription(
+            type="heal",
+            target_id=self.subject_id,
+            amount=self.amount.value,
+            target_pos=target.pos if target else None,
+        )
 
     def _resolve(self, engine: "Engine") -> None:
         final_heal = max(0, self.amount.value)

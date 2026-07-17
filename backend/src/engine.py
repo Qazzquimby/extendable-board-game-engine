@@ -39,7 +39,7 @@ from grid import Grid
 from logger import reset_logs, get_logs, log
 from point import Point
 from queries import QueryIsAlive, Query
-from schemas import EngineState, GameLog, LogEntry, ActionState
+from schemas import EngineState, GameLog, LogEntry, EventDescription
 from util import UniqueTuple
 
 if TYPE_CHECKING:
@@ -296,22 +296,61 @@ class Engine:
 
             return choices
 
+    def _log_event_type(self, event) -> Optional[str]:
+        """Map an event to a log type string for merging consecutive same-type events."""
+        if isinstance(event, (ReactionOpportunityEvent, DecisionEvent)):
+            return None  # Never merge choice points, handle separately
+        desc = event.describe(self)
+        if desc is None:
+            return None
+        if desc.type == "ability_use":
+            # AbilityUseEvent always starts a new frame — never merge
+            return None
+        return desc.type
+
+    def _process_events_into_log(self, logs: List[LogEntry]):
+        """Process events from the queue, grouping consecutive same-type events into LogEntries."""
+        current_type = None
+        current_events: List[EventDescription] = []
+
+        while self.event_queue._queue:
+            event = self.event_queue._queue[0]
+
+            if isinstance(event, (ReactionOpportunityEvent, DecisionEvent)):
+                break
+
+            event_type = self._log_event_type(event)
+            desc = event.describe(self) if event_type is not None else None
+
+            # Type boundary? Emit what we have (unless it's just starting)
+            if current_events and event_type != current_type:
+                logs.append(LogEntry(state=self.to_model(), events=current_events))
+                current_events = []
+
+            if desc:
+                current_events.append(desc)
+
+            current_type = event_type
+            self.event_queue.process_one(engine=self)
+
+        if current_events:
+            logs.append(LogEntry(state=self.to_model(), events=current_events))
+
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
         winner_team = None
-        after_state = None
-        self.event_queue.enqueue(RoundStartEvent())
 
-        pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
+        # Initial frame — board state before anything happens
+        logs.append(LogEntry(state=self.to_model(), events=[]))
+
+        self.event_queue.enqueue(RoundStartEvent())
         self.next_turn()
         next_choices = self.advance_until_choice()
 
+        pbar = tqdm(total=NUM_ROUNDS * len(self.entities))
+
         while not self.is_done:
             pbar.update()
-            if after_state:
-                before_state = after_state
-            else:
-                before_state = self.to_model()
 
             action_index = self.get_choice_index(
                 team=self.get_current_player(), choices=next_choices
@@ -322,37 +361,21 @@ class Engine:
                 action=action_choice,
                 action_idx=action_index,
             )
-            next_choices = self.advance_until_choice()
 
-            is_done = self.is_done
-            if is_done:
+            # Process queued events into log entries grouped by type
+            self._process_events_into_log(logs)
+
+            # Check for choices (reactions / decisions)
+            if self.event_queue._queue:
+                next_choices = self.advance_until_choice()
+            else:
+                next_choices = self.advance_until_choice()
+
+            if self.is_done:
                 winner_team = self.get_winning_player()
 
-            after_state = self.to_model()
-            log_entry = LogEntry(
-                before_state=before_state,
-                action=ActionState.from_action_choice(
-                    action_choice=action_choice, current_actor=self.get_current_actor()
-                ),
-                after_state=after_state,
-                done=is_done,
-                messages=get_logs(),
-            )
-            logs.append(log_entry)
-            reset_logs()
-
-        if after_state:
-            logs.append(
-                LogEntry(
-                    before_state=after_state,
-                    action=ActionState(
-                        actor=-1, target=None, ability="None", movement_name="Game Over"
-                    ),
-                    after_state=after_state,
-                    done=True,
-                    messages=["Game Over"],
-                )
-            )
+        # Final frame
+        logs.append(LogEntry(state=self.to_model(), done=True, events=[]))
 
         pbar.close()
         return GameLog(winner_team=winner_team, logs=logs)

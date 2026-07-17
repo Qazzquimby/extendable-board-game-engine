@@ -1,25 +1,28 @@
 import React, { useEffect, useRef } from 'react';
 import { GameScene } from './scenes/GameScene';
-import { EngineState, ActionState } from './types';
+import { EngineState } from './types';
 import * as Phaser from 'phaser';
 
 interface PhaserComponentProps {
   engineState: EngineState;
-  action?: ActionState;
   onAnimationComplete?: () => void;
 }
 
 // Render at higher internal resolution for crisp text, then CSS-clamp to fit.
-// The canvas is 1400×1400; on narrower screens the browser downscales smoothly.
 const GRID_WIDTH = 10;
 const GRID_HEIGHT = 10;
 const TILE_SIZE = 140;
 const CANVAS_WIDTH = GRID_WIDTH * TILE_SIZE;
 const CANVAS_HEIGHT = GRID_HEIGHT * TILE_SIZE;
 
-const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, onAnimationComplete }) => {
+const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, onAnimationComplete }) => {
   const gameContainer = useRef<HTMLDivElement>(null);
   const gameInstance = useRef<Phaser.Game | null>(null);
+  const pendingState = useRef<EngineState | null>(null);
+  const animCallback = useRef(onAnimationComplete);
+
+  // Keep callback ref current without triggering re-renders
+  animCallback.current = onAnimationComplete;
 
   useEffect(() => {
     if (gameContainer.current && !gameInstance.current) {
@@ -34,7 +37,6 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, 
       };
       gameInstance.current = new Phaser.Game(config);
     }
-
     return () => {
       gameInstance.current?.destroy(true);
       gameInstance.current = null;
@@ -42,14 +44,31 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, 
   }, []);
 
   useEffect(() => {
-    if (gameInstance.current && engineState) {
-        const scene = gameInstance.current.scene.getScene('GameScene') as GameScene;
-        if (scene) {
-            scene.setAnimationCallback(onAnimationComplete || (() => {}));
-            scene.updateEngineState(engineState, action);
+    if (!gameInstance.current) return;
+
+    const scene = gameInstance.current.scene.getScene('GameScene') as GameScene | null;
+    if (scene && scene.scene.isActive()) {
+      scene.setAnimationCallback(animCallback.current || (() => {}));
+      scene.updateEngineState(engineState);
+    } else {
+      // Scene not ready yet — store for later
+      pendingState.current = engineState;
+      // Poll until scene is ready
+      const check = setInterval(() => {
+        const s = gameInstance.current?.scene.getScene('GameScene') as GameScene | null;
+        if (s && s.scene.isActive()) {
+          clearInterval(check);
+          if (pendingState.current) {
+            s.setAnimationCallback(animCallback.current || (() => {}));
+            s.updateEngineState(pendingState.current);
+            pendingState.current = null;
+          }
         }
+      }, 50);
+      // Stop checking after 5 seconds
+      setTimeout(() => clearInterval(check), 5000);
     }
-  }, [engineState, action, onAnimationComplete]);
+  }, [engineState]);
 
   return <div ref={gameContainer} style={{ width: '100%', maxWidth: CANVAS_WIDTH, margin: '20px 0' }}/>;
 };
