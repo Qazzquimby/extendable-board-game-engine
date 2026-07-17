@@ -26,17 +26,22 @@ The user steps through Frames with arrow keys.
 A record of one atomic unit of gameplay for display. Contains a `state` (the
 world after this entry's events) and a list of `events` describing what changed.
 
-### Event Type
-A category of Event used for merging consecutive frames. Events of the same
-type that fire back-to-back (e.g., DamageEvent hitting three AoE victims) are
-merged into a single Log Entry. A Reaction (AbilityUseEvent) always starts a
-new Log Entry because it represents a new ability activation.
+### Event Merge Key
+A compound key `(type, source_id)` used for merging consecutive events into
+one LogEntry. Two events merged if they have the same type AND same source
+entity. This prevents events from different actors (e.g., Viktoria's attack
+damage vs Axe's counter-attack damage) from being merged into one frame.
 
-### Merged Frame
-A Log Entry containing multiple Events of the same type that fired
-consecutively in the event queue. For example, one AoE hitting 5 entities
-produces 5 DamageEvents merged into one frame showing all 5 hits
-simultaneously.
+### Three-Phase Pipeline
+Each Event passes through three processing phases: BEFORE (fires before-hooks
+and modifiers), RESOLVE (applies the event's effect via `_resolve()`), and
+AFTER (fires after-hooks). The event is re-enqueued between phases. The log
+system captures descriptions only during the RESOLVE phase to avoid 3×
+duplication.
+
+### Initial Frame
+The first Log Entry in a game log, containing only the starting board state
+(with no events). The frontend renders this as the player's first view.
 
 ### Marker
 A placed object on the grid that has no health, no actions, and is typically
