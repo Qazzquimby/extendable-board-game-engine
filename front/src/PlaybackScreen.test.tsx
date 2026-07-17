@@ -53,8 +53,9 @@ describe('PlaybackScreen', () => {
 
   it('renders entity panels', () => {
     render(<PlaybackScreen gameLog={mockGameLog} onBack={() => {}} />);
-    expect(screen.getByText(/Axe/)).toBeInTheDocument();
-    expect(screen.getByText(/Necrophos/)).toBeInTheDocument();
+    // Entity names appear in log messages, actor display, and entity panels
+    expect(screen.getAllByText(/Axe/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Necrophos/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders Phaser mock component', () => {

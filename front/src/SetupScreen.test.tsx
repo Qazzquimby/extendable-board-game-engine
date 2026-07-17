@@ -47,9 +47,16 @@ describe('SetupScreen', () => {
     const cell = screen.getByText('0,0');
     fireEvent.click(cell);
 
+    // Placed hero appears in team panel with coordinates
+    expect(screen.getByText(/Axe \[0,0\]/)).toBeInTheDocument();
+
     const removeBtn = screen.getByText('×');
     fireEvent.click(removeBtn);
-    expect(screen.queryByText('Axe')).toBeNull();
+
+    // Hero removed from team panel
+    expect(screen.queryByText(/Axe \[0,0\]/)).toBeNull();
+    // Hero returns to available roster
+    expect(screen.getByText('Axe')).toBeInTheDocument();
   });
 
   it('disables Play button when teams are empty', () => {
