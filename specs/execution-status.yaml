@@ -235,10 +235,18 @@ stories:
     status: done
     note: "Tested via test_run_game_deterministic_seed"
 
+  # ── e09: Symmetra Hero ──
+  - id: e09s01
+    epic: e09
+    title: "Symmetra hero with all 7 abilities"
+    bcps: 3
+    status: done
+    note: "Photon Orb, Beam, Sentry Turret, Teleporter, Shield Gen, Floating Barrier, Photon Barrier. 2 tests passing."
+
 # Totals
-total_bcps: 88
-total_stories: 30
+total_bcps: 91
+total_stories: 31
 completed_stories: 0
-stories_done: 30
+stories_done: 31
 stories_partial: 0
 stories_untested: 0
