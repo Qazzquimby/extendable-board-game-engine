@@ -13,6 +13,8 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(800); // ms per step
   const logEndRef = useRef<HTMLDivElement>(null);
+  const animatingRef = useRef(false);
+  const pendingStepRef = useRef(false);
 
   const goBack = useCallback(() => setCurrentStep((s) => Math.max(0, s - 1)), []);
   const goForward = useCallback(
@@ -20,7 +22,16 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
     [logs.length]
   );
 
-  // Auto-play timer
+  const handleAnimationComplete = useCallback(() => {
+    animatingRef.current = false;
+    // If auto-play queued a step while animating, take it now
+    if (pendingStepRef.current) {
+      pendingStepRef.current = false;
+      goForward();
+    }
+  }, [goForward]);
+
+  // Auto-play timer — waits for animation to finish before scheduling
   useEffect(() => {
     if (!isPlaying) return;
     const atEnd = currentStep >= logs.length - 1;
@@ -28,7 +39,18 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
       setIsPlaying(false);
       return;
     }
-    const timer = setTimeout(() => goForward(), speed);
+    // If Phaser is still animating, wait until it finishes
+    if (animatingRef.current) {
+      pendingStepRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (animatingRef.current) {
+        pendingStepRef.current = true;
+      } else {
+        goForward();
+      }
+    }, speed);
     return () => clearTimeout(timer);
   }, [isPlaying, currentStep, speed, goForward, logs.length]);
 
@@ -42,6 +64,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
   // Keyboard: arrows for step, space for play/pause
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (animatingRef.current) return; // don't skip while animating
       if (e.key === 'ArrowRight') goForward();
       else if (e.key === 'ArrowLeft') goBack();
       else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
@@ -269,7 +292,13 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
             </div>
           )}
 
-          {stateToRender && <PhaserComponent engineState={stateToRender} action={currentLogEntry?.action} />}
+          {stateToRender && (
+            <PhaserComponent
+              engineState={stateToRender}
+              action={currentLogEntry?.action}
+              onAnimationComplete={handleAnimationComplete}
+            />
+          )}
 
           {/* Entity panels */}
           <div style={{ marginTop: '12px' }}>

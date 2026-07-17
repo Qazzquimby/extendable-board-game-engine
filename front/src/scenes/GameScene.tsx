@@ -23,12 +23,18 @@ export class GameScene extends Phaser.Scene {
     private tileSize = 0;
     private gridOffsetX = 0;
     private gridOffsetY = 0;
+    public isAnimating = false;
+    private onAnimComplete: (() => void) | null = null;
 
     constructor() {
         super('GameScene');
         this.entitiesGroup = new Phaser.GameObjects.Group(this);
         this.overlaysGroup = new Phaser.GameObjects.Group(this);
         this.uiGroup = new Phaser.GameObjects.Group(this);
+    }
+
+    public setAnimationCallback(cb: () => void) {
+        this.onAnimComplete = cb;
     }
 
     public updateEngineState(state: EngineState, action?: ActionState) {
@@ -161,6 +167,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     private animateAction(actor: Phaser.GameObjects.Container, action: ActionState, targetPos: [number, number] | null) {
+        this.isAnimating = true;
         const path = action.move_path;
         if (path && path.length > 0) {
             const tweens = path.map((point: any) => ({
@@ -176,17 +183,32 @@ export class GameScene extends Phaser.Scene {
                 onComplete: () => {
                     if (targetPos) {
                         this.drawAttackArrow(actor.x, actor.y, this.gridOffsetX + targetPos[0] * this.tileSize + this.tileSize / 2, this.gridOffsetY + targetPos[1] * this.tileSize + this.tileSize / 2);
-                        this.showDamagePop(actor.x, actor.y, targetPos);
+                        this.showDamagePop(actor.x, actor.y, targetPos, () => {
+                            this.isAnimating = false;
+                            this.onAnimComplete?.();
+                        });
+                    } else {
+                        this.isAnimating = false;
+                        this.onAnimComplete?.();
                     }
                 },
             });
         } else if (targetPos) {
             this.drawAttackArrow(actor.x, actor.y, this.gridOffsetX + targetPos[0] * this.tileSize + this.tileSize / 2, this.gridOffsetY + targetPos[1] * this.tileSize + this.tileSize / 2);
-            this.showDamagePop(actor.x, actor.y, targetPos);
+            this.showDamagePop(actor.x, actor.y, targetPos, () => {
+                this.isAnimating = false;
+                this.onAnimComplete?.();
+            });
+        } else {
+            // No movement or attack — still animate briefly to show the action
+            this.time.delayedCall(300, () => {
+                this.isAnimating = false;
+                this.onAnimComplete?.();
+            });
         }
     }
 
-    private showDamagePop(fromX: number, fromY: number, toPos: [number, number]) {
+    private showDamagePop(fromX: number, fromY: number, toPos: [number, number], onDone?: () => void) {
         const toX = this.gridOffsetX + toPos[0] * this.tileSize + this.tileSize / 2;
         const toY = this.gridOffsetY + toPos[1] * this.tileSize + this.tileSize / 2;
         const midX = (fromX + toX) / 2;
@@ -195,9 +217,9 @@ export class GameScene extends Phaser.Scene {
         const pop = this.add.text(midX, midY, '⚔', {
             fontSize: `${this.tileSize * 0.4}px`,
             color: '#ff4444',
-            fontFamily: 'monospace',
+            fontFamily: 'Arial, sans-serif',
             stroke: '#000',
-            strokeThickness: 3,
+            strokeThickness: 2,
         }).setOrigin(0.5).setAlpha(1);
         this.overlaysGroup.add(pop);
 
@@ -205,9 +227,12 @@ export class GameScene extends Phaser.Scene {
             targets: pop,
             y: midY - 30,
             alpha: 0,
-            duration: 1000,
+            duration: 800,
             ease: 'Quad.easeOut',
-            onComplete: () => pop.destroy(),
+            onComplete: () => {
+                pop.destroy();
+                onDone?.();
+            },
         });
     }
 
@@ -265,65 +290,56 @@ export class GameScene extends Phaser.Scene {
             entityContainer.add(ring);
         }
 
-        // Entity name
+        // --- Entity name (positioned above the disc for clarity) ---
         const displayName = isDead ? `💀${entity.name}` : entity.name;
-        const nameText = this.add.text(0, 0, displayName, {
-            fontSize: `${Math.max(10, this.tileSize * 0.22)}px`,
+        const nameFontSize = `${Math.max(11, Math.round(this.tileSize * 0.2))}px`;
+        // Use sans-serif — renders much cleaner than monospace at small sizes in canvas
+        const nameText = this.add.text(0, -radius - 4, displayName, {
+            fontSize: nameFontSize,
             align: 'center',
             color: '#ffffff',
-            fontFamily: 'monospace',
+            fontFamily: 'Arial, sans-serif',
             fontStyle: isDead ? 'normal' : 'bold',
             stroke: '#000000',
-            strokeThickness: 3,
-            wordWrap: { width: this.tileSize * 0.8, useAdvancedWrap: true },
+            strokeThickness: 1.5,
+            wordWrap: { width: this.tileSize * 0.9, useAdvancedWrap: true },
         }).setOrigin(0.5);
         entityContainer.add(nameText);
 
-        // HP indicator
-        const hpY = radius + 2;
+        // --- HP bar (top of disc) ---
+        const hpY = -radius + 4;
         const hpColor = isDead ? 0x666666 : getHpColor(entity.hp);
         const hpBg = this.add.graphics();
         hpBg.fillStyle(0x222222, 0.8);
-        hpBg.fillRoundedRect(-radius, hpY - 4, radius * 2, 10, 3);
+        hpBg.fillRoundedRect(-radius, hpY, radius * 2, 8, 3);
         entityContainer.add(hpBg);
 
         const hpFg = this.add.graphics();
-        // Scale bar against a reasonable max (12 = max hero HP in current heroes)
         const hpWidth = Math.max(2, Math.min(radius * 2, (entity.hp / 12) * radius * 2));
         hpFg.fillStyle(hpColor, 1);
-        hpFg.fillRoundedRect(-radius, hpY - 4, hpWidth, 10, 3);
+        hpFg.fillRoundedRect(-radius, hpY, hpWidth, 8, 3);
         entityContainer.add(hpFg);
 
-        const hpText = this.add.text(0, hpY + 1, `${entity.hp}`, {
-            fontSize: '10px',
+        const hpText = this.add.text(0, hpY - 2, `${entity.hp}`, {
+            fontSize: '9px',
             color: '#ffffff',
-            fontFamily: 'monospace',
+            fontFamily: 'Arial, sans-serif',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 2,
-        }).setOrigin(0.5);
+            strokeThickness: 1.5,
+        }).setOrigin(0.5, 1);
         entityContainer.add(hpText);
 
-        // Modifier badges (small colored dots)
+        // --- Modifier badges (bottom half of disc) ---
         if (entity.modifiers && entity.modifiers.length > 0) {
-            const mods = entity.modifiers.slice(0, 4);
-            const dotY = hpY + 12;
-            const dotStartX = -(mods.length - 1) * 5;
-            mods.forEach((mod, i) => {
+            const mods = entity.modifiers.slice(0, 3);
+            const badgeY = 2;
+            const dotStartX = -(mods.length - 1) * 6;
+            mods.forEach((_mod, i) => {
                 const dot = this.add.graphics();
                 dot.fillStyle(0xffcc00, 0.9);
-                dot.fillCircle(dotStartX + i * 10, dotY, 3);
+                dot.fillCircle(dotStartX + i * 12, badgeY, 4);
                 entityContainer.add(dot);
-
-                // First modifier gets a label
-                if (i === 0) {
-                    const label = this.add.text(dotStartX - 4, dotY + 5, mod.substring(0, 8), {
-                        fontSize: '7px',
-                        color: '#ffcc00',
-                        fontFamily: 'monospace',
-                    }).setOrigin(0, 0);
-                    entityContainer.add(label);
-                }
             });
         }
 
