@@ -81,6 +81,11 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
 
   const currentLogEntry = logs[currentStep];
   const stateToRender: EngineState | undefined = currentLogEntry?.before_state;
+  // Merge after_state HP into before_state so death is visible immediately
+  const displayEntities = stateToRender?.entities.map(e => {
+    const after = currentLogEntry?.after_state?.entities.find(ae => ae.id === e.id);
+    return after ? { ...e, hp: after.hp } : e;
+  });
 
   const getDestination = (logEntry: typeof currentLogEntry) => {
     if (logEntry?.action.move_path?.length) {
@@ -280,7 +285,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
 
           {stateToRender && (
             <PhaserComponent
-              engineState={stateToRender}
+              engineState={{ ...stateToRender, entities: displayEntities || stateToRender.entities }}
               action={currentLogEntry?.action}
               onAnimationComplete={handleAnimationComplete}
             />
@@ -298,7 +303,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
               Entities
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {stateToRender?.entities.map((e) => {
+              {(displayEntities || stateToRender?.entities || []).map((e) => {
                 const teamColor = theme.team[e.team as 0 | 1];
                 const dead = e.hp <= 0;
                 return (

@@ -290,11 +290,10 @@ export class GameScene extends Phaser.Scene {
             entityContainer.add(ring);
         }
 
-        // --- Entity name (positioned above the disc for clarity) ---
+        // --- Entity name (near center, but slightly above so HP bar fits below) ---
         const displayName = isDead ? `💀${entity.name}` : entity.name;
         const nameFontSize = `${Math.max(11, Math.round(this.tileSize * 0.2))}px`;
-        // Use sans-serif — renders much cleaner than monospace at small sizes in canvas
-        const nameText = this.add.text(0, -radius - 4, displayName, {
+        const nameText = this.add.text(0, -6, displayName, {
             fontSize: nameFontSize,
             align: 'center',
             color: '#ffffff',
@@ -306,42 +305,30 @@ export class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         entityContainer.add(nameText);
 
-        // --- HP bar (top of disc) ---
-        const hpY = -radius + 4;
+        // --- HP bar (below name, within the disc) ---
         const hpColor = isDead ? 0x666666 : getHpColor(entity.hp);
+        const hpBarY = 10;
+        const hpBarWidth = radius * 1.2;
         const hpBg = this.add.graphics();
         hpBg.fillStyle(0x222222, 0.8);
-        hpBg.fillRoundedRect(-radius, hpY, radius * 2, 8, 3);
+        hpBg.fillRoundedRect(-hpBarWidth / 2, hpBarY, hpBarWidth, 6, 2);
         entityContainer.add(hpBg);
 
         const hpFg = this.add.graphics();
-        const hpWidth = Math.max(2, Math.min(radius * 2, (entity.hp / 12) * radius * 2));
+        const hpWidth = Math.max(2, Math.min(hpBarWidth, (entity.hp / 12) * hpBarWidth));
         hpFg.fillStyle(hpColor, 1);
-        hpFg.fillRoundedRect(-radius, hpY, hpWidth, 8, 3);
+        hpFg.fillRoundedRect(-hpBarWidth / 2, hpBarY, hpWidth, 6, 2);
         entityContainer.add(hpFg);
 
-        const hpText = this.add.text(0, hpY - 2, `${entity.hp}`, {
-            fontSize: '9px',
+        const hpText = this.add.text(0, hpBarY + 3, `${entity.hp}`, {
+            fontSize: '8px',
             color: '#ffffff',
             fontFamily: 'Arial, sans-serif',
             fontStyle: 'bold',
             stroke: '#000000',
-            strokeThickness: 1.5,
-        }).setOrigin(0.5, 1);
+            strokeThickness: 1,
+        }).setOrigin(0.5, 0);
         entityContainer.add(hpText);
-
-        // --- Modifier badges (bottom half of disc) ---
-        if (entity.modifiers && entity.modifiers.length > 0) {
-            const mods = entity.modifiers.slice(0, 3);
-            const badgeY = 2;
-            const dotStartX = -(mods.length - 1) * 6;
-            mods.forEach((_mod, i) => {
-                const dot = this.add.graphics();
-                dot.fillStyle(0xffcc00, 0.9);
-                dot.fillCircle(dotStartX + i * 12, badgeY, 4);
-                entityContainer.add(dot);
-            });
-        }
 
         this.entitiesGroup.add(entityContainer);
         return entityContainer;
