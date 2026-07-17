@@ -24,7 +24,7 @@ This replaces the current drag-drop-log workflow entirely.
 5. As a player, I want to press a "Play" button to run the game, so that the AI plays out the matchup.
 6. As a player, I want to step through the game turn by turn with arrow keys, so that I can understand each action.
 7. As a player, I want to see each individual action as its own step, so that I can follow chains of reactions.
-8. As a player, I want to see entities rendered with distinct visuals (shapes, colors, icons), so that I can identify units at a glance.
+
 9. As a player, I want to see terrain rendered on the grid, so that the battlefield state is clear.
 10. As a player, I want to see markers (objects, barriers) rendered on the grid, so that I can track deployed objects.
 11. As a player, I want to see direction indicators for entities that have facing, so that I understand positioning.
