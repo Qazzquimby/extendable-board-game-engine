@@ -342,7 +342,7 @@ class Engine:
             return f"{prefix}{target_name} died"
         return f"{t}: {target_name}"
 
-    def _flush_events(self, logs: List[LogEntry], events: List[EventDescription]):
+    def _flush_events(self, logs: List[LogEntry], events: List[EventDescription], action_logs: Optional[List[str]] = None):
         """Emit a LogEntry for a batch of events with generated messages."""
         if not events:
             return
@@ -354,22 +354,18 @@ class Engine:
         active = first.actor_id or first.source_id
         if active is not None:
             state.active_entity = active
-        logs.append(LogEntry(state=state, events=events, messages=msgs))
+        al = action_logs[:] if action_logs else []
+        logs.append(LogEntry(state=state, events=events, messages=msgs, action_logs=al))
 
     def _process_events_into_log(self, logs: List[LogEntry]):
         """Process events from the queue, merging consecutive same-key events into LogEntries.
 
-        Key behavior:
-        - Events with the same (type, source_id) merge into one entry.
-        - An ability_use event absorbs all subsequent same-action events
-          (damage, heals, modifiers) into its entry. This gives one frame
-          per action ("Axe used Battle Hunger" + "gained X Token" + "dealt Y damage"
-          all in one entry).
-        - Absorption stops when the NEXT ability_use is seen, ending the frame.
+        Each flush captures a snapshot of hierarchical logs at that point so per-entry
+        logs show what was known when that entry was emitted.
         """
         current_key = None
         current_events: List[EventDescription] = []
-        absorbing_ability = False  # After ability_use, absorb same-action events
+        checkpoint = len(get_logs())  # Track log position for incremental capture
 
         while self.event_queue._queue:
             event = self.event_queue._queue[0]
@@ -380,24 +376,17 @@ class Engine:
             key = self._event_merge_key(event)
             is_ability = key is not None and key[0] == "ability_use"
 
-            if is_ability:
-                # Ability use always starts a new frame
-                if current_events:
-                    self._flush_events(logs, current_events)
-                    current_events = []
-                absorbing_ability = True
-                current_key = key
-            elif absorbing_ability:
-                # After an ability_use, absorb all subsequent same-action events
-                # into the same frame (damage, heals, modifiers, moves).
-                # No boundary checks — just keep adding.
-                pass
-            elif current_events and key != current_key:
-                # Normal type/source boundary: emit frame
-                self._flush_events(logs, current_events)
+            # Emit current batch before starting a new ability or type boundary
+            if current_events and (is_ability or key != current_key):
+                snapshot = get_logs()[:]
+                self._flush_events(logs, current_events, snapshot)
                 current_events = []
-                current_key = key
-            else:
+                checkpoint = len(get_logs())
+                if is_ability:
+                    current_key = key
+                else:
+                    current_key = key
+            elif not is_ability:
                 current_key = key
 
             # Describe events at BEFORE state (first time we see them).
@@ -408,15 +397,9 @@ class Engine:
 
             self.event_queue.process_one(engine=self)
 
-            # After processing, if absorption is active, check if the next event
-            # is a new ability_use — if so, flush and end absorption
-            if absorbing_ability:
-                if (not self.event_queue._queue or
-                    isinstance(self.event_queue._queue[0], (ReactionOpportunityEvent, DecisionEvent))):
-                    absorbing_ability = False
-
         if current_events:
-            self._flush_events(logs, current_events)
+            snapshot = get_logs()[:]
+            self._flush_events(logs, current_events, snapshot)
 
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
@@ -452,23 +435,26 @@ class Engine:
                 action_idx=action_index,
             )
 
-            # Process queued events into log entries grouped by type
-            prev_entry_count = len(logs)
+            # Process queued events into log entries grouped by type.
+            # Each flush captures a log snapshot at that point.
             self._process_events_into_log(logs)
 
             # Check for choices (reactions / decisions)
-            # This also processes remaining events (damage, modifiers), generating
-            # the "dealt X damage", "gained X Token" logs.
+            # advance_until_choice also processes remaining events (damage,
+            # modifiers), generating logs like "dealt X damage", "gained X Token".
             if self.event_queue._queue:
                 next_choices = self.advance_until_choice()
             else:
                 next_choices = self.advance_until_choice()
 
-            # NOW capture all logs — includes everything from step() through
-            # event processing AND advance_until_choice()
-            action_logs = get_logs()
-            for entry in logs[prev_entry_count:]:
-                entry.action_logs = action_logs[:]
+            # Append any NEW logs generated during advance_until_choice (from
+            # DamageEvent._resolve, ApplyModifierEvent._resolve, etc.) to the
+            # last entry so damage/modifier logs appear in the sidebar.
+            if logs and len(get_logs()) > 0:
+                existing = set(logs[-1].action_logs or [])
+                all_new = [l for l in get_logs() if l not in existing]
+                if all_new:
+                    logs[-1].action_logs = (logs[-1].action_logs or []) + all_new
 
             if self.is_done:
                 winner_team = self.get_winning_player()

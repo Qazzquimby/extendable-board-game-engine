@@ -94,6 +94,78 @@ describe('PlaybackScreen', () => {
     // Check sidebar shows the entry (several 'Step 1' on page, pick via container)
   });
 
+  it('renders all entries in the log sidebar with per-entry action_logs', () => {
+    const gameLog: GameLog = {
+      winner_team: 0,
+      logs: [
+        mockGameLog.logs[0],
+        {
+          state: mockGameLog.logs[0].state,
+          events: [{ type: 'move', target_id: 1, source_pos: [0, 0], target_pos: [1, 0] }],
+          action_logs: ['Axe moved to (1,0).'],
+          done: false,
+        },
+        {
+          state: mockGameLog.logs[0].state,
+          events: [{ type: 'ability_use', actor_id: 1, ability_name: 'Battle Hunger' }],
+          action_logs: ['Axe used Battle Hunger.', 'Target gained BattleHungerToken.'],
+          done: false,
+        },
+      ],
+    };
+    render(<PlaybackScreen gameLog={gameLog} onBack={() => {}} />);
+
+    // Should show both entries in the sidebar
+    expect(screen.getByText(/Step 1/)).toBeInTheDocument();
+    expect(screen.getByText(/Step 2/)).toBeInTheDocument();
+
+    // Step to entry 1
+    fireEvent.click(screen.getByText(/Step 1/));
+    expect(screen.getByText(/Axe moved to/)).toBeInTheDocument();
+
+    // Step to entry 2
+    fireEvent.click(screen.getByText(/Step 2/));
+    expect(screen.getByText(/Axe used Battle Hunger/)).toBeInTheDocument();
+    expect(screen.getByText(/BattleHungerToken/)).toBeInTheDocument();
+  });
+
+  it('renders entity sidebar with HP bars and modifiers', () => {
+    const gameLog: GameLog = {
+      winner_team: 0,
+      logs: [
+        {
+          state: {
+            round_num: 1,
+            current_team: 0,
+            active_entity: null,
+            entities: [
+              { id: 1, name: 'Axe', hp: 7, pos: [0, 0] as [number, number], team: 0, move_actions: 1, standard_actions: 1, free_actions: 99, modifiers: ['BattleHungerToken', 'SlowToken'] },
+              { id: 2, name: 'Necrophos', hp: 0, pos: [4, 4] as [number, number], team: 1, move_actions: 1, standard_actions: 1, free_actions: 99, modifiers: [] },
+            ],
+          },
+          events: [],
+          done: false,
+        },
+      ],
+    };
+    render(<PlaybackScreen gameLog={gameLog} onBack={() => {}} />);
+
+    // Entity sidebar should show entity names
+    const axeElements = screen.getAllByText(/Axe/);
+    expect(axeElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Necrophos/)).toBeInTheDocument();
+
+    // HP values should be visible
+    expect(screen.getByText('7')).toBeInTheDocument();
+
+    // Modifiers should be shown
+    expect(screen.getByText(/BattleHungerToken/)).toBeInTheDocument();
+    expect(screen.getByText(/SlowToken/)).toBeInTheDocument();
+
+    // Dead entity should show skull
+    expect(screen.getByText(/💀/)).toBeInTheDocument();
+  });
+
   it('shows event summary for frames with events', () => {
     const gameLog: GameLog = {
       winner_team: 0,

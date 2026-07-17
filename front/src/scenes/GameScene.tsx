@@ -169,10 +169,17 @@ export class GameScene extends Phaser.Scene {
         // Compute source positions from events — entities that move should start
         // at their old (source) position so the tween animates visibly instead of
         // jumping from the already-at-destination state.
+        // Use the FIRST move event's source_pos for each entity (the position
+        // before ANY movement this frame). The last event's source_pos is the
+        // position before the final sub-step, not the starting position for the
+        // full movement arc.
         const moveSourcePos: Map<number, [number, number]> = new Map();
         for (const ev of events) {
             if (ev.type === 'move' && ev.target_id != null && ev.source_pos) {
-                moveSourcePos.set(ev.target_id, [ev.source_pos[0], ev.source_pos[1]]);
+                const eid = ev.target_id;
+                if (!moveSourcePos.has(eid)) {
+                    moveSourcePos.set(eid, [ev.source_pos[0], ev.source_pos[1]]);
+                }
             }
         }
 
