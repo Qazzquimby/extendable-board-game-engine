@@ -61,6 +61,7 @@ export const theme = {
     mid: '#fa0',
     low: '#f66',
     dead: '#666',
+    bg: '#333',
   },
 
   borders: {

@@ -233,8 +233,8 @@ export class GameScene extends Phaser.Scene {
                     const dstPixX = this.gridOffsetX + event.target_pos[0] * this.tileSize + this.tileSize / 2;
                     const dstPixY = this.gridOffsetY + event.target_pos[1] * this.tileSize + this.tileSize / 2;
 
-                    // Place at source and tween to destination
-                    container.setPosition(srcPixX, srcPixY);
+                    // Entity is already at source_pos (placed by drawEntity with drawPos).
+                    // Tween it to destination.
                     const dur = 400;
                     this.tweens.add({
                         targets: container,

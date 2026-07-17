@@ -357,9 +357,19 @@ class Engine:
         logs.append(LogEntry(state=state, events=events, messages=msgs))
 
     def _process_events_into_log(self, logs: List[LogEntry]):
-        """Process events from the queue, merging consecutive same-key events into LogEntries."""
+        """Process events from the queue, merging consecutive same-key events into LogEntries.
+
+        Key behavior:
+        - Events with the same (type, source_id) merge into one entry.
+        - An ability_use event absorbs all subsequent same-action events
+          (damage, heals, modifiers) into its entry. This gives one frame
+          per action ("Axe used Battle Hunger" + "gained X Token" + "dealt Y damage"
+          all in one entry).
+        - Absorption stops when the NEXT ability_use is seen, ending the frame.
+        """
         current_key = None
         current_events: List[EventDescription] = []
+        absorbing_ability = False  # After ability_use, absorb same-action events
 
         while self.event_queue._queue:
             event = self.event_queue._queue[0]
@@ -368,22 +378,42 @@ class Engine:
                 break
 
             key = self._event_merge_key(event)
-            # Only describe events at their RESOLVE phase (after _resolve has been
-            # applied, but before AFTER hooks). The 3-phase event pipeline
-            # (BEFORE → RESOLVE → AFTER) re-enqueues the event twice, so without
-            # this guard we'd get 3 identical descriptions per event.
-            desc = event.describe(self) if (key is not None and event.state == "RESOLVE") else None
+            is_ability = key is not None and key[0] == "ability_use"
 
-            # Key boundary? Emit what we have
-            if current_events and key != current_key:
+            if is_ability:
+                # Ability use always starts a new frame
+                if current_events:
+                    self._flush_events(logs, current_events)
+                    current_events = []
+                absorbing_ability = True
+                current_key = key
+            elif absorbing_ability:
+                # After an ability_use, absorb all subsequent same-action events
+                # into the same frame (damage, heals, modifiers, moves).
+                # No boundary checks — just keep adding.
+                pass
+            elif current_events and key != current_key:
+                # Normal type/source boundary: emit frame
                 self._flush_events(logs, current_events)
                 current_events = []
+                current_key = key
+            else:
+                current_key = key
+
+            # Describe events at BEFORE state (first time we see them).
+            desc = event.describe(self) if (key is not None and event.state == "BEFORE") else None
 
             if desc:
                 current_events.append(desc)
 
-            current_key = key
             self.event_queue.process_one(engine=self)
+
+            # After processing, if absorption is active, check if the next event
+            # is a new ability_use — if so, flush and end absorption
+            if absorbing_ability:
+                if (not self.event_queue._queue or
+                    isinstance(self.event_queue._queue[0], (ReactionOpportunityEvent, DecisionEvent))):
+                    absorbing_ability = False
 
         if current_events:
             self._flush_events(logs, current_events)
@@ -497,10 +527,16 @@ class Engine:
             )
 
             if isinstance(action, PlausibleMoveAndAction):
+                # Skip the first point (starting position) — emitting a
+                # ChangeLocationEvent to the current position is a no-op
+                # and inflates the move count by 1.
+                prev_pos = actor.pos
                 for point in action.move_path:
-                    self.event_queue.enqueue(
-                        ChangeLocationEvent(subject=actor, new_pos=point)
-                    )
+                    if point != prev_pos:
+                        self.event_queue.enqueue(
+                            ChangeLocationEvent(subject=actor, new_pos=point)
+                        )
+                        prev_pos = point
 
             if hasattr(action, "ability"):
                 with log(f"{actor.name} used {action.ability.name}{target_str}."):

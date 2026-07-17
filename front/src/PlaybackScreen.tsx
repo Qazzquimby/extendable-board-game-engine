@@ -341,51 +341,82 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
             />
           )}
 
-          {/* Entity panels */}
-          <div style={{ marginTop: '12px' }}>
-            <h3 style={{
-              fontSize: '13px',
-              color: theme.fg.muted,
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              marginBottom: '8px',
-            }}>
-              Entities
-            </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {(stateToRender?.entities || []).map((e) => {
-                const teamColor = theme.team[e.team as 0 | 1];
-                const dead = e.hp <= 0;
-                return (
-                  <div
-                    key={e.id}
-                    style={{
-                      border: `1px solid ${dead ? theme.borders.muted : teamColor}`,
-                      background: dead ? theme.bg.surface : theme.bg.card,
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      minWidth: '150px',
-                      color: theme.fg.secondary,
-                    }}
-                  >
-                    <div style={{ fontWeight: 'bold', color: dead ? theme.hp.dead : teamColor }}>
-                      {dead ? '💀' : ''}{e.name}
-                    </div>
-                    <div>
-                      HP: <span style={{ color: hpColor(e.hp, dead) }}>{e.hp}</span>
-                      {' | '}Pos: [{e.pos ? `${e.pos[0]},${e.pos[1]}` : '?'}]
-                    </div>
-                    {e.modifiers && e.modifiers.length > 0 && (
-                      <div style={{ color: theme.accent.modifier, marginTop: '2px', fontSize: '11px' }}>
-                        {e.modifiers.join(', ')}
-                      </div>
-                    )}
+        </div>
+
+        {/* Entity sidebar */}
+        <div
+          style={{
+            width: '220px',
+            borderLeft: `1px solid ${theme.borders.subtle}`,
+            padding: '0',
+            height: '100%',
+            overflowY: 'auto',
+            background: theme.bg.panel,
+            flexShrink: 0,
+          }}
+        >
+          <h3 style={{
+            margin: '0',
+            padding: '12px 12px 8px',
+            fontSize: '14px',
+            color: theme.fg.muted,
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            borderBottom: `1px solid ${theme.borders.subtle}`,
+            position: 'sticky',
+            top: 0,
+            background: theme.bg.panel,
+            zIndex: 1,
+          }}>
+            Entities
+          </h3>
+          {(stateToRender?.entities || []).map((e) => {
+            const teamColor = theme.team[e.team as 0 | 1];
+            const dead = e.hp <= 0;
+            return (
+              <div
+                key={e.id}
+                style={{
+                  padding: '8px 12px',
+                  borderBottom: `1px solid ${theme.borders.subtle}`,
+                }}
+              >
+                <div style={{
+                  fontWeight: 'bold',
+                  color: dead ? theme.hp.dead : teamColor,
+                  fontSize: '13px',
+                }}>
+                  {dead ? '💀 ' : ''}{e.name}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>
+                  <div style={{
+                    flex: 1,
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: theme.hp.bg,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${dead ? 0 : Math.max(3, (e.hp / 12) * 100)}%`,
+                      height: '100%',
+                      background: hpColor(e.hp, dead),
+                      borderRadius: '3px',
+                    }} />
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                  <span style={{ fontSize: '11px', color: theme.fg.secondary }}>{e.hp}</span>
+                </div>
+                <div style={{ fontSize: '11px', color: theme.fg.disabled, marginTop: '2px' }}>
+                  Pos: [{e.pos ? `${e.pos[0]},${e.pos[1]}` : '?'}]
+                  {' | '}Team {e.team + 1}
+                </div>
+                {e.modifiers && e.modifiers.length > 0 && (
+                  <div style={{ color: theme.accent.modifier, marginTop: '3px', fontSize: '11px', lineHeight: 1.4 }}>
+                    {e.modifiers.join(', ')}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
