@@ -25,12 +25,46 @@ export class GameScene extends Phaser.Scene {
     private gridOffsetY = 0;
     public isAnimating = false;
     private onAnimComplete: (() => void) | null = null;
+    private isDragging = false;
+    private dragPointer: { x: number; y: number } | null = null;
 
     constructor() {
         super('GameScene');
         this.entitiesGroup = new Phaser.GameObjects.Group(this);
         this.overlaysGroup = new Phaser.GameObjects.Group(this);
         this.uiGroup = new Phaser.GameObjects.Group(this);
+    }
+
+    create() {
+        // Enable zoom with scroll wheel
+        this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: any[], _deltaX: number, deltaY: number) => {
+            const cam = this.cameras.main;
+            const step = deltaY > 0 ? -0.1 : 0.1;
+            const newZoom = Phaser.Math.Clamp(cam.zoom + step, 0.3, 3);
+            cam.setZoom(newZoom);
+        });
+
+        // Enable drag-to-pan
+        this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            this.isDragging = true;
+            this.dragPointer = { x: pointer.x, y: pointer.y };
+        });
+
+        this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+            if (this.isDragging && this.dragPointer) {
+                const cam = this.cameras.main;
+                const dx = pointer.x - this.dragPointer.x;
+                const dy = pointer.y - this.dragPointer.y;
+                cam.scrollX -= dx / cam.zoom;
+                cam.scrollY -= dy / cam.zoom;
+                this.dragPointer = { x: pointer.x, y: pointer.y };
+            }
+        });
+
+        this.input.on('pointerup', () => {
+            this.isDragging = false;
+            this.dragPointer = null;
+        });
     }
 
     public setAnimationCallback(cb: () => void) {

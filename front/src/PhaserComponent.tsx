@@ -12,6 +12,8 @@ interface PhaserComponentProps {
 const GRID_WIDTH = 10;
 const GRID_HEIGHT = 10;
 const TILE_SIZE = 70;
+const CANVAS_WIDTH = GRID_WIDTH * TILE_SIZE;
+const CANVAS_HEIGHT = GRID_HEIGHT * TILE_SIZE;
 
 const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, onAnimationComplete }) => {
   const gameContainer = useRef<HTMLDivElement>(null);
@@ -21,8 +23,8 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, 
     if (gameContainer.current && !gameInstance.current) {
       const config: Phaser.Types.Core.GameConfig = {
         type: Phaser.AUTO,
-        width: GRID_WIDTH * TILE_SIZE,
-        height: GRID_HEIGHT * TILE_SIZE,
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
         parent: gameContainer.current,
         backgroundColor: '#1a1a1a',
         scene: GameScene,
@@ -46,7 +48,7 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, 
     }
   }, [engineState, action, onAnimationComplete]);
 
-  return <div ref={gameContainer} style={{ width: GRID_WIDTH * TILE_SIZE, height: GRID_HEIGHT * TILE_SIZE, margin: '20px 0' }}/>;
+  return <div ref={gameContainer} style={{ width: '100%', maxWidth: CANVAS_WIDTH, height: CANVAS_HEIGHT, margin: '20px 0', overflow: 'hidden' }}/>;
 };
 
 export default PhaserComponent;

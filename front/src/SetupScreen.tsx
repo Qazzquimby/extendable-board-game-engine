@@ -14,7 +14,7 @@ interface SetupScreenProps {
   onPlay: (gameLog: any) => void;
 }
 
-const GRID_SIZE = 5;
+const DEFAULT_GRID_SIZE = 6;
 
 export function SetupScreen({ onPlay }: SetupScreenProps) {
   const [heroes, setHeroes] = useState<string[]>([]);
@@ -26,6 +26,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
   const [selectedHero, setSelectedHero] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
 
   useEffect(() => {
     fetch('/heroes')
@@ -72,7 +73,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           seed: Math.floor(Math.random() * 100000),
-          grid_size: GRID_SIZE,
+          grid_size: gridSize,
           teams: teams.map((t) => ({ heroes: t.heroes })),
         }),
       });
@@ -147,7 +148,24 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
 
         {/* Grid */}
         <div>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: '13px', color: theme.fg.placeholder, marginRight: '4px' }}>
+              Grid:{' '}
+              <select
+                value={gridSize}
+                onChange={(e) => setGridSize(Number(e.target.value))}
+                style={{
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  border: `1px solid ${theme.borders.gridLine}`,
+                  fontSize: '13px',
+                }}
+              >
+                {[5, 6, 7, 8, 9, 10].map(s => (
+                  <option key={s} value={s}>{s}×{s}</option>
+                ))}
+              </select>
+            </label>
             {([0, 1] as const).map((t) => (
               <button
                 key={t}
@@ -170,17 +188,17 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${GRID_SIZE}, 60px)`,
-            gridTemplateRows: `repeat(${GRID_SIZE}, 60px)`,
+            gridTemplateColumns: `repeat(${gridSize}, 60px)`,
+            gridTemplateRows: `repeat(${gridSize}, 60px)`,
             gap: '2px',
             border: `3px solid ${theme.borders.gridBorder}`,
             borderRadius: '4px',
             background: theme.bg.grid,
             padding: '2px',
           }}>
-            {Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, i) => {
-              const x = i % GRID_SIZE;
-              const y = Math.floor(i / GRID_SIZE);
+            {Array.from({ length: gridSize * gridSize }, (_, i) => {
+              const x = i % gridSize;
+              const y = Math.floor(i / gridSize);
               const entity = getEntityAt(x, y);
               const occupied = isOccupied(x, y);
 
