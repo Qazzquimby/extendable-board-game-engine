@@ -280,7 +280,7 @@ export class GameScene extends Phaser.Scene {
         arrow.lineTo(toX, toY);
 
         const angle = Phaser.Math.Angle.Between(fromX, fromY, toX, toY);
-        const arrowHeadLength = 12;
+        const arrowHeadLength = Math.max(8, Math.round(this.tileSize * 0.12));
 
         arrow.lineTo(toX - arrowHeadLength * Math.cos(angle - Math.PI / 6), toY - arrowHeadLength * Math.sin(angle - Math.PI / 6));
         arrow.moveTo(toX, toY);
@@ -355,7 +355,7 @@ export class GameScene extends Phaser.Scene {
         entityContainer.add(hpFg);
 
         const hpText = this.add.text(0, hpBarY + 3, `${entity.hp}`, {
-            fontSize: '8px',
+            fontSize: `${Math.max(10, Math.round(this.tileSize * 0.09))}px`,
             color: '#ffffff',
             fontFamily: 'Arial, sans-serif',
             fontStyle: 'bold',

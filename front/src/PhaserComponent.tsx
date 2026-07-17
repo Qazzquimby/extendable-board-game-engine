@@ -9,9 +9,11 @@ interface PhaserComponentProps {
   onAnimationComplete?: () => void;
 }
 
+// Render at higher internal resolution for crisp text, then CSS-clamp to fit.
+// The canvas is 1400×1400; on narrower screens the browser downscales smoothly.
 const GRID_WIDTH = 10;
 const GRID_HEIGHT = 10;
-const TILE_SIZE = 70;
+const TILE_SIZE = 140;
 const CANVAS_WIDTH = GRID_WIDTH * TILE_SIZE;
 const CANVAS_HEIGHT = GRID_HEIGHT * TILE_SIZE;
 
@@ -28,6 +30,7 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, 
         parent: gameContainer.current,
         backgroundColor: '#1a1a1a',
         scene: GameScene,
+        canvasStyle: 'display: block; width: 100%; max-width: ' + CANVAS_WIDTH + 'px; height: auto;',
       };
       gameInstance.current = new Phaser.Game(config);
     }
@@ -48,7 +51,7 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, action, 
     }
   }, [engineState, action, onAnimationComplete]);
 
-  return <div ref={gameContainer} style={{ width: '100%', maxWidth: CANVAS_WIDTH, height: CANVAS_HEIGHT, margin: '20px 0', overflow: 'hidden' }}/>;
+  return <div ref={gameContainer} style={{ width: '100%', maxWidth: CANVAS_WIDTH, margin: '20px 0' }}/>;
 };
 
 export default PhaserComponent;
