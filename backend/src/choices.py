@@ -122,7 +122,7 @@ def get_plausible_movements(
     proposed_moves = {actor.pos: "Stay"}
     if reachable_points:
         for ability in actor.abilities:
-            if ability.is_available():
+            if ability.is_available(round_num=engine.round_num):
                 proposed_moves.update(
                     ability.get_movement(
                         engine, actor, reachable_points, enemies, allies
@@ -149,7 +149,7 @@ def get_plausible_actions_after_movement(
 ) -> dict[tuple, PlausibleMoveAndAction]:
     actions = {}
     for ability in actor.abilities:
-        if not ability.is_available():
+        if not ability.is_available(round_num=engine.round_num):
             continue
         # Instant abilities don't take standard actions — they're handled
         # as free actions (get_plausible_free_actions) or reactions.
@@ -223,7 +223,7 @@ def get_plausible_free_actions(
     for ability in actor.abilities:
         if (
             ability.action_cost not in (ActionCost.FREE, ActionCost.INSTANT)
-            or not ability.is_available()
+            or not ability.is_available(round_num=engine.round_num)
         ):
             continue
 

@@ -61,7 +61,7 @@ def test_tracer_has_instant_abilities():
 
 
 def test_blink_reaction_condition_tracer_targeted():
-    """blink_reaction_condition returns True when Tracer is in the trigger's targets."""
+    """blink_reaction_condition returns True when Tracer is targeted by a damaging ability."""
     from engine import Engine
     from grid import Grid
     from heroes.tracer import Tracer, blink_reaction_condition
@@ -79,11 +79,17 @@ def test_blink_reaction_condition_tracer_targeted():
     )
 
     blink = next(a for a in tracer.abilities if a.name == "Blink")
+    # Only react to damaging abilities
+    damaging_ability = Ability(
+        name="TestAttack",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=100)],
+    )
     assert blink_reaction_condition(
         engine=engine,
         event=AbilityUseEvent(
             source=attacker,
-            ability=Ability(name="Test", aiming=TargetEntity(in_range=5)),
+            ability=damaging_ability,
             aiming_result=AimingResult(
                 target_points=[Point(5, 0)],
                 included_points=[],
@@ -92,7 +98,7 @@ def test_blink_reaction_condition_tracer_targeted():
         ),
         actor=tracer,
         ability=blink,
-    ), "Should react when Tracer is targeted"
+    ), "Should react when Tracer is targeted by a damaging ability"
 
 
 def test_blink_reaction_condition_not_targeted():
@@ -104,6 +110,7 @@ def test_blink_reaction_condition_not_targeted():
     from abilities import Ability
     from aimings import AimingResult, TargetEntity
     from events import AbilityUseEvent
+    from instruction_library import DamageInstruction
     from point import Point
 
     engine = Engine(grid=Grid(6, 6))
@@ -115,11 +122,16 @@ def test_blink_reaction_condition_not_targeted():
     blink = next(a for a in tracer.abilities if a.name == "Blink")
 
     # Aim at a DIFFERENT point than Tracer's position
+    damaging_ability = Ability(
+        name="TestAttack",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=100)],
+    )
     assert not blink_reaction_condition(
         engine=engine,
         event=AbilityUseEvent(
             source=attacker,
-            ability=Ability(name="Test", aiming=TargetEntity(in_range=5)),
+            ability=damaging_ability,
             aiming_result=AimingResult(
                 target_points=[Point(3, 0)],
                 included_points=[],
@@ -139,6 +151,7 @@ def test_blink_reaction_condition_ally_target():
     from abilities import Ability
     from aimings import AimingResult, TargetEntity
     from events import AbilityUseEvent
+    from instruction_library import DamageInstruction
     from point import Point
 
     engine = Engine(grid=Grid(6, 6))
@@ -146,12 +159,17 @@ def test_blink_reaction_condition_ally_target():
     ally = Tracer(engine=engine, pos=Point(5, 1), team=1)
 
     blink = next(a for a in tracer.abilities if a.name == "Blink")
+    damaging_ability = Ability(
+        name="FriendlyFire",
+        aiming=TargetEntity(in_range=5),
+        instructions=[DamageInstruction(amount=100)],
+    )
 
     assert not blink_reaction_condition(
         engine=engine,
         event=AbilityUseEvent(
             source=ally,
-            ability=Ability(name="Friendly Fire", aiming=TargetEntity(in_range=5)),
+            ability=damaging_ability,
             aiming_result=AimingResult(
                 target_points=[Point(5, 0)],
                 included_points=[],
@@ -321,3 +339,122 @@ def test_instant_abilities_not_in_standard_actions():
     assert "Pulse Pistols" in standard_ability_names, (
         f"Standard (non-instant) abilities should still appear: {standard_ability_names}"
     )
+
+
+def test_tracer_blinks_to_dodge_attack():
+    """Tracer should react-blink away when targeted by a damaging ability.
+
+    When an attacker hits Tracer at range 1 with a damaging ability:
+    1. ReactionOpportunityEvent should present Blink as a reaction choice
+    2. If Tracer blinks away, the attack should miss (entity_at returns None)
+    3. Tracer takes no damage
+    """
+    from engine import Engine
+    from grid import Grid
+    from heroes.tracer import Tracer
+    from entities import Entity
+    from abilities import Ability
+    from aimings import AimingResult, TargetEntity
+    from events import (
+        AbilityUseEvent,
+        ReactionOpportunityEvent,
+        EventQueue,
+    )
+    from instruction_library import DamageInstruction
+    from point import Point
+
+    engine = Engine(grid=Grid(6, 6))
+    engine.finalize_setup()
+
+    tracer = Tracer(engine=engine, pos=Point(5, 0), team=1)
+    attacker = Entity(
+        engine=engine, name="Attacker", hp=100, speed=3, pos=Point(4, 0), team=0
+    )
+
+    blink = next(a for a in tracer.abilities if a.name == "Blink")
+    initial_hp = tracer.hp
+    initial_pos = tracer.pos
+
+    # Create a damaging ability (like a melee attack)
+    slash = Ability(
+        name="Slash",
+        aiming=TargetEntity(in_range=1),
+        instructions=[DamageInstruction(amount=100)],
+    )
+
+    # Enqueue the attack targeting Tracer
+    attack_event = AbilityUseEvent(
+        source=attacker,
+        ability=slash,
+        aiming_result=AimingResult(
+            target_points=[tracer.pos],
+            included_points=[],
+            sub_aimings={},
+        ),
+    )
+    engine.event_queue.enqueue(attack_event)
+
+    # Process the first event — this should create a ReactionOpportunityEvent
+    engine.event_queue.process_one(engine=engine)
+
+    # Queue should now have [AttackAbility(RESOLVE), ReactionOpportunity]
+    # Actually: AFTER process_one, attack is at RESOLVE state and re-enqueued,
+    # and ReactionOpportunityEvent was enqueued during process()
+
+    # The ReactionOpportunityEvent should have Blink as an option for Tracer
+    front = engine.event_queue._queue[0] if engine.event_queue._queue else None
+    assert isinstance(front, ReactionOpportunityEvent), (
+        f"Expected ReactionOpportunityEvent, got {type(front).__name__ if front else None}"
+    )
+
+    choices, react_entity = front.get_choices(engine=engine)
+    assert react_entity == tracer, "Tracer should be the reacting entity"
+    assert any(
+        c.ability.name == "Blink" for c in choices
+    ), f"Blink should be a reaction choice, got {[c.ability.name if hasattr(c, 'ability') else type(c).__name__ for c in choices]}"
+
+    # Choose the Blink reaction — find a target point
+    blink_choice = next(c for c in choices if c.ability.name == "Blink")
+    # Verify the blink target is a different position
+    blink_target = blink_choice.aiming_result.target_points[0]
+    assert blink_target != tracer.pos, "Blink should target a different position"
+
+    # Now simulate what happens: the attacker attacks, Tracer blinks as reaction
+    # First, let's advance_until_choice which processes events till we get choices
+    # Pop the ReactionOpportunityEvent and process the Blink reaction
+    engine.event_queue._queue.pop(0)
+
+    # Simulate the reaction step: blink away
+    blink.react(engine=engine, source=tracer, aiming_result=blink_choice.aiming_result)
+
+    # Now process the blink reaction AbilityUseEvent (and its ChangeLocationEvent)
+    while engine.event_queue._queue:
+        ev = engine.event_queue._queue[0]
+        if isinstance(ev, ReactionOpportunityEvent):
+            # Second reaction opportunity (from blink's AFTER) — consume
+            choices2, _ = ev.get_choices(engine=engine)
+            if choices2 and len(choices2) > 1:
+                # Entity could react to blink — pass
+                pass_choice = next(c for c in choices2 if c.features.get("pass_reaction"))
+                ev.declined_entities.add(tracer.id)
+                engine.event_queue._queue.pop(0)
+                continue
+            else:
+                engine.event_queue._queue.pop(0)
+                continue
+        engine.event_queue.process_one(engine=engine)
+
+    # Tracer should have moved
+    assert tracer.pos != initial_pos, (
+        f"Tracer should have blinked from {initial_pos} to a new position, but is still at {tracer.pos}"
+    )
+
+    # The attack should miss since Tracer is no longer at the target point
+    # The original AttackAbilityUseEvent went to RESOLVE, then its _resolve
+    # should have tried to get_roll_result which checks entity_at(target_point)
+    # Since Tracer moved, entity_at returned None → zero damage
+    assert tracer.hp == initial_hp, (
+        f"Tracer should have taken 0 damage after blinking, but took {initial_hp - tracer.hp}"
+    )
+
+    print(f"Tracer blinked: {initial_pos} → {tracer.pos}, HP: {tracer.hp}/{initial_hp}")

@@ -157,7 +157,7 @@ class Engine:
         self.entities: List["Entity"] = []
         self.markers: List["Marker"] = []
         self.rng = TrackedRandom(seed)
-        self.round_num: int = 1
+        self.round_num: int = 0
 
         self.team_heroes: List[List[Hero]] = None  # run finalize
         self.num_hero_rows: int = None  # run finalize

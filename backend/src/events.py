@@ -150,7 +150,7 @@ class ReactionOpportunityEvent(Event):
             for react_ability in entity.abilities:
                 if (
                     react_ability.action_cost == ActionCost.INSTANT
-                    and react_ability.is_available()
+                    and react_ability.is_available(round_num=engine.round_num)
                 ):
                     if react_ability.reaction_condition:
                         if not react_ability.reaction_condition(

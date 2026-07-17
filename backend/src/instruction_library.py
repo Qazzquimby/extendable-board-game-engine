@@ -277,10 +277,16 @@ class RefreshAbilityInstruction(Instruction):
 @dataclass(kw_only=True)
 class TeleportInstruction(Instruction):
     destination: DynamicPoint
+    teleport_source: bool = False
+    """If True, teleport the source entity instead of entity_at subject_point.
+    Used for abilities like Blink that target an empty destination point."""
     valence: Valence = Valence.MIXED
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
-        subject = engine.entity_at(ctx.subject_point)
+        if self.teleport_source:
+            subject = engine.get_entity_by_id(ctx.source_id)
+        else:
+            subject = engine.entity_at(ctx.subject_point)
         if subject:
             dest = (
                 self.destination(ctx)

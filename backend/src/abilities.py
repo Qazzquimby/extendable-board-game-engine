@@ -473,11 +473,14 @@ class Ability:
             return Valence.BAD
         assert False
 
-    def is_available(self):
+    def is_available(self, round_num: Optional[int] = None):
         if self.is_tapped:
             return False
         if self.charges is not None and self.charges <= 0:
             return False
+        if self.is_ultimate and self.ultimate_turn is not None and round_num is not None:
+            if round_num < self.ultimate_turn:
+                return False
 
         return True
 

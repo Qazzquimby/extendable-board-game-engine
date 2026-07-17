@@ -118,16 +118,25 @@ class Recall(Ability):
 def blink_reaction_condition(
     engine: "Engine", event: object, actor: "Entity", ability: "Ability"
 ) -> bool:
-    """React when Tracer is targeted by an enemy ability.
+    """React when Tracer is targeted by an enemy attack that deals damage.
 
     If any of the triggering event's target/included points contain the actor
     (Tracer), she can blink to an empty space within range 3 to avoid the attack.
+    Only triggers for abilities that deal damage (have DamageInstruction).
     """
     from events import AbilityUseEvent
+    from instruction_library import DamageInstruction
     if not isinstance(event, AbilityUseEvent):
         return False
     subject = engine.get_entity_by_id(event.subject_id)
     if subject.team == actor.team:
+        return False
+
+    # Only react to damaging abilities
+    has_damage = any(
+        isinstance(inst, DamageInstruction) for inst in event.ability.instructions
+    )
+    if not has_damage:
         return False
 
     # Check if actor is in the trigger's target/included points
@@ -159,7 +168,7 @@ class Blink(Ability):
             text="3/Game, Instant +2: Teleport up to 3.",
             aiming=TargetPoint(in_range=3, empty=True),
             instructions=[
-                TeleportInstruction(destination=lambda ctx: ctx.subject_point)
+                TeleportInstruction(destination=lambda ctx: ctx.subject_point, teleport_source=True)
             ],
             action_cost=ActionCost.INSTANT,
             instant_speed=2,
