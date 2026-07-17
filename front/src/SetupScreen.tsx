@@ -248,7 +248,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
             >
               <h4 style={{ margin: '0 0 6px', color: TEAM_COLORS[t] }}>{TEAM_LABELS[t]}</h4>
               {teams[t].heroes.length === 0 ? (
-                <p style={{ fontSize: '12px', color: '#999', margin: 0 }}>Empty</p>
+                <p style={{ fontSize: '12px', color: '#434343', margin: 0 }}>Empty</p>
               ) : (
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                   {teams[t].heroes.map((h, i) => (
