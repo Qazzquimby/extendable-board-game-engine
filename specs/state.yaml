@@ -1,27 +1,26 @@
 # specs/state.yaml
-# Purpose: The cockpit — tells any agent (or you) where the project is
-#   at a glance. Updated at every phase transition.
-# What this file is: "Where am I right now?" — active flow, current
-#   epic/story, git state, and the handoff message for the next session.
+# Purpose: The cockpit
+# Status: All 8 epics completed, 30 stories done, 119 tests passing.
 
 active_flow: complete
-active_epic_id: e01
-active_story_id: e01s01
-completed_epic: false
+active_epic_id: null
+active_story_id: null
+completed_epic: true
 
 epic_cycle:
   current_step: complete
-  next_skill: plan-work (next story)
-  story_bcps: 1
+  next_skill: null
+  story_bcps: 0
   completed_steps:
+    - elaborate-spec
     - scope-work
     - slice-tasks
-    - plan-work (e01s01)
+    - plan-work
     - kickoff-branch
-    - develop-tdd (e01s01)
+    - develop-tdd
     - verify-work
     - audit-code
-    - release-branch (solo-local)
+    - release-branch
   audit_result: null
 
 bug_cycle:
@@ -29,7 +28,7 @@ bug_cycle:
   completed_steps: []
 
 release:
-  target_version: null
+  target_version: "1.0.0"
   last_tag: null
   last_publish: null
   ci_verified: false
@@ -42,15 +41,14 @@ metrics:
 
 git:
   branch: master
-  hash: 1fb1498
+  hash: f56241b
   pushed: false
 
 handoff:
-  last_step_completed: "release-branch (solo-local) — e01s01 merged to master"
+  last_step_completed: "All 8 epics complete, 30 stories done, 119 tests passing"
   open_decisions:
-    - "e01s01 done. Next: e01s02 (Entity lifecycle) — plan-work then chain"
-  required_reading:
-    - specs/release-plan.yaml
-    - specs/execution-status.yaml
-    - specs/epics/e01-core-engine/epic.yaml
-  next_skill: plan-work (next story)
+    - "Deferred: Symmetra, Reinhardt, Spy hero design (new epics)"
+    - "Deferred: Tween animations (Phaser integration)"
+    - "Deferred: MCTS self-play pipeline"
+  required_reading: []
+  next_skill: null

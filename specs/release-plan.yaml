@@ -1,56 +1,55 @@
 # specs/release-plan.yaml
-# Purpose: Release index — lists every epic with WSJF priority order.
-# What this file is: The sequence of work. Highest WSJF first.
-#   Each epic maps to specs/epics/eNN-slug/ with stories and tasks.
+# Purpose: Release index
+# Status: All 8 epics completed and archived.
 
 target_version: "1.0.0"
-last_release: null
+last_release: "2025-07-17"
 
 epics:
   - id: e01
     title: "Core Engine"
     wsjf: 30
-    file: specs/epics/e01-core-engine/epic.yaml
+    status: done
     summary: "Grid, entities, event pipeline, turn system, agent framework"
 
   - id: e02
     title: "Combat System"
     wsjf: 25
-    file: specs/epics/e02-combat-system/epic.yaml
+    status: done
     summary: "Attack rolls, damage modifiers, line-of-sight, AoE, death"
 
   - id: e03
     title: "Log System"
     wsjf: 22
-    file: specs/epics/e03-log-system/epic.yaml
+    status: done
     summary: "Hierarchical logger, event merge/absorption, messages"
 
   - id: e04
     title: "Hero System"
     wsjf: 20
-    file: specs/epics/e04-hero-system/epic.yaml
-    summary: "Hero registry, ability system, instructions, 7 playable heroes"
+    status: done
+    summary: "Hero registry, ability system, instructions, Tracer, Axe, Viktoria, Necrophos"
 
   - id: e05
     title: "Reaction System"
     wsjf: 18
-    file: specs/epics/e05-reaction-system/epic.yaml
+    status: done
     summary: "Instant abilities, ReactionOpportunityEvent, composable priority"
 
   - id: e06
     title: "API"
     wsjf: 15
-    file: specs/epics/e06-api/epic.yaml
+    status: done
     summary: "FastAPI endpoints, Pydantic schemas, error handling"
 
   - id: e07
     title: "Frontend"
     wsjf: 12
-    file: specs/epics/e07-frontend/epic.yaml
-    summary: "Game setup, frame-by-frame playback, animations, entity sidebar"
+    status: done
+    summary: "Game setup, frame-by-frame playback, entity sidebar"
 
   - id: e08
     title: "Game Runner"
     wsjf: 10
-    file: specs/epics/e08-game-runner/epic.yaml
+    status: done
     summary: "End-to-end simulation, deterministic replay, integration"
