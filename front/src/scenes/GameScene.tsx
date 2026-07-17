@@ -235,7 +235,7 @@ export class GameScene extends Phaser.Scene {
 
                     // Entity is already at source_pos (placed by drawEntity with drawPos).
                     // Tween it to destination.
-                    const dur = 400;
+                    const dur = 800;
                     this.tweens.add({
                         targets: container,
                         x: dstPixX,
