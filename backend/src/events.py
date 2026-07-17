@@ -154,7 +154,7 @@ class ReactionOpportunityEvent(Event):
                 ):
                     if react_ability.reaction_condition:
                         if not react_ability.reaction_condition(
-                            self.triggering_event, engine, entity, react_ability
+                            engine, self.triggering_event, entity, react_ability
                         ):
                             continue
 

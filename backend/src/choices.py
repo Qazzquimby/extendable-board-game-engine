@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, TYPE_CHECKING, Union
 
 from abilities import Ability, ActionCost
-from aimings import TargetEntity, IncludeArea, TargetSelf, AimingResult, MultipleAiming
+from aimings import TargetEntity, IncludeArea, TargetSelf, TargetPoint, AimingResult, MultipleAiming
 from point import Point
 from queries import QueryLegalAimings, QuerySpeed
 from util import UniqueTuple, DO_NOTHING
@@ -150,6 +150,10 @@ def get_plausible_actions_after_movement(
     actions = {}
     for ability in actor.abilities:
         if not ability.is_available():
+            continue
+        # Instant abilities don't take standard actions — they're handled
+        # as free actions (get_plausible_free_actions) or reactions.
+        if ability.action_cost == ActionCost.INSTANT:
             continue
         actions.update(
             get_plausible_uses_of_ability_after_movement(
@@ -382,6 +386,19 @@ def _get_plausible_uses_of_ability_at_pos(
                         priority=priority,
                         **choice_kwargs,
                     )
+            elif isinstance(ability.aiming, TargetPoint):
+                # TargetPoint aims at arbitrary grid points (possibly empty).
+                for target_point in aiming_res.target_points:
+                    key = (pos, target_point, ability.get_hash())
+                    if key not in plausible_uses:
+                        plausible_uses[key] = choice_class(
+                            target=None,
+                            ability=ability,
+                            actor=actor,
+                            aiming_result=aiming_res,
+                            priority=priority,
+                            **choice_kwargs,
+                        )
             elif isinstance(ability.aiming, IncludeArea):
                 affected_entities = {
                     e

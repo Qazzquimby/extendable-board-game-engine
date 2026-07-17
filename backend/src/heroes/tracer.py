@@ -115,6 +115,43 @@ class Recall(Ability):
         return 1.0
 
 
+def blink_reaction_condition(
+    engine: "Engine", event: object, actor: "Entity", ability: "Ability"
+) -> bool:
+    """React when Tracer is targeted by an enemy ability.
+
+    If any of the triggering event's target/included points contain the actor
+    (Tracer), she can blink to an empty space within range 3 to avoid the attack.
+    """
+    from events import AbilityUseEvent
+    if not isinstance(event, AbilityUseEvent):
+        return False
+    subject = engine.get_entity_by_id(event.subject_id)
+    if subject.team == actor.team:
+        return False
+
+    # Check if actor is in the trigger's target/included points
+    trigger_targets = []
+    if event.aiming_result.sub_aimings:
+        for res in event.aiming_result.sub_aimings.values():
+            trigger_targets.extend(res.target_points)
+            trigger_targets.extend(res.included_points)
+    elif event.aiming_result:
+        trigger_targets.extend(event.aiming_result.target_points)
+        trigger_targets.extend(event.aiming_result.included_points)
+
+    if actor.pos not in trigger_targets:
+        return False
+
+    # Verify there's at least one valid empty space to blink to
+    reachable = engine.grid.get_movable_spaces(
+        engine=engine, actor=actor, max_movement=3
+    )
+    occupied = {e.pos for e in engine.living_entities if e.pos is not None}
+    viable = [p for p in reachable if p != actor.pos and p not in occupied]
+    return len(viable) > 0
+
+
 class Blink(Ability):
     def __init__(self, owner_id: str):
         super().__init__(
@@ -128,6 +165,8 @@ class Blink(Ability):
             instant_speed=2,
             max_charges=3,
             owner_id=owner_id,
+            reaction_condition=blink_reaction_condition,
+            requires_target=False,
         )
 
     def get_priority(

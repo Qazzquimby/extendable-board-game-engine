@@ -87,6 +87,10 @@ def best_move_for_score(
         reachable_points,
         key=lambda pt: (score_fn(pt), -pt.get_distance(actor_pos)),
     )
+    # Tie-break by lowest distance moved (prefer closest to current position)
+    tied = [pt for pt in reachable_points if score_fn(pt) == score_fn(best)]
+    if tied and len(tied) > 1:
+        return {min(tied, key=lambda pt: pt.get_distance(actor_pos)): reason}
     if score_fn(best) > 0:
         return {best: reason}
     return {}

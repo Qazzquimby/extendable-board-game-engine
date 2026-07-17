@@ -77,16 +77,14 @@ class RuleBasedAgent(Agent):
 
         actor = env.get_current_actor()
         if actor:
-            pref_pos = actor.get_preferred_position(env)
-            if pref_pos:
+            # Tie-break by lowest distance moved from current position
+            def get_distance(choice_idx: int) -> int:
+                choice = choices[choice_idx]
+                pos = getattr(choice, "move_pos", actor.pos)
+                return pos.get_distance(actor.pos) if pos else 0
 
-                def get_distance(choice_idx: int) -> int:
-                    choice = choices[choice_idx]
-                    pos = getattr(choice, "move_pos", actor.pos)
-                    return pos.get_distance(pref_pos) if pos else 0
-
-                min_dist = min(get_distance(i) for i in best_choices)
-                best_choices = [i for i in best_choices if get_distance(i) == min_dist]
+            min_dist = min(get_distance(i) for i in best_choices)
+            best_choices = [i for i in best_choices if get_distance(i) == min_dist]
 
         return env.rng.choice(best_choices)
 
