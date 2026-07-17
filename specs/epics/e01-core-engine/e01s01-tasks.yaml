@@ -1,0 +1,26 @@
+# Story: Grid places entities and validates positions
+story_id: e01s01
+title: "Grid places entities and validates positions"
+status: todo
+bcps: 1
+
+tasks:
+  - id: e01s01t01
+    description: "Grid initializes with correct dimensions and boundaries"
+    verify: 'cd backend && python -c "from src.grid import Grid; g=Grid(5,5); assert g.width==5 and g.height==5"'
+    status: todo
+
+  - id: e01s01t02
+    description: "Entities can be placed at valid grid positions"
+    verify: 'cd backend && python -c "from src.grid import Grid; from src.point import Point; g=Grid(5,5); assert g.is_valid(Point(2,3))"'
+    status: todo
+
+  - id: e01s01t03
+    description: "Invalid positions (out of bounds) are rejected"
+    verify: 'cd backend && python -c "from src.grid import Grid; from src.point import Point; g=Grid(5,5); assert not g.is_valid(Point(10,10))"'
+    status: todo
+
+  - id: e01s01t04
+    description: "Entity at position can be looked up"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q 2>&1 | tail -5"
+    status: todo

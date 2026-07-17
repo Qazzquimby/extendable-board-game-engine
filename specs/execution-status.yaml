@@ -1,0 +1,209 @@
+# specs/execution-status.yaml
+# Purpose: Flat status of every story across all epics.
+# What this file is: A quick "what's done, what's pending" view.
+
+stories:
+  # Core Engine (e01)
+  - id: e01s01
+    epic: e01
+    title: "Grid places entities and validates positions"
+    bcps: 1
+    status: todo
+
+  - id: e01s02
+    epic: e01
+    title: "Entity lifecycle: create, activate, die"
+    bcps: 2
+    status: todo
+
+  - id: e01s03
+    epic: e01
+    title: "3-phase event pipeline processes events correctly"
+    bcps: 3
+    status: todo
+
+  - id: e01s04
+    epic: e01
+    title: "Turn system runs 6 rounds with L-to-R activation"
+    bcps: 3
+    status: todo
+
+  - id: e01s05
+    epic: e01
+    title: "Agent framework makes valid choices"
+    bcps: 2
+    status: todo
+
+  # Combat System (e02)
+  - id: e02s01
+    epic: e02
+    title: "Attack roll resolves damage with defense and crit"
+    bcps: 3
+    status: todo
+
+  - id: e02s02
+    epic: e02
+    title: "Damage modifiers stack correctly"
+    bcps: 2
+    status: todo
+
+  - id: e02s03
+    epic: e02
+    title: "Line-of-sight blocks attacks through blocking terrain"
+    bcps: 3
+    status: todo
+
+  - id: e02s04
+    epic: e02
+    title: "AoE abilities hit multiple targets in shaped areas"
+    bcps: 3
+    status: todo
+
+  - id: e02s05
+    epic: e02
+    title: "Death removes entities and awards kill points"
+    bcps: 1
+    status: todo
+
+  # Log System (e03)
+  - id: e03s01
+    epic: e03
+    title: "Logger captures hierarchical action logs"
+    bcps: 1
+    status: todo
+
+  - id: e03s02
+    epic: e03
+    title: "Events merge into frames by (type, source_id)"
+    bcps: 2
+    status: todo
+
+  - id: e03s03
+    epic: e03
+    title: "Ability absorption groups related events into one frame"
+    bcps: 2
+    status: todo
+
+  - id: e03s04
+    epic: e03
+    title: "Human-readable messages generated for each event type"
+    bcps: 2
+    status: todo
+
+  # Hero System (e04)
+  - id: e04s01
+    epic: e04
+    title: "Hero registry resolves class names to modules"
+    bcps: 1
+    status: todo
+
+  - id: e04s02
+    epic: e04
+    title: "Ability executes instructions (damage, heal, move)"
+    bcps: 3
+    status: todo
+
+  - id: e04s03
+    epic: e04
+    title: "Abilities respect charges and ultimate availability"
+    bcps: 2
+    status: todo
+
+  - id: e04s04
+    epic: e04
+    title: "Tracer abilities work correctly (Blink, Recall, Pulse Bomb)"
+    bcps: 3
+    status: todo
+
+  - id: e04s05
+    epic: e04
+    title: "Symmetra abilities work correctly (turret, barrier, teleporter)"
+    bcps: 3
+    status: todo
+
+  # Reaction System (e05)
+  - id: e05s01
+    epic: e05
+    title: "Instant abilities can be used as reactions"
+    bcps: 2
+    status: todo
+
+  - id: e05s02
+    epic: e05
+    title: "ReactionOpportunityEvent fires between BEFORE and RESOLVE"
+    bcps: 2
+    status: todo
+
+  - id: e05s03
+    epic: e05
+    title: "AI chooses optimal reaction by composable priority"
+    bcps: 3
+    status: todo
+
+  - id: e05s04
+    epic: e05
+    title: "Reactions dodge attacks by leaving the target area"
+    bcps: 3
+    status: todo
+
+  # API (e06)
+  - id: e06s01
+    epic: e06
+    title: "GET /heroes returns available hero class names"
+    bcps: 1
+    status: todo
+
+  - id: e06s02
+    epic: e06
+    title: "POST /run-game accepts config and returns GameLog"
+    bcps: 2
+    status: todo
+
+  - id: e06s03
+    epic: e06
+    title: "Error handling for invalid team configurations"
+    bcps: 2
+    status: todo
+
+  # Frontend (e07)
+  - id: e07s01
+    epic: e07
+    title: "Game setup screen sends team config to API"
+    bcps: 3
+    status: todo
+
+  - id: e07s02
+    epic: e07
+    title: "Frame-by-frame playback renders game log"
+    bcps: 5
+    status: todo
+
+  - id: e07s03
+    epic: e07
+    title: "Tween animations for move, damage, heal, death"
+    bcps: 5
+    status: todo
+
+  - id: e07s04
+    epic: e07
+    title: "Entity sidebar shows HP and action logs"
+    bcps: 3
+    status: todo
+
+  # Game Runner (e08)
+  - id: e08s01
+    epic: e08
+    title: "Full game simulation runs end-to-end via API"
+    bcps: 3
+    status: todo
+
+  - id: e08s02
+    epic: e08
+    title: "Deterministic simulation: same seed → same result"
+    bcps: 2
+    status: todo
+
+# Totals
+total_bcps: 88
+total_stories: 32
+completed_stories: 0

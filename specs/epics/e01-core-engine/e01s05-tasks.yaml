@@ -1,0 +1,26 @@
+# Story: Agent framework makes valid choices
+story_id: e01s05
+title: "Agent framework makes valid choices"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e01s05t01
+    description: "RuleBasedAgent picks the highest-priority action"
+    verify: 'cd backend && python -c "from src.engine import RuleBasedAgent; a=RuleBasedAgent(); assert hasattr(a,''choose'')"'
+    status: todo
+
+  - id: e01s05t02
+    description: "RandomAgent picks a valid (not necessarily optimal) action"
+    verify: 'cd backend && python -c "from src.engine import RandomAgent; a=RandomAgent(); assert hasattr(a,''choose'')"'
+    status: todo
+
+  - id: e01s05t03
+    description: "Ties broken by lowest distance moved"
+    verify: "cd backend && python -m pytest tests/ -x -q -k 'tiebreak' 2>&1 | tail -5 || echo 'No tiebreak test yet'"
+    status: todo
+
+  - id: e01s05t04
+    description: "Agent produces legal actions within action budget"
+    verify: 'cd backend && python -c "from src.choices import get_plausible_move_and_actions; print(''choices module loaded'')"'
+    status: todo

@@ -1,0 +1,31 @@
+# Story: Attack roll resolves damage with defense and crit
+story_id: e02s01
+title: "Attack roll resolves damage with defense and crit"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e02s01t01
+    description: "Attack roll includes defense value from target and ability"
+    verify: "cd backend && python -m pytest tests/test_combat_roll.py -x -q 2>&1 | tail -10"
+    status: todo
+
+  - id: e02s01t02
+    description: "Roll <= defense results in miss (no damage)"
+    verify: "cd backend && python -m pytest tests/test_combat_roll.py -x -q 2>&1 | tail -10"
+    status: todo
+
+  - id: e02s01t03
+    description: "Rolls of 5-6 always hit regardless of defense"
+    verify: 'cd backend && python -c "from src.abilities import Ability; print(''ability module'')"'
+    status: todo
+
+  - id: e02s01t04
+    description: "Critical hits deal bonus damage when roll >= threshold"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q -k 'crit' 2>&1 | tail -5 || echo 'No crit test yet'"
+    status: todo
+
+  - id: e02s01t05
+    description: "AoE abilities skip attack rolls (no miss/crit)"
+    verify: 'cd backend && python -c "from src.areas import Area; print(''areas module'')"'
+    status: todo

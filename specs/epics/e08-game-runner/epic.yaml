@@ -1,0 +1,20 @@
+# Epic: Game Runner
+# delta: MODIFIED — integration exists, needs determinism testing
+
+id: e08
+title: Game Runner
+summary: "End-to-end simulation, deterministic replay, integration"
+wsjf: 10
+
+stories:
+  - id: e08s01
+    title: "Full game simulation runs end-to-end via API"
+    bcps: 3
+    file: e08s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e08s02
+    title: "Deterministic simulation: same seed → same result"
+    bcps: 2
+    file: e08s02-tasks.yaml
+    delta: MODIFIED

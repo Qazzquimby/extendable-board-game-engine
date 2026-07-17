@@ -1,0 +1,26 @@
+# Story: Events merge into frames by (type, source_id)
+story_id: e03s02
+title: "Events merge into frames by (type, source_id)"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e03s02t01
+    description: "_event_merge_key returns (type, source_id) tuple"
+    verify: "cd backend && python -m pytest tests/test_api.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e03s02t02
+    description: "Consecutive same-key events merge into one LogEntry"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q -k 'log' 2>&1 | tail -5 || echo 'No log test yet'"
+    status: todo
+
+  - id: e03s02t03
+    description: "Different-key events produce separate LogEntries"
+    verify: 'cd backend && python -c "from src.schemas import LogEntry; le=LogEntry(state=None); assert hasattr(le,''events'')"'
+    status: todo
+
+  - id: e03s02t04
+    description: "ReactionOpportunityEvent and DecisionEvent don't create log entries"
+    verify: 'cd backend && python -c "from src.events import ReactionOpportunityEvent, DecisionEvent; print(''control events'')"'
+    status: todo

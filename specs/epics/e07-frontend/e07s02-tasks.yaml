@@ -1,0 +1,26 @@
+# Story: Frame-by-frame playback renders game log
+story_id: e07s02
+title: "Frame-by-frame playback renders game log"
+status: todo
+bcps: 5
+
+tasks:
+  - id: e07s02t01
+    description: "Frontend receives GameLog from API and renders first frame"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo
+
+  - id: e07s02t02
+    description: "Arrow keys advance through frames forward and backward"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo
+
+  - id: e07s02t03
+    description: "Grid renders entity positions from each frame's EngineState"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo
+
+  - id: e07s02t04
+    description: "Viewport is 100vh, overflow hidden, sidebars scroll"
+    verify: "cd front && grep -r '100vh' src/ 2>&1 | head -5 || echo 'No 100vh found'"
+    status: todo

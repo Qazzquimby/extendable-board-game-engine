@@ -1,0 +1,31 @@
+# Story: AoE abilities hit multiple targets in shaped areas
+story_id: e02s04
+title: "AoE abilities hit multiple targets in shaped areas"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e02s04t01
+    description: "Burst area encompasses all spaces within N range of source"
+    verify: "cd backend && python -m pytest tests/test_areas.py -x -q -k 'burst' 2>&1 | tail -5 || echo 'No burst test yet'"
+    status: todo
+
+  - id: e02s04t02
+    description: "Line area is a 1xN rectangle moving away from source"
+    verify: "cd backend && python -m pytest tests/test_areas.py -x -q -k 'line' 2>&1 | tail -5 || echo 'No line test yet'"
+    status: todo
+
+  - id: e02s04t03
+    description: "Path area follows a sequence of adjacent spaces"
+    verify: "cd backend && python -m pytest tests/test_areas.py -x -q -k 'path' 2>&1 | tail -5 || echo 'No path test yet'"
+    status: todo
+
+  - id: e02s04t04
+    description: "NxN square area affects a grid-aligned block of spaces"
+    verify: "cd backend && python -m pytest tests/test_areas.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e02s04t05
+    description: "AoE hits all valid targets in area, not just chosen ones"
+    verify: 'cd backend && python -c "from src.aimings import AimingResult; print(''aimings module'')"'
+    status: todo

@@ -1,0 +1,26 @@
+# Story: Reactions dodge attacks by leaving the target area
+story_id: e05s04
+title: "Reactions dodge attacks by leaving the target area"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e05s04t01
+    description: "Reaction teleport/blink moves entity out of target space"
+    verify: "cd backend && python -m pytest tests/test_reactions.py -x -q -k 'dodge' 2>&1 | tail -10"
+    status: todo
+
+  - id: e05s04t02
+    description: "Original attack misses when target space is empty"
+    verify: "cd backend && python -m pytest tests/test_reactions.py -x -q -k 'dodge' 2>&1 | tail -10"
+    status: todo
+
+  - id: e05s04t03
+    description: "Reaction enqueues at front to process before resolution"
+    verify: 'cd backend && python -c "from src.events import EventQueue; eq=EventQueue(); eq.enqueue_front(None); print(''front enqueue'')"'
+    status: todo
+
+  - id: e05s04t04
+    description: "Multiple reaction options are presented to the choosing agent"
+    verify: 'cd backend && python -c "from src.events import ReactionOpportunityEvent; print(''reaction options'')"'
+    status: todo

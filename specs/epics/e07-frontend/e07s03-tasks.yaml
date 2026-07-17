@@ -1,0 +1,31 @@
+# Story: Tween animations for move, damage, heal, death
+story_id: e07s03
+title: "Tween animations for move, damage, heal, death"
+status: todo
+bcps: 5
+
+tasks:
+  - id: e07s03t01
+    description: "Move animation tweens entity sprite source_pos → target_pos (400ms)"
+    verify: "cd front && grep -r 'tween' src/ 2>&1 | head -5 || echo 'No tweens in frontend'"
+    status: todo
+
+  - id: e07s03t02
+    description: "Damage shows red floating '-N' at target position"
+    verify: "cd front && grep -r 'damage' src/ -i 2>&1 | head -5 || echo 'No damage UI'"
+    status: todo
+
+  - id: e07s03t03
+    description: "Heal shows green floating '+N' at target position"
+    verify: "cd front && grep -r 'heal' src/ -i 2>&1 | head -5 || echo 'No heal UI'"
+    status: todo
+
+  - id: e07s03t04
+    description: "Ability use flashes entity sprite and shows ability name"
+    verify: "cd front && grep -r 'ability' src/ -i 2>&1 | head -5 || echo 'No ability UI'"
+    status: todo
+
+  - id: e07s03t05
+    description: "Death animation fades out entity sprite"
+    verify: "cd front && grep -r 'death\|die\|fade' src/ -i 2>&1 | head -5 || echo 'No death UI'"
+    status: todo

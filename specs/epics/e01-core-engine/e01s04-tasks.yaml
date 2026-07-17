@@ -1,0 +1,26 @@
+# Story: Turn system runs 6 rounds with L-to-R activation
+story_id: e01s04
+title: "Turn system runs 6 rounds with L-to-R activation"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e01s04t01
+    description: "Engine initializes with correct round number and team order"
+    verify: 'cd backend && python -c "from src.engine import Engine; from src.grid import Grid; e=Engine(grid=Grid(3,3)); assert hasattr(e,''round_num'')"'
+    status: todo
+
+  - id: e01s04t02
+    description: "Heroes activate left-to-right within each team"
+    verify: "cd backend && python -m pytest tests/ -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e01s04t03
+    description: "Round advances after all heroes have acted"
+    verify: 'cd backend && python -c "from src.engine import Engine; from src.grid import Grid; e=Engine(grid=Grid(3,3)); assert hasattr(e,''next_turn'')"'
+    status: todo
+
+  - id: e01s04t04
+    description: "Game ends after 6 rounds with a winner"
+    verify: 'cd backend && python -c "from src.engine import Engine; from src.grid import Grid; e=Engine(grid=Grid(3,3)); assert hasattr(e,''get_winning_player'')"'
+    status: todo

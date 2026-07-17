@@ -1,0 +1,32 @@
+# Epic: Log System
+# delta: MODIFIED — logger exists, needs merge/absorption hardening
+
+id: e03
+title: Log System
+summary: "Hierarchical logger, event merge/absorption, human-readable messages"
+wsjf: 22
+
+stories:
+  - id: e03s01
+    title: "Logger captures hierarchical action logs"
+    bcps: 1
+    file: e03s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e03s02
+    title: "Events merge into frames by (type, source_id)"
+    bcps: 2
+    file: e03s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e03s03
+    title: "Ability absorption groups related events into one frame"
+    bcps: 2
+    file: e03s03-tasks.yaml
+    delta: MODIFIED
+
+  - id: e03s04
+    title: "Human-readable messages generated for each event type"
+    bcps: 2
+    file: e03s04-tasks.yaml
+    delta: MODIFIED

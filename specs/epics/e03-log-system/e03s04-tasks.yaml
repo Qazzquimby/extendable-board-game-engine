@@ -1,0 +1,26 @@
+# Story: Human-readable messages generated for each event type
+story_id: e03s04
+title: "Human-readable messages generated for each event type"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e03s04t01
+    description: "_describe_event_as_message converts EventDescription to string"
+    verify: 'cd backend && python -c "from src.schemas import EventDescription; e=EventDescription(type=''damage'', amount=5); print(''event desc'')"'
+    status: todo
+
+  - id: e03s04t02
+    description: "Ability use event renders as 'X used Y'"
+    verify: "cd backend && python -m pytest tests/test_api.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e03s04t03
+    description: "Damage event renders as '[source] dealt X damage to [target]'"
+    verify: 'cd backend && python -c "print(''damage message format'')"'
+    status: todo
+
+  - id: e03s04t04
+    description: "Move, heal, death events all produce readable messages"
+    verify: 'cd backend && python -c "print(''heal/move/death messages'')"'
+    status: todo

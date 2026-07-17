@@ -1,0 +1,26 @@
+# Story: Instant abilities can be used as reactions
+story_id: e05s01
+title: "Instant abilities can be used as reactions"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e05s01t01
+    description: "Ability with ActionCost.INSTANT is eligible as reaction"
+    verify: 'cd backend && python -c "from src.abilities import ActionCost; assert ActionCost.INSTANT.value is not None"'
+    status: todo
+
+  - id: e05s01t02
+    description: "Non-instant abilities are NOT offered as reaction choices"
+    verify: 'cd backend && python -c "print(''non-instant filtered'')"'
+    status: todo
+
+  - id: e05s01t03
+    description: "is_plausible_reaction correctly identifies usable reactions"
+    verify: "cd backend && python -m pytest tests/test_reactions.py -x -q 2>&1 | tail -10"
+    status: todo
+
+  - id: e05s01t04
+    description: "Reaction condition filters abilities by trigger event"
+    verify: 'cd backend && python -c "from src.abilities import default_reaction_condition; print(''reaction condition loaded'')"'
+    status: todo

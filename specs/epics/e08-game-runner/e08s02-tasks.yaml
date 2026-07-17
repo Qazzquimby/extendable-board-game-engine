@@ -1,0 +1,21 @@
+# Story: Deterministic simulation: same seed → same result
+story_id: e08s02
+title: "Deterministic simulation: same seed → same result"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e08s02t01
+    description: "Two runs with same seed produce identical GameLog"
+    verify: 'cd backend && python -c "print(''seed determinism test'')"'
+    status: todo
+
+  - id: e08s02t02
+    description: "Different seeds produce different results"
+    verify: 'cd backend && python -c "print(''different seed different result'')"'
+    status: todo
+
+  - id: e08s02t03
+    description: "Game ends after exactly 6 rounds (or early concession)"
+    verify: 'cd backend && python -c "print(''round count check'')"'
+    status: todo

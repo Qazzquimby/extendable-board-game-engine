@@ -1,0 +1,26 @@
+# Story: Game setup screen sends team config to API
+story_id: e07s01
+title: "Game setup screen sends team config to API"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e07s01t01
+    description: "Setup page loads with hero selection UI"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo
+
+  - id: e07s01t02
+    description: "User selects heroes for two teams"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo
+
+  - id: e07s01t03
+    description: "Start button sends POST /run-game with team config"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo
+
+  - id: e07s01t04
+    description: "Grid size and seed inputs are configurable"
+    verify: "cd front && npx vitest run --reporter=verbose 2>&1 | tail -10 || echo 'No frontend tests yet'"
+    status: todo

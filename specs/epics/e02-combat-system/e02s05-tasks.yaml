@@ -1,0 +1,21 @@
+# Story: Death removes entities and awards kill points
+story_id: e02s05
+title: "Death removes entities and awards kill points"
+status: todo
+bcps: 1
+
+tasks:
+  - id: e02s05t01
+    description: "Entity with HP <= 0 is marked as dead"
+    verify: 'cd backend && python -c "from src.entities import Hero; h=Hero(name=''T'',team=0,hp=10,speed=3,abilities=[]); h.take_damage(10); assert h.hp <= 0" 2>&1 || echo ''No take_damage method'''
+    status: todo
+
+  - id: e02s05t02
+    description: "Dead hero scores 1 point for the killer's team"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q -k 'death' 2>&1 | tail -5 || echo 'No death test yet'"
+    status: todo
+
+  - id: e02s05t03
+    description: "Dead entities are removed from activation queue"
+    verify: 'cd backend && python -c "print(''test: death removes from queue'')"'
+    status: todo

@@ -1,0 +1,38 @@
+# Epic: Hero System
+# delta: MODIFIED — heroes exist, need instruction/ability hardening
+
+id: e04
+title: Hero System
+summary: "Hero registry, ability system, instructions, 7 playable heroes"
+wsjf: 20
+
+stories:
+  - id: e04s01
+    title: "Hero registry resolves class names to modules"
+    bcps: 1
+    file: e04s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e04s02
+    title: "Ability executes instructions (damage, heal, move)"
+    bcps: 3
+    file: e04s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e04s03
+    title: "Abilities respect charges and ultimate availability"
+    bcps: 2
+    file: e04s03-tasks.yaml
+    delta: MODIFIED
+
+  - id: e04s04
+    title: "Tracer abilities work correctly (Blink, Recall, Pulse Bomb)"
+    bcps: 3
+    file: e04s04-tasks.yaml
+    delta: MODIFIED
+
+  - id: e04s05
+    title: "Symmetra abilities work correctly (turret, barrier, teleporter)"
+    bcps: 3
+    file: e04s05-tasks.yaml
+    delta: MODIFIED

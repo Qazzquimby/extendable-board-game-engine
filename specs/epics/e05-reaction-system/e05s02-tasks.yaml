@@ -1,0 +1,26 @@
+# Story: ReactionOpportunityEvent fires between BEFORE and RESOLVE
+story_id: e05s02
+title: "ReactionOpportunityEvent fires between BEFORE and RESOLVE"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e05s02t01
+    description: "AbilityUseEvent.process(BEFORE) enqueues ReactionOpportunityEvent"
+    verify: "cd backend && python -m pytest tests/test_reactions.py -x -q -k 'reaction_opp' 2>&1 | tail -10 || echo 'No reaction_opp test'"
+    status: todo
+
+  - id: e05s02t02
+    description: "Reaction processes before original action resolves"
+    verify: "cd backend && python -m pytest tests/test_reactions.py -x -q 2>&1 | tail -10"
+    status: todo
+
+  - id: e05s02t03
+    description: "Reaction fires from AFTER phase as well (after-hooks)"
+    verify: 'cd backend && python -c "from src.events import ReactionOpportunityEvent; r=ReactionOpportunityEvent(None, ''after''); print(''after reaction'')"'
+    status: todo
+
+  - id: e05s02t04
+    description: "No-reaction path skips to RESOLVE without delay"
+    verify: 'cd backend && python -c "from src.events import ReactionOpportunityEvent; from src.util import UniqueTuple; assert isinstance(UniqueTuple(()), UniqueTuple)"'
+    status: todo

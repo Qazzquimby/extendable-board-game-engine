@@ -1,0 +1,38 @@
+# Epic: Combat System
+# delta: MODIFIED — combat mechanics exist, needs hardening
+
+id: e02
+title: Combat System
+summary: "Attack rolls, damage modifiers, line-of-sight, AoE, death"
+wsjf: 25
+
+stories:
+  - id: e02s01
+    title: "Attack roll resolves damage with defense and crit"
+    bcps: 3
+    file: e02s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e02s02
+    title: "Damage modifiers stack correctly"
+    bcps: 2
+    file: e02s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e02s03
+    title: "Line-of-sight blocks attacks through blocking terrain"
+    bcps: 3
+    file: e02s03-tasks.yaml
+    delta: MODIFIED
+
+  - id: e02s04
+    title: "AoE abilities hit multiple targets in shaped areas"
+    bcps: 3
+    file: e02s04-tasks.yaml
+    delta: MODIFIED
+
+  - id: e02s05
+    title: "Death removes entities and awards kill points"
+    bcps: 1
+    file: e02s05-tasks.yaml
+    delta: MODIFIED

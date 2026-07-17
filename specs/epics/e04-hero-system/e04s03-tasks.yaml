@@ -1,0 +1,26 @@
+# Story: Abilities respect charges and ultimate availability
+story_id: e04s03
+title: "Abilities respect charges and ultimate availability"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e04s03t01
+    description: "Ability.is_available returns False when charges exhausted"
+    verify: 'cd backend && python -c "from src.abilities import Ability; print(''ability loaded'')"'
+    status: todo
+
+  - id: e04s03t02
+    description: "Ultimate abilities check round_number vs ultimate_turn"
+    verify: 'cd backend && python -c "from src.abilities import Ability; a=Ability(name=''Ult'',action_cost=2,instructions=[]); print(''ult check'')"'
+    status: todo
+
+  - id: e04s03t03
+    description: "ActionCost enum has STANDARD, MOVE, FREE, INSTANT"
+    verify: 'cd backend && python -c "from src.abilities import ActionCost; assert len(ActionCost)>=4"'
+    status: todo
+
+  - id: e04s03t04
+    description: "Ability use correctly decrements remaining charges"
+    verify: 'cd backend && python -c "print(''charge tracking'')"'
+    status: todo

@@ -1,0 +1,32 @@
+# Epic: Reaction System
+# delta: MODIFIED — reaction system exists, needs priority hardening
+
+id: e05
+title: Reaction System
+summary: "Instant abilities, ReactionOpportunityEvent, composable priority"
+wsjf: 18
+
+stories:
+  - id: e05s01
+    title: "Instant abilities can be used as reactions"
+    bcps: 2
+    file: e05s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e05s02
+    title: "ReactionOpportunityEvent fires between BEFORE and RESOLVE"
+    bcps: 2
+    file: e05s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e05s03
+    title: "AI chooses optimal reaction by composable priority"
+    bcps: 3
+    file: e05s03-tasks.yaml
+    delta: MODIFIED
+
+  - id: e05s04
+    title: "Reactions dodge attacks by leaving the target area"
+    bcps: 3
+    file: e05s04-tasks.yaml
+    delta: MODIFIED

@@ -1,0 +1,26 @@
+# Epic: API
+# delta: MODIFIED — API exists, needs hardening
+
+id: e06
+title: API
+summary: "FastAPI endpoints, Pydantic schemas, error handling"
+wsjf: 15
+
+stories:
+  - id: e06s01
+    title: "GET /heroes returns available hero class names"
+    bcps: 1
+    file: e06s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e06s02
+    title: "POST /run-game accepts config and returns GameLog"
+    bcps: 2
+    file: e06s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e06s03
+    title: "Error handling for invalid team configurations"
+    bcps: 2
+    file: e06s03-tasks.yaml
+    delta: MODIFIED

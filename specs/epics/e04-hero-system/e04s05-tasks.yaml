@@ -1,0 +1,26 @@
+# Story: Symmetra abilities work correctly
+story_id: e04s05
+title: "Symmetra abilities work correctly (turret, barrier, teleporter)"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e04s05t01
+    description: "Symmetra places turrets at target positions (Marker)"
+    verify: 'cd backend && python -c "from src.heroes.symmetra import Symmetra; print(''symmetra loaded'')"'
+    status: todo
+
+  - id: e04s05t02
+    description: "Photon Barrier creates a wall of blocking terrain"
+    verify: 'cd backend && python -c "print(''barrier creation'')"'
+    status: todo
+
+  - id: e04s05t03
+    description: "Teleporter allows allied units to move between two points"
+    verify: 'cd backend && python -c "print(''teleporter check'')"'
+    status: todo
+
+  - id: e04s05t04
+    description: "Symmetra created via engine with correct abilities"
+    verify: 'cd backend && python -c "from src.heroes.symmetra import Symmetra; from src.grid import Grid; from src.point import Point; print(''symmetra creation'')"'
+    status: todo

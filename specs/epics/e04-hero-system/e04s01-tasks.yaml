@@ -1,0 +1,21 @@
+# Story: Hero registry resolves class names to modules
+story_id: e04s01
+title: "Hero registry resolves class names to modules"
+status: todo
+bcps: 1
+
+tasks:
+  - id: e04s01t01
+    description: "get_hero_class returns correct class for known hero name"
+    verify: 'cd backend && python -c "from src.hero_registry import get_hero_class; cls=get_hero_class(''tracer''); assert cls.__name__==''Tracer''"'
+    status: todo
+
+  - id: e04s01t02
+    description: "get_hero_class raises KeyError for unknown hero names"
+    verify: 'cd backend && python -c "from src.hero_registry import get_hero_class; try: get_hero_class(''nobody''); except KeyError: print(''OK'')"'
+    status: todo
+
+  - id: e04s01t03
+    description: "list_heroes returns all available hero class names"
+    verify: 'cd backend && python -c "from src.hero_registry import list_heroes; heroes=list_heroes(); assert len(heroes)>=1; print(heroes)"'
+    status: todo

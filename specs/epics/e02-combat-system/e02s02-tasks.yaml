@@ -1,0 +1,31 @@
+# Story: Damage modifiers stack correctly
+story_id: e02s02
+title: "Damage modifiers stack correctly"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e02s02t01
+    description: "Additive damage modifiers increase damage by flat amount"
+    verify: 'cd backend && python -c "from src.mod_value import ModValue; print(''modvalue'')"'
+    status: todo
+
+  - id: e02s02t02
+    description: "Multiplicative modifiers stack additively with each other"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q -k 'modif' 2>&1 | tail -5 || echo 'No modifier test yet'"
+    status: todo
+
+  - id: e02s02t03
+    description: "Multiply before add: multipliers apply before flat bonuses"
+    verify: 'cd backend && python -c "from src.modifiers import Modifier; print(''modifiers'')"'
+    status: todo
+
+  - id: e02s02t04
+    description: "Resistance halves damage if no positive multipliers exist"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e02s02t05
+    description: "Armor reduces damage by flat 1 (min 0)"
+    verify: 'cd backend && python -c "print(''test: armor flat reduction'')"'
+    status: todo

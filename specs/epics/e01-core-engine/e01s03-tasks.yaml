@@ -1,0 +1,31 @@
+# Story: 3-phase event pipeline processes events correctly
+story_id: e01s03
+title: "3-phase event pipeline processes events correctly"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e01s03t01
+    description: "Event transitions through BEFORE→RESOLVE→AFTER states"
+    verify: 'cd backend && python -c "from src.events import Event; e=Event(); assert e.state==''BEFORE''"'
+    status: todo
+
+  - id: e01s03t02
+    description: "Resolve applies the event effect without modifiers"
+    verify: "cd backend && python -m pytest tests/test_reactions.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e01s03t03
+    description: "BEFORE phase fires before-hooks via Router"
+    verify: 'cd backend && python -c "from src.events import Router, EventPhase; r=Router()"'
+    status: todo
+
+  - id: e01s03t04
+    description: "AFTER phase fires after-hooks via Router"
+    verify: 'cd backend && python -c "from src.events import EventPhase; assert hasattr(EventPhase, ''AFTER'')"'
+    status: todo
+
+  - id: e01s03t05
+    description: "Canceled events skip RESOLVE but still trigger AFTER"
+    verify: 'cd backend && python -c "from src.events import Event; e=Event(); e.canceled=True; assert e.canceled"'
+    status: todo

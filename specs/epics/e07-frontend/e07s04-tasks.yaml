@@ -1,0 +1,26 @@
+# Story: Entity sidebar shows HP and action logs
+story_id: e07s04
+title: "Entity sidebar shows HP and action logs"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e07s04t01
+    description: "Sidebar lists all entities with name, team, and HP"
+    verify: "cd front && grep -r 'sidebar' src/ 2>&1 | head -5 || echo 'No sidebar'"
+    status: todo
+
+  - id: e07s04t02
+    description: "Active entity is highlighted in sidebar"
+    verify: "cd front && grep -r 'active.*entity\|highlight' src/ -i 2>&1 | head -5 || echo 'No active highlight'"
+    status: todo
+
+  - id: e07s04t03
+    description: "Action log panel shows hierarchical combat logs per frame"
+    verify: "cd front && grep -r 'log\|action_log' src/ -i 2>&1 | head -5 || echo 'No action logs'"
+    status: todo
+
+  - id: e07s04t04
+    description: "Modifiers (status effects) displayed on entity"
+    verify: "cd front && grep -r 'modifier\|status\|effect' src/ -i 2>&1 | head -5 || echo 'No modifiers UI'"
+    status: todo

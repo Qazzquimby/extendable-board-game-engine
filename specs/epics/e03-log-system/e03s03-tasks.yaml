@@ -1,0 +1,26 @@
+# Story: Ability absorption groups related events into one frame
+story_id: e03s03
+title: "Ability absorption groups related events into one frame"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e03s03t01
+    description: "AbilityUseEvent always starts a new frame"
+    verify: 'cd backend && python -c "from src.events import AbilityUseEvent; print(''AbilityUseEvent'')"'
+    status: todo
+
+  - id: e03s03t02
+    description: "Subsequent same-action events (damage, heal) absorb into ability frame"
+    verify: "cd backend && python -m pytest tests/test_api.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e03s03t03
+    description: "Absorption ends at the next AbilityUseEvent or queue drain"
+    verify: "cd backend && python -m pytest tests/test_api.py -x -q 2>&1 | tail -10"
+    status: todo
+
+  - id: e03s03t04
+    description: "Action logs snapshot is captured at each flush point"
+    verify: 'cd backend && python -c "from src.logger import get_logs; assert isinstance(get_logs(), list)"'
+    status: todo

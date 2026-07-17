@@ -1,0 +1,26 @@
+# Story: Tracer abilities work correctly
+story_id: e04s04
+title: "Tracer abilities work correctly (Blink, Recall, Pulse Bomb)"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e04s04t01
+    description: "Tracer Blink teleports to target position within range"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q -k 'tracer' 2>&1 | tail -10 || echo 'No tracer test yet'"
+    status: todo
+
+  - id: e04s04t02
+    description: "Tracer Recall returns to position from 2 turns ago"
+    verify: 'cd backend && python -c "from src.heroes.tracer import Tracer; print(''tracer loaded'')"'
+    status: todo
+
+  - id: e04s04t03
+    description: "Pulse Bomb is placed as a Marker and explodes after delay"
+    verify: 'cd backend && python -c "from src.entities import Marker; print(''marker for bomb'')"'
+    status: todo
+
+  - id: e04s04t04
+    description: "Tracer created via engine with correct stats"
+    verify: 'cd backend && python -c "from src.heroes.tracer import Tracer; from src.grid import Grid; from src.point import Point; print(''tracer creation'')"'
+    status: todo

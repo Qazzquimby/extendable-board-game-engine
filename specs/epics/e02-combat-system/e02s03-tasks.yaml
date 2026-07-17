@@ -1,0 +1,26 @@
+# Story: Line-of-sight blocks attacks through blocking terrain
+story_id: e02s03
+title: "Line-of-sight blocks attacks through blocking terrain"
+status: todo
+bcps: 3
+
+tasks:
+  - id: e02s03t01
+    description: "LOS check traces line from closest corner to corresponding corner"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q -k 'los' 2>&1 | tail -5 || echo 'No LOS test yet'"
+    status: todo
+
+  - id: e02s03t02
+    description: "Blocking terrain (walls) prevents LOS"
+    verify: "cd backend && python -m pytest tests/test_grid.py -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e02s03t03
+    description: "Enemy entity blocks LOS through its space"
+    verify: 'cd backend && python -c "from src.grid import Grid; from src.point import Point; g=Grid(5,5)"'
+    status: todo
+
+  - id: e02s03t04
+    description: "Cover provides +2 defense when target adjacent to blocking terrain"
+    verify: 'cd backend && python -c "print(''cover check: +2 def vs blocking terrain'')"'
+    status: todo

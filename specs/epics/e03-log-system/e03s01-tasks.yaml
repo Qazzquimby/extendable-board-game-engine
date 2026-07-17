@@ -1,0 +1,26 @@
+# Story: Logger captures hierarchical action logs
+story_id: e03s01
+title: "Logger captures hierarchical action logs"
+status: todo
+bcps: 1
+
+tasks:
+  - id: e03s01t01
+    description: "Logger builds tree structure from context manager scopes"
+    verify: 'cd backend && python -c "from src.logger import Logger, LogNode; l=Logger(); with l(''root''): l(''child''); assert len(l.root)==1"'
+    status: todo
+
+  - id: e03s01t02
+    description: "get_logs() flattens tree to indented string list"
+    verify: 'cd backend && python -c "from src.logger import get_logs, reset_logs; reset_logs(); logs=get_logs(); assert isinstance(logs, list)"'
+    status: todo
+
+  - id: e03s01t03
+    description: "reset_logs() clears all captured logs between actions"
+    verify: 'cd backend && python -c "from src.logger import reset_logs, get_logs; reset_logs(); assert len(get_logs())==0"'
+    status: todo
+
+  - id: e03s01t04
+    description: "Disabled logger produces no output"
+    verify: 'cd backend && python -c "from src.logger import Logger; l=Logger(); l.enabled=False; with l(''test''): pass; assert len(l.root)==0"'
+    status: todo

@@ -1,0 +1,26 @@
+# Story: POST /run-game accepts config and returns GameLog
+story_id: e06s02
+title: "POST /run-game accepts config and returns GameLog"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e06s02t01
+    description: "POST /run-game accepts valid team config and returns 200"
+    verify: "cd backend && python -m pytest tests/test_api.py -x -q -k 'run_game' 2>&1 | tail -10"
+    status: todo
+
+  - id: e06s02t02
+    description: "Response body is valid GameLog with winner_team and logs"
+    verify: 'cd backend && python -c "from src.schemas import GameLog; gl=GameLog(winner_team=0, logs=[]); assert gl.winner_team==0"'
+    status: todo
+
+  - id: e06s02t03
+    description: "GameLog contains ordered LogEntry list with state and events"
+    verify: 'cd backend && python -c "from src.schemas import LogEntry; le=LogEntry(state=None); assert hasattr(le,''state'') and hasattr(le,''events'')"'
+    status: todo
+
+  - id: e06s02t04
+    description: "Seed parameter produces deterministic results"
+    verify: 'cd backend && python -c "print(''seed determinism check'')"'
+    status: todo

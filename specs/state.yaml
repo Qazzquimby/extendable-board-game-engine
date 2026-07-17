@@ -4,7 +4,7 @@
 # What this file is: "Where am I right now?" — active flow, current
 #   epic/story, git state, and the handoff message for the next session.
 
-active_flow: scope-work
+active_flow: slice-tasks
 active_epic_id: null
 active_story_id: null
 completed_epic: false
@@ -34,17 +34,16 @@ metrics:
 
 git:
   branch: master
-  hash: b94631b  # latest commit
+  hash: b94631b # latest commit
   pushed: false
 
 handoff:
-  last_step_completed: "scope-work — wrote specs/product/SCOPE_LATEST.yaml with 28 in_scope items across 8 epics"
-  # All decisions in planning-context.yaml capture what we know
-  open_decisions: []
+  last_step_completed: "slice-tasks — 8 epic capsules, 31 stories, 88 BCPs"
+  open_decisions:
+    - "Tracer-bullet: e01 (Core Engine) — all other epics depend on it"
   required_reading:
-    - specs/planning-context.yaml
-    - specs/product/GLOSSARY_LATEST.yaml
-    - specs/product/SCOPE_LATEST.yaml
-    - specs/product/VISION_LATEST.yaml
-    - specs/plans/TECH_STACK_LATEST.md
-  next_skill: slice-tasks
+    - specs/release-plan.yaml
+    - specs/execution-status.yaml
+    - specs/epics/e01-core-engine/epic.yaml
+    - specs/epics/e01-core-engine/e01s01-tasks.yaml
+  next_skill: plan-work

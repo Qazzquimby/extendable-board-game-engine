@@ -1,0 +1,32 @@
+# Epic: Frontend
+# delta: MODIFIED — frontend exists, needs playback+animation hardening
+
+id: e07
+title: Frontend
+summary: "Game setup, frame-by-frame playback, animations, entity sidebar"
+wsjf: 12
+
+stories:
+  - id: e07s01
+    title: "Game setup screen sends team config to API"
+    bcps: 3
+    file: e07s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e07s02
+    title: "Frame-by-frame playback renders game log"
+    bcps: 5
+    file: e07s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e07s03
+    title: "Tween animations for move, damage, heal, death"
+    bcps: 5
+    file: e07s03-tasks.yaml
+    delta: MODIFIED
+
+  - id: e07s04
+    title: "Entity sidebar shows HP and action logs"
+    bcps: 3
+    file: e07s04-tasks.yaml
+    delta: MODIFIED

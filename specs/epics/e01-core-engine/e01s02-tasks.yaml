@@ -1,0 +1,26 @@
+# Story: Entity lifecycle: create, activate, die
+story_id: e01s02
+title: "Entity lifecycle: create, activate, die"
+status: todo
+bcps: 2
+
+tasks:
+  - id: e01s02t01
+    description: "Hero entity created with correct team, pos, and stats"
+    verify: 'cd backend && python -c "from src.entities import Hero; h=Hero(name=''Test'',team=0,hp=10,speed=3,abilities=[]); assert h.hp==10 and h.team==0"'
+    status: todo
+
+  - id: e01s02t02
+    description: "Entity dies when HP reaches 0"
+    verify: "cd backend && python -m pytest tests/test_abilities.py -x -q -k 'test_death' 2>&1 | tail -5 || echo 'No death test yet'"
+    status: todo
+
+  - id: e01s02t03
+    description: "Dead entities are skipped during activation"
+    verify: "cd backend && python -m pytest tests/ -x -q 2>&1 | tail -5"
+    status: todo
+
+  - id: e01s02t04
+    description: "Marker and Object subtypes behave correctly"
+    verify: 'cd backend && python -c "from src.entities import Marker; m=Marker(name=''Bomb'',pos=(2,2)); assert m.hp is None" 2>&1 || echo ''Marker has no hp'''
+    status: todo

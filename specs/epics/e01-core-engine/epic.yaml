@@ -1,0 +1,38 @@
+# Epic: Core Engine
+# delta: MODIFIED — engine exists, hardening and test coverage
+
+id: e01
+title: Core Engine
+summary: "Grid, entities, 3-phase event pipeline, turn system, agent framework"
+wsjf: 30
+
+stories:
+  - id: e01s01
+    title: "Grid places entities and validates positions"
+    bcps: 1
+    file: e01s01-tasks.yaml
+    delta: MODIFIED
+
+  - id: e01s02
+    title: "Entity lifecycle: create, activate, die"
+    bcps: 2
+    file: e01s02-tasks.yaml
+    delta: MODIFIED
+
+  - id: e01s03
+    title: "3-phase event pipeline processes events correctly"
+    bcps: 3
+    file: e01s03-tasks.yaml
+    delta: MODIFIED
+
+  - id: e01s04
+    title: "Turn system runs 6 rounds with L-to-R activation"
+    bcps: 3
+    file: e01s04-tasks.yaml
+    delta: MODIFIED
+
+  - id: e01s05
+    title: "Agent framework makes valid choices"
+    bcps: 2
+    file: e01s05-tasks.yaml
+    delta: MODIFIED
