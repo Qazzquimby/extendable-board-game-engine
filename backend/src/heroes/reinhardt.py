@@ -5,6 +5,7 @@ from abilities import (
     Ability,
     ActionCost,
 )
+from valence import Valence
 from instruction_library import (
     DamageInstruction,
     AddTokenInstruction,
@@ -42,8 +43,10 @@ class PathAllInRangeArea(PathArea):
                 yield selection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ChargeInstruction(Instruction):
+    valence: Valence = Valence.BAD
+
     def execute(self, ctx: ActionContext) -> None:
         first_enemy = None
         last_point = ctx.source.pos

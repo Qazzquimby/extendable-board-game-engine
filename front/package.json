@@ -11,10 +11,12 @@
 		"update-types": "json2ts -i ../scripts/schema.json -o src\\types.ts"
 	},
 	"devDependencies": {
+		"@tailwindcss/vite": "^4.3.2",
 		"@testing-library/jest-dom": "^6",
 		"@testing-library/react": "^16",
-		"vitest": "^4",
-		"jsdom": "^29"
+		"jsdom": "^29",
+		"tailwindcss": "^4.3.2",
+		"vitest": "^4"
 	},
 	"dependencies": {
 		"@types/react": "^19.2.14",

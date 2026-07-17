@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SetupScreen } from './SetupScreen';
 
@@ -25,7 +25,7 @@ describe('SetupScreen', () => {
     render(<SetupScreen onPlay={() => {}} />);
     const axe = await screen.findByText('Axe');
     fireEvent.click(axe);
-    expect(axe).toHaveStyle('background: #eef');
+    expect(axe).toHaveStyle('background: #f0f8ff');
   });
 
   it('places hero on grid cell click', async () => {
@@ -36,7 +36,8 @@ describe('SetupScreen', () => {
     const cell = screen.getByText('0,0');
     fireEvent.click(cell);
 
-    expect(screen.getByText('Axe')).toBeInTheDocument();
+    // Hero appears in team panel with coordinates
+    expect(screen.getByText(/Axe \[0,0\]/)).toBeInTheDocument();
   });
 
   it('removes hero from team on × click', async () => {
@@ -55,8 +56,24 @@ describe('SetupScreen', () => {
 
     // Hero removed from team panel
     expect(screen.queryByText(/Axe \[0,0\]/)).toBeNull();
-    // Hero returns to available roster
-    expect(screen.getByText('Axe')).toBeInTheDocument();
+  });
+
+  it('allows duplicate heroes on the same team', async () => {
+    render(<SetupScreen onPlay={() => {}} />);
+    const axe = await screen.findByText('Axe');
+
+    // Place Axe twice on team 0
+    fireEvent.click(axe);
+    fireEvent.click(screen.getByText('0,0'));
+
+    // Select Axe again (still in roster since duplicates allowed)
+    const axeBtns = screen.getAllByText('Axe');
+    fireEvent.click(axeBtns[0]);
+    fireEvent.click(screen.getByText('0,1'));
+
+    // Team panel shows both placements
+    expect(screen.getByText(/Axe \[0,0\]/)).toBeInTheDocument();
+    expect(screen.getByText(/Axe \[0,1\]/)).toBeInTheDocument();
   });
 
   it('disables Play button when teams are empty', () => {
@@ -85,11 +102,11 @@ describe('SetupScreen', () => {
     fireEvent.click(axe);
     fireEvent.click(screen.getByText('0,0'));
 
-    fireEvent.click(screen.getByText('Red Team (0)'));
+    fireEvent.click(screen.getByText('Team 2 (0)'));
     fireEvent.click(necro);
     fireEvent.click(screen.getByText('4,4'));
 
-    fireEvent.click(screen.getByText('Blue Team (1)'));
+    fireEvent.click(screen.getByText('Team 1 (1)'));
     fireEvent.click(melee);
     fireEvent.click(screen.getByText('4,3'));
 

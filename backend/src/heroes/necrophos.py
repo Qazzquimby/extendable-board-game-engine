@@ -142,9 +142,9 @@ class NecroGhostShroud(Modifier):
         event.amount.add(1)  # todo should be a query on damage taken
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DeathPulse(Instruction):
-    valence = Valence.MIXED
+    valence: Valence = Valence.MIXED
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         point = ctx.subject_point
@@ -165,9 +165,9 @@ class DeathPulse(Instruction):
             return score_damage(1, target.hp)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NecroTeleportAdjacentInstruction(Instruction):
-    valence = Valence.BAD
+    valence: Valence = Valence.BAD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         target = ctx.get_target(engine)

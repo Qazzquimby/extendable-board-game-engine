@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Optional, Union
 from aimings import (
     TargetEntity,
@@ -43,8 +44,9 @@ class RecallTracker(Modifier):
             self.recorded_pos = owner.pos
 
 
+@dataclass(kw_only=True)
 class RecallInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         owner = engine.get_entity_by_id(ctx.source_id)
@@ -209,7 +211,10 @@ class PulseBombDetonator(Modifier):
                     )
 
 
+@dataclass(kw_only=True)
 class PulseBombInstruction(Instruction):
+    valence: Valence = Valence.BAD
+
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         target = engine.entity_at(ctx.subject_point)
         owner = engine.get_entity_by_id(ctx.source_id)

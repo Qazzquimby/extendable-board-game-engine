@@ -110,9 +110,9 @@ class PhotonBeamManager(Modifier):
                 entity.remove_token(engine, PhotonBeamToken, amount=1)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PhotonBeamDamageInstruction(Instruction):
-    valence = Valence.BAD
+    valence: Valence = Valence.BAD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         subject = engine.entity_at(ctx.subject_point)
@@ -132,10 +132,10 @@ class PhotonBeamDamageInstruction(Instruction):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GivePhotonBeamTokenAndTrack(Instruction):
     tracker: PhotonBeamManager
-    valence = Valence.BAD
+    valence: Valence = Valence.BAD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         subject = engine.entity_at(ctx.subject_point)
@@ -241,9 +241,9 @@ class SentryTurret(Object):
         self.add_modifier(engine, TurretAttack())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CreateSentryTurretInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         source = engine.get_entity_by_id(ctx.source_id)
@@ -351,9 +351,9 @@ class Teleporter(Object):
         self.add_modifier(engine, TeleporterModifier())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CreateTeleporterInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         source = engine.get_entity_by_id(ctx.source_id)
@@ -432,9 +432,9 @@ class ShieldGenerator(Object):
         self.add_modifier(engine, ShieldGeneratorModifier())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CreateShieldGeneratorInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         source = engine.get_entity_by_id(ctx.source_id)
@@ -521,9 +521,9 @@ class FloatingBarrierModifier(Modifier):
                         owner.pos = next_pos
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CreateFloatingBarrierInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         source = engine.get_entity_by_id(ctx.source_id)
@@ -603,9 +603,9 @@ class PhotonBarrier(Object):
         self.add_modifier(engine, BlocksLOSModifier())
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CreatePhotonBarrierInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         source = engine.get_entity_by_id(ctx.source_id)

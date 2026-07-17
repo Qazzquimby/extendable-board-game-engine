@@ -20,12 +20,12 @@ from util import UniqueTuple
 from valence import Valence
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DamageInstruction(Instruction):
     amount: DynamicInt
     undefendable: bool = False
     irreducible: bool = False
-    valence = Valence.BAD
+    valence: Valence = Valence.BAD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         subject = engine.entity_at(ctx.subject_point)
@@ -51,10 +51,10 @@ class DamageInstruction(Instruction):
         return score_damage(dmg, target.hp) if isinstance(dmg, int) else 1.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HealInstruction(Instruction):
     amount: DynamicInt
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         subject = engine.entity_at(ctx.subject_point)
@@ -71,10 +71,11 @@ class HealInstruction(Instruction):
         return 1.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AddModifierInstruction(Instruction):
     modifier_class: Type["Modifier"]
     modifier_kwargs: dict = field(default_factory=dict)
+    valence: Valence = Valence.MIXED
 
     def __post_init__(self):
         self.valence = self.modifier_class.valence
@@ -94,10 +95,11 @@ class AddModifierInstruction(Instruction):
         return score_add_token(self.modifier_class)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RemoveModifierInstruction(Instruction):
     modifier_class: Type["Modifier"]
     amount: DynamicInt = 1
+    valence: Valence = Valence.MIXED
 
     def __post_init__(self):
         if self.modifier_class.valence == Valence.GOOD:
@@ -117,11 +119,12 @@ class RemoveModifierInstruction(Instruction):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AddTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
     token_kwargs: dict = field(default_factory=dict)
+    valence: Valence = Valence.MIXED
 
     def __post_init__(self):
         self.valence = self.token_class.valence
@@ -149,10 +152,11 @@ class AddTokenInstruction(Instruction):
         return value
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RemoveTokenInstruction(Instruction):
     token_class: Type["Token"]
     amount: DynamicInt = 1
+    valence: Valence = Valence.MIXED
 
     def __post_init__(self):
         if self.token_class.valence == Valence.GOOD:
@@ -183,10 +187,10 @@ class RemoveTokenInstruction(Instruction):
         return 0.0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PullInstruction(Instruction):
     distance: DynamicInt
-    valence = Valence.MIXED
+    valence: Valence = Valence.MIXED
 
     # todo probably want direction param and update resolution
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
@@ -203,12 +207,12 @@ class PullInstruction(Instruction):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UseAnAbilityInstruction(Instruction):
     default_only: bool = False
     required_target: Optional["Point"] = None
     subject_chooses: bool = True
-    valence = Valence.MIXED
+    valence: Valence = Valence.MIXED
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         from choices import Choice
@@ -254,9 +258,9 @@ class UseAnAbilityInstruction(Instruction):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RefreshAbilityInstruction(Instruction):
-    valence = Valence.GOOD
+    valence: Valence = Valence.GOOD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         subject = engine.entity_at(ctx.subject_point)
@@ -270,10 +274,10 @@ class RefreshAbilityInstruction(Instruction):
         return 2.0  # refreshing an ability has fixed value
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TeleportInstruction(Instruction):
     destination: DynamicPoint
-    valence = Valence.MIXED
+    valence: Valence = Valence.MIXED
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         subject = engine.entity_at(ctx.subject_point)
@@ -291,8 +295,9 @@ class TeleportInstruction(Instruction):
 @dataclass(kw_only=True)
 class ApplyModifierInstruction(Instruction):
     modifier_class: Type[Modifier]
+    valence: Valence = Valence.MIXED
 
-    def __post__init__(self):
+    def __post_init__(self):
         self.valence = self.modifier_class.valence
 
     def score(self, engine, actor, target, ctx) -> float:

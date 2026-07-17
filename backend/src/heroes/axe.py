@@ -63,9 +63,9 @@ class BattleHungerToken(Token):
                 owner.remove_token(engine, DamageOverTimeToken, amount=99)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CullingBladeInstruction(Instruction):
-    valence = Valence.BAD
+    valence: Valence = Valence.BAD
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         target = ctx.get_target(engine)

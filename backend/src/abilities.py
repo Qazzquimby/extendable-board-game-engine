@@ -158,6 +158,14 @@ class Instruction:
     aiming_name: Optional[str] = None
     valence: Valence
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "valence" not in cls.__dict__ and "__post_init__" not in cls.__dict__:
+            raise TypeError(
+                f"{cls.__name__} must define a class-level `valence` attribute. "
+                f"Add `valence: Valence = Valence.<GOOD|BAD|MIXED>` to the class body."
+            )
+
     def __deepcopy__(self, memo):
         return self
 

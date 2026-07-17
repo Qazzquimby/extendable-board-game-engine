@@ -1,0 +1,664 @@
+[
+  {
+    "winner_team": 1,
+    "logs": [
+      {
+        "before_state": {
+          "round_num": 2,
+          "current_team": 0,
+          "active_entity": 1,
+          "entities": [
+            {
+              "id": 1,
+              "name": "Axe",
+              "hp": 10,
+              "pos": [
+                0,
+                0
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "AxeCounterHelix",
+                "AxeReflectHalfOfDamageFromDefaults"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Necrophos",
+              "hp": 8,
+              "pos": [
+                0,
+                1
+              ],
+              "team": 0,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "NecroStartTurnAura",
+                "NecroGetKillCounter"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Melee Hero",
+              "hp": 12,
+              "pos": [
+                4,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": []
+            },
+            {
+              "id": 4,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                4,
+                3
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            },
+            {
+              "id": 5,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                3,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            }
+          ]
+        },
+        "action": {
+          "actor": 3,
+          "target": 4,
+          "ability": "Battle Hunger",
+          "move_path": [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "movement_name": "Range 1 of Viktoria(5)5 for Culling Blade"
+        },
+        "after_state": {
+          "round_num": 2,
+          "current_team": 1,
+          "active_entity": 3,
+          "entities": [
+            {
+              "id": 1,
+              "name": "Axe",
+              "hp": 10,
+              "pos": [
+                3,
+                0
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "AxeCounterHelix",
+                "AxeReflectHalfOfDamageFromDefaults"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Necrophos",
+              "hp": 8,
+              "pos": [
+                0,
+                1
+              ],
+              "team": 0,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "NecroStartTurnAura",
+                "NecroGetKillCounter"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Melee Hero",
+              "hp": 12,
+              "pos": [
+                4,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": []
+            },
+            {
+              "id": 4,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                4,
+                3
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef",
+                "BattleHungerToken x 1",
+                "DamageOverTimeToken x 2",
+                "SlowToken x 1"
+              ]
+            },
+            {
+              "id": 5,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                3,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            }
+          ]
+        },
+        "done": false,
+        "simulations": [],
+        "messages": [
+          "DeployEvent triggered Viktoria's OnFirstTurnSpawnOtherViktoria.",
+          "--New Viktoria spawned at (3,4)",
+          "Axe used Battle Hunger on Viktoria.",
+          "Viktoria gained 1 BattleHungerToken.",
+          "Viktoria gained 2 DamageOverTimeToken.",
+          "Viktoria gained 1 SlowToken."
+        ]
+      },
+      {
+        "before_state": {
+          "round_num": 2,
+          "current_team": 1,
+          "active_entity": 3,
+          "entities": [
+            {
+              "id": 1,
+              "name": "Axe",
+              "hp": 10,
+              "pos": [
+                3,
+                0
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "AxeCounterHelix",
+                "AxeReflectHalfOfDamageFromDefaults"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Necrophos",
+              "hp": 8,
+              "pos": [
+                0,
+                1
+              ],
+              "team": 0,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "NecroStartTurnAura",
+                "NecroGetKillCounter"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Melee Hero",
+              "hp": 12,
+              "pos": [
+                4,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": []
+            },
+            {
+              "id": 4,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                4,
+                3
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef",
+                "BattleHungerToken x 1",
+                "DamageOverTimeToken x 2",
+                "SlowToken x 1"
+              ]
+            },
+            {
+              "id": 5,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                3,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            }
+          ]
+        },
+        "action": {
+          "actor": 2,
+          "target": 3,
+          "ability": "Do Nothing",
+          "move_path": [
+            [
+              4,
+              4
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              4,
+              2
+            ]
+          ],
+          "movement_name": "Guard Viktoria 5 from Axe 1"
+        },
+        "after_state": {
+          "round_num": 2,
+          "current_team": 0,
+          "active_entity": 2,
+          "entities": [
+            {
+              "id": 1,
+              "name": "Axe",
+              "hp": 10,
+              "pos": [
+                3,
+                0
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "AxeCounterHelix",
+                "AxeReflectHalfOfDamageFromDefaults"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Necrophos",
+              "hp": 8,
+              "pos": [
+                0,
+                1
+              ],
+              "team": 0,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "NecroStartTurnAura",
+                "NecroGetKillCounter"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Melee Hero",
+              "hp": 12,
+              "pos": [
+                4,
+                2
+              ],
+              "team": 1,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": []
+            },
+            {
+              "id": 4,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                4,
+                3
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef",
+                "BattleHungerToken x 1",
+                "DamageOverTimeToken x 2",
+                "SlowToken x 1"
+              ]
+            },
+            {
+              "id": 5,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                3,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            }
+          ]
+        },
+        "done": false,
+        "simulations": [],
+        "messages": [
+          "Melee Hero used Do Nothing on Melee Hero."
+        ]
+      },
+      {
+        "before_state": {
+          "round_num": 2,
+          "current_team": 0,
+          "active_entity": 2,
+          "entities": [
+            {
+              "id": 1,
+              "name": "Axe",
+              "hp": 10,
+              "pos": [
+                3,
+                0
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "AxeCounterHelix",
+                "AxeReflectHalfOfDamageFromDefaults"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Necrophos",
+              "hp": 8,
+              "pos": [
+                0,
+                1
+              ],
+              "team": 0,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "NecroStartTurnAura",
+                "NecroGetKillCounter"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Melee Hero",
+              "hp": 12,
+              "pos": [
+                4,
+                2
+              ],
+              "team": 1,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": []
+            },
+            {
+              "id": 4,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                4,
+                3
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef",
+                "BattleHungerToken x 1",
+                "DamageOverTimeToken x 2",
+                "SlowToken x 1"
+              ]
+            },
+            {
+              "id": 5,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                3,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            }
+          ]
+        },
+        "action": {
+          "actor": 4,
+          "target": 3,
+          "ability": "Reaper's Scythe",
+          "move_path": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              2,
+              1
+            ]
+          ],
+          "movement_name": "Range 3 of Melee Hero(3)3 for Reaper's Scythe"
+        },
+        "after_state": {
+          "round_num": 2,
+          "current_team": 1,
+          "active_entity": 4,
+          "entities": [
+            {
+              "id": 1,
+              "name": "Axe",
+              "hp": 10,
+              "pos": [
+                3,
+                0
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "AxeCounterHelix",
+                "AxeReflectHalfOfDamageFromDefaults"
+              ]
+            },
+            {
+              "id": 2,
+              "name": "Necrophos",
+              "hp": 8,
+              "pos": [
+                2,
+                1
+              ],
+              "team": 0,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "NecroStartTurnAura",
+                "NecroGetKillCounter"
+              ]
+            },
+            {
+              "id": 3,
+              "name": "Melee Hero",
+              "hp": 12,
+              "pos": [
+                4,
+                2
+              ],
+              "team": 1,
+              "move_actions": 1,
+              "standard_actions": 1,
+              "free_actions": 99,
+              "modifiers": [
+                "ReapersScythe x 1",
+                "ImmobileToken x 1"
+              ]
+            },
+            {
+              "id": 4,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                4,
+                3
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef",
+                "BattleHungerToken x 1",
+                "DamageOverTimeToken x 2",
+                "SlowToken x 1"
+              ]
+            },
+            {
+              "id": 5,
+              "name": "Viktoria",
+              "hp": 6,
+              "pos": [
+                3,
+                4
+              ],
+              "team": 1,
+              "move_actions": 0,
+              "standard_actions": 0,
+              "free_actions": 0,
+              "modifiers": [
+                "OnFirstTurnSpawnOtherViktoria",
+                "OnKillAllViktoriasHeal",
+                "OnDeathOtherViktoriasHealAndGainDef"
+              ]
+            }
+          ]
+        },
+        "done": false,
+        "simulations": [],
+        "messages": [
+          "Necrophos used Reaper's Scythe on Melee Hero.",
+          "TurnStartEvent triggered Necrophos's NecroStartTurnAura.",
+          "Melee Hero gained 1 ReapersScythe.",
+          "Melee Hero gained 1 ImmobileToken."
+        ]
+      }
+    ]
+  }
+]

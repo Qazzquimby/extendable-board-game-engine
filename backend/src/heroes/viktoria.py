@@ -115,7 +115,7 @@ class OnDeathOtherViktoriasHealAndGainDef(Modifier):
 
 @dataclass(kw_only=True)
 class DragonsBreathPull(Instruction):
-    valence = Valence.MIXED
+    valence: Valence = Valence.MIXED
 
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         target = ctx.get_target(engine)

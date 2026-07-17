@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { theme } from './theme';
 
 interface HeroPlacement {
   class_name: string;
@@ -14,8 +15,6 @@ interface SetupScreenProps {
 }
 
 const GRID_SIZE = 5;
-const TEAM_COLORS = ['#4488ff', '#ff4444'];
-const TEAM_LABELS = ['Blue Team', 'Red Team'];
 
 export function SetupScreen({ onPlay }: SetupScreenProps) {
   const [heroes, setHeroes] = useState<string[]>([]);
@@ -35,12 +34,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
       .catch(() => setError('Failed to load hero list'));
   }, []);
 
-  const availableHeroes = heroes.filter(
-    (h) =>
-      !teams[0].heroes.some((p) => p.class_name === h) &&
-      !teams[1].heroes.some((p) => p.class_name === h)
-  );
-
+  // Show all heroes — duplicates are allowed
   const handleGridClick = (x: number, y: number) => {
     if (!selectedHero) return;
     const team = teams[selectedTeam];
@@ -112,31 +106,32 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <h1 style={{ marginBottom: '20px' }}>Game Setup</h1>
+      <h1 style={{ marginBottom: '20px', color: theme.fg.primary }}>Game Setup</h1>
 
       <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-        {/* Hero Roster */}
+        {/* Hero Roster: always shows all heroes regardless of placement */}
         <div style={{
           width: '220px',
-          border: '1px solid #ccc',
+          border: `1px solid ${theme.borders.gridLine}`,
           borderRadius: '8px',
           padding: '12px',
-          background: '#f8f8f8',
+          background: theme.bg.roster,
         }}>
-          <h3 style={{ margin: '0 0 10px' }}>Hero Roster</h3>
+          <h3 style={{ margin: '0 0 10px', color: theme.fg.placeholder }}>Hero Roster</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {availableHeroes.map((hero) => (
+            {heroes.map((hero, idx) => (
               <button
-                key={hero}
+                key={`${hero}-${idx}`}
                 onClick={() => setSelectedHero(selectedHero === hero ? null : hero)}
                 style={{
                   padding: '6px 10px',
-                  border: `2px solid ${selectedHero === hero ? TEAM_COLORS[selectedTeam] : '#ddd'}`,
+                  border: `2px solid ${selectedHero === hero ? theme.team[selectedTeam as 0 | 1] : theme.borders.gridLine}`,
                   borderRadius: '4px',
-                  background: selectedHero === hero ? '#eef' : 'white',
+                  background: selectedHero === hero ? theme.bg.gridCellHover : theme.bg.gridCell,
                   cursor: 'pointer',
                   textAlign: 'left',
                   fontSize: '14px',
+                  color: theme.fg.placeholder,
                 }}
               >
                 {hero}
@@ -144,7 +139,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
             ))}
           </div>
           {selectedHero && (
-            <p style={{ fontSize: '12px', color: '#666', margin: '8px 0 0' }}>
+            <p style={{ fontSize: '12px', color: theme.fg.placeholder, margin: '8px 0 0' }}>
               Click a grid cell to place {selectedHero}
             </p>
           )}
@@ -153,22 +148,22 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
         {/* Grid */}
         <div>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
-            {[0, 1].map((t) => (
+            {([0, 1] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => { setSelectedTeam(t); setSelectedHero(null); }}
                 style={{
                   padding: '6px 14px',
                   borderRadius: '4px',
-                  border: `2px solid ${TEAM_COLORS[t]}`,
-                  background: selectedTeam === t ? TEAM_COLORS[t] : 'white',
-                  color: selectedTeam === t ? 'white' : TEAM_COLORS[t],
+                  border: `2px solid ${theme.team[t]}`,
+                  background: selectedTeam === t ? theme.team[t] : theme.bg.gridCell,
+                  color: selectedTeam === t ? theme.fg.bright : theme.team[t],
                   fontWeight: 'bold',
                   cursor: 'pointer',
                   fontSize: '14px',
                 }}
               >
-                {TEAM_LABELS[t]} ({teams[t].heroes.length})
+                Team {t + 1} ({teams[t].heroes.length})
               </button>
             ))}
           </div>
@@ -178,9 +173,9 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
             gridTemplateColumns: `repeat(${GRID_SIZE}, 60px)`,
             gridTemplateRows: `repeat(${GRID_SIZE}, 60px)`,
             gap: '2px',
-            border: '3px solid #aaa',
+            border: `3px solid ${theme.borders.gridBorder}`,
             borderRadius: '4px',
-            background: '#e8e8e8',
+            background: theme.bg.grid,
             padding: '2px',
           }}>
             {Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, i) => {
@@ -196,18 +191,18 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
                   style={{
                     width: '60px',
                     height: '60px',
-                    border: '1px solid #ccc',
+                    border: `1px solid ${theme.borders.gridLine}`,
                     borderRadius: '4px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: occupied ? 'default' : 'pointer',
                     background: entity
-                      ? TEAM_COLORS[entity.team]
+                      ? theme.team[entity.team as 0 | 1]
                       : selectedHero
-                        ? '#f0f8ff'
-                        : 'white',
-                    color: entity ? 'white' : '#999',
+                        ? theme.bg.gridCellHover
+                        : theme.bg.gridCell,
+                    color: entity ? theme.fg.bright : theme.fg.placeholder,
                     fontSize: '11px',
                     fontWeight: entity ? 'bold' : 'normal',
                     textAlign: 'center',
@@ -229,26 +224,26 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
           </div>
 
           {error && (
-            <p style={{ color: 'red', marginTop: '8px', fontSize: '14px' }}>{error}</p>
+            <p style={{ color: theme.accent.hit, marginTop: '8px', fontSize: '14px' }}>{error}</p>
           )}
         </div>
 
         {/* Team Roster */}
         <div style={{ width: '200px' }}>
-          {[0, 1].map((t) => (
+          {([0, 1] as const).map((t) => (
             <div
               key={t}
               style={{
-                border: `2px solid ${TEAM_COLORS[t]}`,
+                border: `2px solid ${theme.team[t]}`,
                 borderRadius: '8px',
                 padding: '10px',
                 marginBottom: '10px',
-                background: t === selectedTeam ? '#f0f4ff' : 'white',
+                background: t === selectedTeam ? theme.bg.roster : theme.bg.gridCell,
               }}
             >
-              <h4 style={{ margin: '0 0 6px', color: TEAM_COLORS[t] }}>{TEAM_LABELS[t]}</h4>
+              <h4 style={{ margin: '0 0 6px', color: theme.team[t] }}>Team {t + 1}</h4>
               {teams[t].heroes.length === 0 ? (
-                <p style={{ fontSize: '12px', color: '#434343', margin: 0 }}>Empty</p>
+                <p style={{ fontSize: '12px', color: theme.fg.placeholder, margin: 0 }}>Empty</p>
               ) : (
                 <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                   {teams[t].heroes.map((h, i) => (
@@ -260,6 +255,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
+                        color: theme.fg.placeholder,
                       }}
                     >
                       <span>
@@ -271,7 +267,7 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
                           border: 'none',
                           background: 'none',
                           cursor: 'pointer',
-                          color: '#c00',
+                          color: theme.accent.danger,
                           fontSize: '14px',
                           padding: '0 4px',
                         }}
@@ -297,8 +293,8 @@ export function SetupScreen({ onPlay }: SetupScreenProps) {
             fontWeight: 'bold',
             borderRadius: '8px',
             border: 'none',
-            background: loading ? '#ccc' : '#28a745',
-            color: 'white',
+            background: loading ? theme.bg.surfaceHover : theme.accent.primary,
+            color: theme.fg.bright,
             cursor: loading ? 'default' : 'pointer',
           }}
         >
