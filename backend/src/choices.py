@@ -133,7 +133,11 @@ def get_plausible_movements(
             pref_pos = actor.get_preferred_position(engine)
             if pref_pos:
                 best_move = min(
-                    reachable_points, key=lambda p: (p.get_distance(pref_pos), p.x, p.y)
+                    reachable_points,
+                    key=lambda p: (
+                        p.get_distance(pref_pos),       # closest to enemy
+                        p.get_distance(actor.pos),      # least movement from current
+                    ),
                 )
                 if best_move != actor.pos:
                     proposed_moves = {best_move: "Move towards preferred position"}

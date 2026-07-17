@@ -605,3 +605,60 @@ def test_tracer_must_dodge_in_game_or_die():
         f"Tracer should be dead from 2-dmg attack at 2HP, but has {tracer.hp} HP"
     )
     print(f"Tracer died (as expected without reaction): HP={tracer.hp}")
+
+
+def test_melee_heroes_adjacent_stay_put():
+    """Two adjacent melee heroes should NOT circle top-left.
+
+    Both placed adjacent in the center of a 6x6. Each is already in
+    range of the other's attack. Over several rounds they should
+    stay put (no wandering to top-left corner).
+    """
+    from fastapi.testclient import TestClient
+    from backend.main import app
+
+    client = TestClient(app)
+    resp = client.post("/run-game", json={
+        "seed": 42,
+        "grid_size": 6,
+        "teams": [
+            {"heroes": [{"class": "MeleeHero", "pos": [2, 2]}]},
+            {"heroes": [{"class": "MeleeHero", "pos": [3, 2]}]},
+        ],
+    })
+    data = resp.json()
+
+    # Collect positions over time (only alive entities)
+    positions_by_entry = []
+    for e in data["logs"]:
+        pos0 = None
+        pos1 = None
+        for ent in e["state"]["entities"]:
+            if ent.get("pos") is None:
+                continue  # dead entities have null pos
+            if ent["team"] == 0:
+                pos0 = tuple(ent["pos"])
+            else:
+                pos1 = tuple(ent["pos"])
+        positions_by_entry.append((pos0, pos1))
+
+    initial_team0 = positions_by_entry[0][0]
+    initial_team1 = positions_by_entry[0][1]
+
+    # Neither hero should wander from their starting square
+    # They're adjacent — both in range already, no movement needed
+    for i, (p0, p1) in enumerate(positions_by_entry):
+        if p0 is None:
+            continue  # team 0 is dead
+        assert p0 == initial_team0, (
+            f"Entry[{i}]: Team 0 moved from {initial_team0} to {p0} — "
+            f"should have stayed (already adjacent to enemy)"
+        )
+        if p1 is None:
+            continue  # team 1 is dead
+        assert p1 == initial_team1, (
+            f"Entry[{i}]: Team 1 moved from {initial_team1} to {p1} — "
+            f"should have stayed (already adjacent to enemy)"
+        )
+
+    print(f"Both heroes stayed at {initial_team0} and {initial_team1} for {len(positions_by_entry)} entries")
