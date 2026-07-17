@@ -464,6 +464,7 @@ class Engine:
         while not self.is_done:
             new_current_activator = self._get_current_activator()
             if new_current_activator is None:
+                self._advance_hero_indices()
                 continue
 
             self.current_turn_hero = new_current_activator
