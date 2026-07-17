@@ -93,7 +93,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
   };
 
   return (
-    <div style={{ background: theme.bg.page, color: theme.fg.primary, minHeight: '100vh', fontFamily: 'sans-serif' }}>
+    <div style={{ background: theme.bg.page, color: theme.fg.primary, height: '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
       {/* Top bar */}
       <div style={{
         padding: '8px 16px',
@@ -155,14 +155,14 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
         </span>
       </div>
 
-      <div style={{ display: 'flex' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Written log sidebar */}
         <div
           style={{
             width: '320px',
             borderRight: `1px solid ${theme.borders.subtle}`,
             padding: '12px',
-            height: 'calc(100vh - 52px)',
+            height: '100%',
             overflowY: 'auto',
             background: theme.bg.panel,
             order: -1,
@@ -201,7 +201,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
         </div>
 
         {/* Main view */}
-        <div style={{ flex: 1, padding: '8px' }}>
+        <div style={{ flex: 1, padding: '8px', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {/* Step controls */}
           <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button

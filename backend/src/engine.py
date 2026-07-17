@@ -364,7 +364,11 @@ class Engine:
                 break
 
             key = self._event_merge_key(event)
-            desc = event.describe(self) if key is not None else None
+            # Only describe events at their RESOLVE phase (after _resolve has been
+            # applied, but before AFTER hooks). The 3-phase event pipeline
+            # (BEFORE → RESOLVE → AFTER) re-enqueues the event twice, so without
+            # this guard we'd get 3 identical descriptions per event.
+            desc = event.describe(self) if (key is not None and event.state == "RESOLVE") else None
 
             # Key boundary? Emit what we have
             if current_events and key != current_key:
