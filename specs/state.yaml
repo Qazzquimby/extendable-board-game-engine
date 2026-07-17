@@ -19,6 +19,9 @@ epic_cycle:
     - plan-work (e01s01)
     - kickoff-branch
     - develop-tdd (e01s01)
+    - verify-work
+    - audit-code
+    - release-branch (solo-local)
   audit_result: null
 
 bug_cycle:
@@ -39,16 +42,15 @@ metrics:
 
 git:
   branch: master
-  hash: b94631b # latest commit
+  hash: 1fb1498
   pushed: false
 
 handoff:
-  last_step_completed: "e01s01 complete — 25 grid tests written, 113/113 regression"
+  last_step_completed: "release-branch (solo-local) — e01s01 merged to master"
   open_decisions:
-    - "e01s01 done. Next: e01s02 (Entity lifecycle)"
+    - "e01s01 done. Next: e01s02 (Entity lifecycle) — plan-work then chain"
   required_reading:
     - specs/release-plan.yaml
     - specs/execution-status.yaml
     - specs/epics/e01-core-engine/epic.yaml
-    - specs/epics/e01-core-engine/e01s01-tasks.yaml
-  next_skill: develop-tdd
+  next_skill: plan-work (next story)

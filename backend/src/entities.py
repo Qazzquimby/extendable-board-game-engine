@@ -206,7 +206,6 @@ class Entity:
         self, engine: "Engine", token_class: Type["Token"], amount: int = 1
     ) -> None:
         event = AddTokenEvent(
-            engine=engine,
             subject=self,
             token_class=token_class,
             amount=amount,
