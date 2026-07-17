@@ -1,0 +1,46 @@
+# specs/planning-context.yaml
+# Written by: elaborate-spec (Step 5)
+# Purpose: Captures the elaborated understanding of the project.
+#   Consumed by scope-work and slice-tasks in the planning spine.
+# What this file is: The output of the DISCOVER phase — what we know
+#   about the problem, solution boundaries, and key decisions so far.
+
+feature_name: "Overwatch-style Tactical Game Engine"
+
+problem_statement: >
+  Build a tactical teamfight game engine with a simulation API and
+  React/Phaser frontend. The engine handles a 3-phase event pipeline
+  (BEFORE→RESOLVE→AFTER), composable reactions (instant abilities),
+  grid-based movement with line-of-sight, attack rolls with crit/miss,
+  and hierarchical combat logging. The API serves game simulations
+  over HTTP, returning frame-by-frame logs for frontend playback.
+
+constraints:
+  - "Python backend, React/Phaser frontend"
+  - "FastAPI HTTP API for game simulation"
+  - "3-phase event pipeline (BEFORE → RESOLVE → AFTER)"
+  - "Grid-based, non-diagonal movement"
+  - "Attack rolls with defense, miss, and crit mechanics"
+  - "Reactions via ActionCost.INSTANT abilities with composable priority"
+  - "Hierarchical combat log via Logger with scoped context managers"
+  - "Event merge key (type, source_id) for frame grouping"
+  - "AbilityUseEvent always starts a new frame (absorption model)"
+  - "6 rounds per game, heroes activate left-to-right"
+
+out_of_scope:
+  - "Multiplayer networking / real-time sync"
+  - "Persistent save/load of game state"
+  - "Undo/replay system"
+  - "AI training pipeline (MCTS self-play is separate)"
+
+key_decisions:
+  - decision: "3-phase event pipeline instead of flat processing"
+    rationale: "Modifiers hook BEFORE/AFTER phases for reactions, dmg mods, and effects"
+  - decision: "Event merge by (type, source_id) with ability absorption"
+    rationale: "Groups related events per frame; ability use is the frame boundary"
+  - decision: "Hierarchical Logger with context manager scopes"
+    rationale: "Tree-structured logs per action instead of flat text"
+  - decision: "Reactions via instant abilities with composable priority functions"
+    rationale: "Per-hero reaction behavior; priority functions compose to pick the best"
+  - decision: "RuleBasedAgent for AI decisions"
+    rationale: "Deterministic AI for simulation; ties broken by lowest distance moved"

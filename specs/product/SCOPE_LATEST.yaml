@@ -1,0 +1,145 @@
+# specs/product/SCOPE_LATEST.yaml
+# Written by: scope-work
+# What this file is: The bounded PRD — what's in and out of scope for this
+#   initiative. Every in_scope item maps to a future epic/story. Every
+#   out_of_scope has a reason (deferred, not valuable, too risky).
+#   This is WHAT and WHY, not HOW.
+
+core_value: >
+  A deterministic, API-served tactical game engine for Overwatch-style
+  hero battles on a grid, with frame-by-frame playback and extensible
+  hero abilities.
+
+summary: >
+  This project builds a tactical teamfight game engine where two teams
+  of 4 heroes battle on a grid over 6 rounds. The engine runs the
+  simulation via a 3-phase event pipeline (BEFORE→RESOLVE→AFTER),
+  supporting attack rolls, damage modifiers, line-of-sight, area-of-effect
+  abilities, and composable instant-action reactions.
+  The engine serves game results via a FastAPI HTTP API, returning
+  frame-by-frame logs that a React/Phaser frontend renders as an
+  animated playback. New heroes can be added as Python modules without
+  modifying core engine code.
+
+in_scope:
+  # ── Epic: Core Engine ──
+  - description: "Grid movement (non-diagonal, speed-based, pathfinding)"
+    epic: Core Engine
+  - description: "Turn system: 6 rounds, L-to-R activation, dead heroes pass"
+    epic: Core Engine
+  - description: "Entity system with heroes, summons, markers, and objects"
+    epic: Core Engine
+  - description: "3-phase event pipe (BEFORE→RESOLVE→AFTER) w/ re-enqueue"
+    epic: Core Engine
+  - description: "Router pub/sub for Modifier hooks at each event phase"
+    epic: Core Engine
+  - description: "Agent framework (RuleBasedAgent, RandomAgent)"
+    epic: Core Engine
+
+  # ── Epic: Combat System ──
+  - description: "Attack rolls with defense, miss chance, and crit hits"
+    epic: Combat System
+  - description: "Dmg modifiers (additive, multiplicative, resistance, armor)"
+    epic: Combat System
+  - description: "Line-of-sight with cover (+2 def vs blocking terrain)"
+    epic: Combat System
+  - description: "AoE shapes (burst, line, path, NxN) for multi-unit targeting"
+    epic: Combat System
+  - description: "Death handling and scoring (1 point per enemy hero killed)"
+    epic: Combat System
+
+  # ── Epic: Hero System ──
+  - description: "Hero registry with class lookup by name"
+    epic: Hero System
+  - description: "Ability system: costs, targeting, instructions, charges, ults"
+    epic: Hero System
+  - description: "Instruction lib (damage, heal, move, apply modifier, etc.)"
+    epic: Hero System
+  - description: "Playable heroes: Tracer, Symmetra, Axe, Viktoria, etc."
+    epic: Hero System
+  - description: "Extensible hero modules — new heroes added w/o engine changes"
+    epic: Hero System
+
+  # ── Epic: Reaction System ──
+  - description: "Instant abilities (ActionCost.INSTANT) usable as reactions"
+    epic: Reaction System
+  - description: "ReactionOpportunityEvent between BEFORE and RESOLVE phases"
+    epic: Reaction System
+  - description: "Composable reaction priority (value, escape, conservation)"
+    epic: Reaction System
+  - description: "Reaction condition system — per-ability trigger conditions"
+    epic: Reaction System
+
+  # ── Epic: Log System ──
+  - description: "Hierarchical Logger with context manager scopes"
+    epic: Log System
+  - description: "Event merge (type, source_id) with ability absorption"
+    epic: Log System
+  - description: "Initial frame (pre-round empty state) + final frame (done)"
+    epic: Log System
+  - description: "Human-readable messages generated from EventDescriptions"
+    epic: Log System
+
+  # ── Epic: API ──
+  - description: "FastAPI /run-game (team config in, GameLog out)"
+    epic: API
+  - description: "FastAPI /heroes listing available hero classes"
+    epic: API
+  - description: "Pydantic schemas (GameLog, LogEntry, EventDescription, etc.)"
+    epic: API
+
+  # ── Epic: Frontend ──
+  - description: "Game setup screen (team composition, grid size, seed)"
+    epic: Frontend
+  - description: "Frame-by-frame playback with tween animations"
+    epic: Frontend
+  - description: "Entity sidebar: HP, modifiers, action logs per frame"
+    epic: Frontend
+  - description: "Viewport: 100vh, overflow hidden, scrollable sidebars"
+    epic: Frontend
+
+  # ── Epic: Integration / Game Runner ──
+  - description: "End-to-end sim: setup → run → log → API response"
+    epic: Game Runner
+
+out_of_scope:
+  - description: "Multiplayer networking / real-time sync"
+    reason: "DEFERRED — single-machine sim; no network layer yet"
+  - description: "Persistent save/load of game state"
+    reason: "DEFERRED — each game is ephemeral; no database or file storage"
+  - description: "Undo/replay system"
+    reason: "DEFERRED — Effect pattern later; not needed for initial engine"
+  - description: "AI training pipeline (MCTS self-play)"
+    reason: "DEFERRED — MCTS is separate; engine is sim, not trainer"
+  - description: "Player authentication or user accounts"
+    reason: "NOT VALUABLE — open API for local/dev use only"
+  - description: "Real-time tick-based animation"
+    reason: "NOT NEEDED — frame-by-frame render, no game-loop ticks"
+  - description: "Tabletop Simulator integration"
+    reason: "DEFERRED — physical board game out of scope"
+  - description: "Multi-hero-per-team control (strategy layer)"
+    reason: "DEFERRED — Agent-controlled; human-in-the-loop is future"
+
+constraints:
+  - "Python backend (3.12+), React/Phaser frontend"
+  - "FastAPI for HTTP API"
+  - "No database or external storage"
+  - "Deterministic simulation (seeded random for reproducibility)"
+  - "All heroes must follow the same ability/instruction contract"
+  - "New heroes must be addable without modifying core engine files"
+
+success_criteria:
+  - "Engine runs a full 6-round game with two teams of 4 heroes"
+  - "3-phase pipeline correctly processes BEFORE/RESOLVE/AFTER for every event"
+  - "Reactions fire and resolve within the triggering action's window"
+  - "Attack rolls respect defense, miss, and crit mechanics"
+  - "Hierarchical combat log captures per-action detail in tree format"
+  - "API serves valid GameLog responses for any valid team composition"
+  - "Frontend renders frame-by-frame playback from API response"
+  - "A new hero can be added by creating one file with no engine changes"
+
+references:
+  - specs/planning-context.yaml
+  - specs/plans/TECH_STACK_LATEST.md
+  - specs/product/VISION_LATEST.yaml
+  - CONTEXT.md (domain glossary)

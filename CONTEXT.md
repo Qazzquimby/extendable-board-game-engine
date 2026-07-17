@@ -1,7 +1,5 @@
 # Game Engine — Domain Glossary
 
-<!-- Resolved during 2025-07-16 grilling session on log splitting. -->
-
 ## Terms
 
 ### Action
@@ -51,7 +49,3 @@ Pulse Bomb, Symmetra's turret locations (as deployables).
 ### Object
 A grid entity that has health but does not move or act. A cross between a
 Marker and an Entity. Examples: Symmetra's barriers.
-
-### Initial Frame
-The first Log Entry in a game log, containing only the starting board state
-(with no events). The frontend renders this as the player's first view.

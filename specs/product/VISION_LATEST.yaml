@@ -1,0 +1,25 @@
+# specs/requirements/VISION_LATEST.yaml
+# Purpose: The north star — what is this project, and what does success look like?
+# What this file is: The elevator pitch + success criteria. It does NOT
+#   say how to build it — that's the plan. It says WHAT we're building and WHY.
+
+north_star: >
+  A tactical teamfight game engine that simulates Overwatch-style hero
+  battles on a grid, served via HTTP, and rendered in a web frontend.
+  The engine is deterministic, debuggable, and extensible — new heroes
+  and abilities can be added without touching core systems.
+
+success_criteria:
+  - "Engine runs full 6-round games with teams of 4 heroes"
+  - "3-phase event pipeline correctly processes BEFORE/RESOLVE/AFTER"
+  - "Reactions (instant abilities) fire and resolve within action windows"
+  - "Attack rolls respect defense, miss, and crit mechanics"
+  - "Hierarchical combat log captures per-action detail"
+  - "Frontend renders frame-by-frame playback from API response"
+  - "API serves /run-game and /heroes endpoints"
+  - "New heroes can be added as modules without engine changes"
+
+target_users:
+  - "Developer exploring tactical game design"
+  - "Player testing hero compositions and synergies"
+  - "AI/ML researcher using the engine for self-play training"

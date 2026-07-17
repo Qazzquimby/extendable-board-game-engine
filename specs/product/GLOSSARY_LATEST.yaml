@@ -1,0 +1,93 @@
+# specs/requirements/GLOSSARY_LATEST.yaml
+# Purpose: Domain glossary — the ubiquitous language of the project.
+#   Extracted from CONTEXT.md (domain grilling session 2025-07-16).
+# What this file is: Shared vocabulary so all agents and humans mean the
+#   same thing when they say "Action" vs "Event" vs "Reaction".
+
+glossary:
+  - term: Action
+    definition: >
+      An ability activation chosen by an agent. One Action = one ability
+      used by one actor. Represented by ActionState in the log.
+
+  - term: Event
+    definition: >
+      A single state change within the engine (DamageEvent, HealEvent,
+      ChangeLocationEvent, etc.). Events are processed through a queue;
+      one Action typically triggers a chain of Events.
+
+  - term: Reaction
+    definition: >
+      An Event that fires in response to another Event, registered via
+      Modifier hooks (e.g., @after(DamageEvent)). Reactions are processed
+      synchronously within the same Action's event-processing window.
+
+  - term: Frame
+    definition: >
+      A single visual state shown in the frontend, corresponding to one
+      LogEntry. The user steps through Frames with arrow keys.
+
+  - term: Log Entry
+    definition: >
+      A record of one atomic unit of gameplay for display. Contains a
+      state (world snapshot) and events describing what changed.
+
+  - term: Event Merge Key
+    definition: >
+      A compound key (type, source_id) used for merging consecutive
+      events into one LogEntry. Two events merge if they have the same
+      type AND same source entity.
+
+  - term: Three-Phase Pipeline
+    definition: >
+      Each Event passes through BEFORE → RESOLVE → AFTER phases.
+      BEFORE fires before-hooks, RESOLVE applies the effect, AFTER
+      fires after-hooks. The event is re-enqueued between phases.
+
+  - term: Initial Frame
+    definition: >
+      The first Log Entry, containing only the starting board state
+      with no events. The frontend renders this as the player's first view.
+
+  - term: Marker
+    definition: >
+      A placed object on the grid with no health, no actions, typically
+      untargetable. Tracked separately from Entities. Examples: Tracer's
+      Pulse Bomb, Symmetra turret locations.
+
+  - term: Object
+    definition: >
+      A grid entity that has health but does not move or act. Cross
+      between a Marker and an Entity. Examples: Symmetra's barriers.
+
+  - term: Ability
+    definition: >
+      The static rules text of an action. Contains targeting rules,
+      costs (ActionCost), Instructions, and reaction conditions.
+
+  - term: Instruction
+    definition: >
+      The blueprint of what an ability tries to do (e.g.,
+      DealDamageInstruction). Instructions generate Events when executed.
+
+  - term: Event Phase
+    definition: >
+      Enum: BEFORE, AFTER, QUERY. Controls when modifiers are triggered
+      during the 3-phase pipeline. QUERY is used for information
+      gathering (e.g., "how much damage will this deal?").
+
+  - term: Router
+    definition: >
+      Pub/sub system that dispatches Events to subscribed Modifiers.
+      Subscriptions are registered by event type, phase, and optional
+      only_self filter.
+
+  - term: ActionCost
+    definition: >
+      Enum: STANDARD, MOVE, FREE, INSTANT. Controls what action resource
+      an ability consumes. INSTANT abilities can be used as reactions.
+
+  - term: Agent
+    definition: >
+      Decision-maker for a team. RuleBasedAgent picks highest-priority
+      actions deterministically. RandomAgent picks randomly.
