@@ -4,19 +4,21 @@
 # What this file is: "Where am I right now?" — active flow, current
 #   epic/story, git state, and the handoff message for the next session.
 
-active_flow: plan-work
+active_flow: complete
 active_epic_id: e01
 active_story_id: e01s01
 completed_epic: false
 
 epic_cycle:
-  current_step: plan-work
-  next_skill: kickoff-branch
+  current_step: complete
+  next_skill: plan-work (next story)
   story_bcps: 1
   completed_steps:
     - scope-work
     - slice-tasks
     - plan-work (e01s01)
+    - kickoff-branch
+    - develop-tdd (e01s01)
   audit_result: null
 
 bug_cycle:
@@ -41,12 +43,12 @@ git:
   pushed: false
 
 handoff:
-  last_step_completed: "plan-work (e01s01) — story spec + 8 tasks for Grid tests, risk P2"
+  last_step_completed: "e01s01 complete — 25 grid tests written, 113/113 regression"
   open_decisions:
-    - "e01s01 active: Grid tests. Next: kickoff-branch to implement"
+    - "e01s01 done. Next: e01s02 (Entity lifecycle)"
   required_reading:
     - specs/release-plan.yaml
     - specs/execution-status.yaml
     - specs/epics/e01-core-engine/epic.yaml
     - specs/epics/e01-core-engine/e01s01-tasks.yaml
-  next_skill: kickoff-branch
+  next_skill: develop-tdd

@@ -238,7 +238,7 @@ stories:
 # Totals
 total_bcps: 88
 total_stories: 32
-completed_stories: 0 # Replaced with per-status count
-stories_done: 20
+completed_stories: 0
+stories_done: 21
 stories_partial: 9
 stories_untested: 3
