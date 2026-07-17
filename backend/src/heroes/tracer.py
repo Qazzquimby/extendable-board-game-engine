@@ -131,7 +131,9 @@ class Recall(Ability):
             # So we check if that position escapes the trigger
             recall_pos = tracker.recorded_pos if tracker else None
             if recall_pos:
-                base += reaction_value_of_instructions(trigger, actor, engine, recall_pos)
+                base += reaction_value_of_instructions(
+                    trigger, actor, engine, recall_pos
+                )
                 if reaction_escapes_area(pos, recall_pos, trigger):
                     base += 2.0
 
@@ -220,6 +222,7 @@ class Blink(Ability):
             reaction_escapes_area,
             reaction_resource_conservation,
         )
+
         target_pt = aiming_result.target_points[0]
 
         base = displacement_value(actor, pos, target_pt, engine)
@@ -361,8 +364,9 @@ class PulseBomb(Ability):
         target_pt = aiming_result.target_points[0]
         target = engine.entity_at(target_pt)
         if target and target.team != actor.team:
-            return 10.0
-        return 2.0
+            return 9.0
+        # todo, consider damage on nearby enemies and allies
+        return 0.0
 
 
 class Tracer(Hero):

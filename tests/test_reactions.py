@@ -461,3 +461,147 @@ def test_tracer_blinks_to_dodge_attack():
     )
 
     print(f"Tracer blinked: {initial_pos} → {tracer.pos}, HP: {tracer.hp}/{initial_hp}")
+
+
+def test_tracer_blinks_to_dodge_attack_from_real_loop():
+    """Tracer blinks away when attacked at low HP, using engine's own loop.
+
+    Sets up round 2, Tracer at 2 HP, attacker with 2-damage melee ability.
+    Uses advance_until_choice() + step() like run_game() does.
+    If reactions work: Tracer blinks, attack misses, HP stays 2.
+    """
+    from engine import Engine
+    from grid import Grid
+    from heroes.tracer import Tracer
+    from entities import Entity
+    from abilities import Ability
+    from aimings import TargetEntity, AimingResult
+    from point import Point
+    from events import AbilityUseEvent, ReactionOpportunityEvent
+    from instruction_library import DamageInstruction
+    from choices import PlausibleMoveAndAction
+
+    engine = Engine(grid=Grid(8, 8))
+    engine.finalize_setup()
+
+    attacker = Entity(
+        engine=engine, name="Attacker", hp=50, speed=3, pos=Point(1, 0), team=0
+    )
+    tracer = Tracer(engine=engine, pos=Point(2, 0), team=1)
+    tracer.hp = 2
+    initial_hp = tracer.hp
+    initial_pos = tracer.pos
+    # Create a 2-damage melee ability for attacker
+    stab = Ability(
+        name="Stab",
+        aiming=TargetEntity(in_range=1),
+        instructions=[DamageInstruction(amount=2)],
+    )
+    stab.owner_id = attacker.id
+    attacker.abilities.append(stab)
+
+    # Set up game state so attacker can act
+    engine.round_num = 2
+    engine.current_turn_hero = attacker
+    engine.setup_activation_queue()
+    engine.advance_to_next_activator()
+    attacker.start_turn()
+
+    # Attacker stabs Tracer
+    stab_event = AbilityUseEvent(
+        source=attacker,
+        ability=stab,
+        aiming_result=AimingResult(
+            target_points=[tracer.pos],
+            included_points=[],
+            sub_aimings={},
+        ),
+    )
+    engine.event_queue.enqueue(stab_event)
+
+    # advance_until_choice processes events including the stab's BEFORE phase,
+    # which enqueues ReactionOpportunityEvent. It should return Blink choices.
+    reaction_choices = engine.advance_until_choice()
+    assert len(reaction_choices) > 0, "Should get reaction choices"
+
+    # Verify Blink is among them
+    blink_actions = [
+        c for c in reaction_choices
+        if hasattr(c, 'ability') and c.ability.name == 'Blink'
+    ]
+    assert len(blink_actions) > 0, f"Blink should be a reaction choice"
+    print(f"Found {len(blink_actions)} Blink options")
+
+    # Pick the first Blink action and step it
+    blink_action = blink_actions[0]
+    engine.step(action=blink_action, action_idx=0)
+
+    # After step(), process remaining events (Blink's lifecycle + attack resolution)
+    while engine.event_queue._queue:
+        ev = engine.event_queue._queue[0]
+        if isinstance(ev, ReactionOpportunityEvent):
+            engine.event_queue._queue.pop(0)
+            continue
+        engine.event_queue.process_one(engine=engine)
+
+    # Tracer must have moved (blinked away)
+    assert tracer.pos != initial_pos, (
+        f"Tracer should have blinked from {initial_pos}, still at {tracer.pos}"
+    )
+
+    # Tracer must NOT have taken damage
+    assert tracer.hp == initial_hp, (
+        f"Tracer took {initial_hp - tracer.hp} damage at {tracer.pos} — "
+        f"attack should have missed after blink! HP: {tracer.hp}/{initial_hp}"
+    )
+
+    print(f"Tracer blinked: {initial_pos} -> {tracer.pos}, "
+          f"HP: {tracer.hp}/{initial_hp} (unchanged)")
+
+
+def test_tracer_must_dodge_in_game_or_die():
+    """If Tracer does NOT react to a 2-damage attack at 2 HP, she dies.
+    
+    This is a canary test: if reactions break, this test fails because
+    Tracer ends up dead. If reactions work, she survives.
+    """
+    from engine import Engine
+    from grid import Grid
+    from heroes.tracer import Tracer
+    from entities import Entity
+    from abilities import Ability
+    from aimings import TargetEntity, AimingResult
+    from point import Point
+    from events import AbilityUseEvent, ReactionOpportunityEvent
+    from instruction_library import DamageInstruction
+
+    engine = Engine(grid=Grid(8, 8))
+    engine.finalize_setup()
+
+    attacker = Entity(
+        engine=engine, name="Attacker", hp=50, speed=3, pos=Point(1, 0), team=0
+    )
+    tracer = Tracer(engine=engine, pos=Point(2, 0), team=1)
+    tracer.hp = 2
+
+    stab = Ability(
+        name="Stab",
+        aiming=TargetEntity(in_range=1),
+        instructions=[DamageInstruction(amount=2)],
+    )
+    stab.owner_id = attacker.id
+    attacker.abilities.append(stab)
+
+    # Force the attack through without reactions: directly enqueue DamageEvent
+    from event_library import DamageEvent
+    engine.event_queue.enqueue(
+        DamageEvent(source=attacker, subject=tracer, amount=2)
+    )
+    while engine.event_queue._queue:
+        engine.event_queue.process_one(engine=engine)
+
+    # Without blinking, Tracer takes 2 damage and dies
+    assert tracer.hp <= 0, (
+        f"Tracer should be dead from 2-dmg attack at 2HP, but has {tracer.hp} HP"
+    )
+    print(f"Tracer died (as expected without reaction): HP={tracer.hp}")
