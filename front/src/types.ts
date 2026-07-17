@@ -29,6 +29,7 @@ export interface LogEntry {
   state: EngineState;
   events: EventDescription[];
   messages?: string[];
+  action_logs?: string[];
   done: boolean;
   [k: string]: unknown;
 }

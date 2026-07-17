@@ -3,8 +3,21 @@ import { GameScene } from './scenes/GameScene';
 import { EngineState } from './types';
 import * as Phaser from 'phaser';
 
+export interface FrameEvent {
+  type: string;
+  actor_id?: number | null;
+  target_id?: number | null;
+  ability_name?: string | null;
+  amount?: number | null;
+  source_pos?: [number, number] | null;
+  target_pos?: [number, number] | null;
+  source_id?: number | null;
+  [k: string]: unknown;
+}
+
 interface PhaserComponentProps {
   engineState: EngineState;
+  events?: FrameEvent[];
   onAnimationComplete?: () => void;
 }
 
@@ -15,7 +28,7 @@ const TILE_SIZE = 140;
 const CANVAS_WIDTH = GRID_WIDTH * TILE_SIZE;
 const CANVAS_HEIGHT = GRID_HEIGHT * TILE_SIZE;
 
-const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, onAnimationComplete }) => {
+const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, events, onAnimationComplete }) => {
   const gameContainer = useRef<HTMLDivElement>(null);
   const gameInstance = useRef<Phaser.Game | null>(null);
   const pendingState = useRef<EngineState | null>(null);
@@ -49,7 +62,7 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, onAnimat
     const scene = gameInstance.current.scene.getScene('GameScene') as GameScene | null;
     if (scene && scene.scene.isActive()) {
       scene.setAnimationCallback(animCallback.current || (() => {}));
-      scene.updateEngineState(engineState);
+      scene.updateEngineState(engineState, events || []);
     } else {
       // Scene not ready yet — store for later
       pendingState.current = engineState;
@@ -60,7 +73,7 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, onAnimat
           clearInterval(check);
           if (pendingState.current) {
             s.setAnimationCallback(animCallback.current || (() => {}));
-            s.updateEngineState(pendingState.current);
+            s.updateEngineState(pendingState.current, events || []);
             pendingState.current = null;
           }
         }
@@ -68,9 +81,9 @@ const PhaserComponent: React.FC<PhaserComponentProps> = ({ engineState, onAnimat
       // Stop checking after 5 seconds
       setTimeout(() => clearInterval(check), 5000);
     }
-  }, [engineState]);
+  }, [engineState, events]);
 
-  return <div ref={gameContainer} style={{ width: '100%', maxWidth: CANVAS_WIDTH, margin: '20px 0' }}/>;
+  return <div ref={gameContainer} style={{ width: '100%', maxWidth: CANVAS_WIDTH, margin: '0' }}/>;
 };
 
 export default PhaserComponent;

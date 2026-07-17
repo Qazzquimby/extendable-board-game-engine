@@ -1,4 +1,16 @@
-import { EngineState, EntityState, ActionState } from '../types';
+import { EngineState, EntityState } from '../types';
+
+interface FrameEvent {
+  type: string;
+  actor_id?: number | null;
+  target_id?: number | null;
+  ability_name?: string | null;
+  amount?: number | null;
+  source_pos?: [number, number] | null;
+  target_pos?: [number, number] | null;
+  source_id?: number | null;
+  [k: string]: unknown;
+}
 import * as Phaser from 'phaser';
 
 const TEAM_COLORS = [0x3388ff, 0xff4444];
@@ -71,17 +83,17 @@ export class GameScene extends Phaser.Scene {
         this.onAnimComplete = cb;
     }
 
-    public updateEngineState(state: EngineState, action?: ActionState) {
+    public updateEngineState(state: EngineState, events?: FrameEvent[]) {
         if (this.entitiesGroup && this.overlaysGroup) {
-            this.drawState(state, action);
+            this.drawState(state, events || []);
         } else {
             this.events.once(Phaser.Scenes.Events.CREATE, () => {
-                this.drawState(state, action);
+                this.drawState(state, events || []);
             });
         }
     }
 
-    private drawState(state: EngineState, action?: ActionState) {
+    private drawState(state: EngineState, events: FrameEvent[]) {
         this.entitiesGroup.clear(true, true);
         this.overlaysGroup.clear(true, true);
         this.uiGroup.clear(true, true);
@@ -154,9 +166,6 @@ export class GameScene extends Phaser.Scene {
         );
         this.gridGameObject.setDepth(0);
 
-        let activeEntityContainer: Phaser.GameObjects.Container | null = null;
-        let targetPos: [number, number] | null = null;
-
         const posCounts: Record<string, number> = {};
         const posIndex: Record<number, number> = {};
 
@@ -168,6 +177,9 @@ export class GameScene extends Phaser.Scene {
             }
         });
 
+        // Store containers for animation reference
+        const entityContainers: Map<number, Phaser.GameObjects.Container> = new Map();
+
         state.entities.forEach(entityState => {
             const isActive = state.active_entity === entityState.id;
             let totalAtPos = 1;
@@ -178,68 +190,168 @@ export class GameScene extends Phaser.Scene {
                 indexAtPos = posIndex[entityState.id];
             }
             const container = this.drawEntity(entityState, isActive, totalAtPos, indexAtPos);
-
-            if (action) {
-                if (action.actor === entityState.id) {
-                    activeEntityContainer = container;
-                }
-                if (action.target === entityState.id) {
-                    if (action.target === action.actor) {
-                        targetPos = action.move_pos as [number, number];
-                    } else {
-                        targetPos = entityState.pos as [number, number];
-                    }
-                }
-            } else if (isActive) {
-                activeEntityContainer = container;
-            }
+            if (container) entityContainers.set(entityState.id, container);
         });
 
-        if (action && activeEntityContainer) {
-            this.animateAction(activeEntityContainer, action, targetPos);
+        // Animate based on events
+        if (events.length > 0) {
+            this.animateFromEvents(events, entityContainers);
         }
     }
 
-    private animateAction(actor: Phaser.GameObjects.Container, action: ActionState, targetPos: [number, number] | null) {
+    private animateFromEvents(events: FrameEvent[], entityContainers: Map<number, Phaser.GameObjects.Container>) {
         this.isAnimating = true;
-        const path = action.move_path;
-        if (path && path.length > 0) {
-            const tweens = path.map((point: any) => ({
-                x: this.gridOffsetX + point[0] * this.tileSize + this.tileSize / 2,
-                y: this.gridOffsetY + point[1] * this.tileSize + this.tileSize / 2,
-                duration: 200,
-                ease: 'Sine.easeInOut',
-            }));
+        let totalDuration = 0;
 
-            this.tweens.chain({
-                targets: actor,
-                tweens: tweens,
-                onComplete: () => {
-                    if (targetPos) {
-                        this.drawAttackArrow(actor.x, actor.y, this.gridOffsetX + targetPos[0] * this.tileSize + this.tileSize / 2, this.gridOffsetY + targetPos[1] * this.tileSize + this.tileSize / 2);
-                        this.showDamagePop(actor.x, actor.y, targetPos, () => {
-                            this.isAnimating = false;
-                            this.onAnimComplete?.();
-                        });
-                    } else {
-                        this.isAnimating = false;
-                        this.onAnimComplete?.();
+        for (const event of events) {
+            const t = event.type;
+            const tid = event.target_id;
+            const sid = event.source_id;
+
+            if (t === 'move' && tid != null && event.source_pos && event.target_pos) {
+                const container = entityContainers.get(tid);
+                if (container) {
+                    // Start entity at source position for animation
+                    const srcPixX = this.gridOffsetX + event.source_pos[0] * this.tileSize + this.tileSize / 2;
+                    const srcPixY = this.gridOffsetY + event.source_pos[1] * this.tileSize + this.tileSize / 2;
+                    const dstPixX = this.gridOffsetX + event.target_pos[0] * this.tileSize + this.tileSize / 2;
+                    const dstPixY = this.gridOffsetY + event.target_pos[1] * this.tileSize + this.tileSize / 2;
+
+                    // Place at source and tween to destination
+                    container.setPosition(srcPixX, srcPixY);
+                    const dur = 250;
+                    this.tweens.add({
+                        targets: container,
+                        x: dstPixX,
+                        y: dstPixY,
+                        duration: dur,
+                        ease: 'Sine.easeInOut',
+                    });
+                    totalDuration = Math.max(totalDuration, dur);
+                }
+            }
+
+            if (t === 'damage' && tid != null && event.amount != null) {
+                // Show damage popup at target position
+                let targetPixX: number, targetPixY: number;
+                const container = entityContainers.get(tid);
+                if (container) {
+                    targetPixX = container.x;
+                    targetPixY = container.y;
+                } else if (event.target_pos) {
+                    targetPixX = this.gridOffsetX + event.target_pos[0] * this.tileSize + this.tileSize / 2;
+                    targetPixY = this.gridOffsetY + event.target_pos[1] * this.tileSize + this.tileSize / 2;
+                } else {
+                    return;
+                }
+
+                // Draw attack arrow from source to target
+                if (sid != null && sid !== tid) {
+                    const srcContainer = entityContainers.get(sid);
+                    if (srcContainer) {
+                        this.drawAttackArrow(srcContainer.x, srcContainer.y, targetPixX, targetPixY);
                     }
-                },
-            });
-        } else if (targetPos) {
-            this.drawAttackArrow(actor.x, actor.y, this.gridOffsetX + targetPos[0] * this.tileSize + this.tileSize / 2, this.gridOffsetY + targetPos[1] * this.tileSize + this.tileSize / 2);
-            this.showDamagePop(actor.x, actor.y, targetPos, () => {
-                this.isAnimating = false;
-                this.onAnimComplete?.();
-            });
-        } else {
-            // No movement or attack — still animate briefly to show the action
-            this.time.delayedCall(300, () => {
-                this.isAnimating = false;
-                this.onAnimComplete?.();
-            });
+                }
+
+                const damageText = this.add.text(
+                    targetPixX + (Math.random() - 0.5) * 20,
+                    targetPixY - 20,
+                    `-${event.amount}`,
+                    {
+                        fontSize: `${this.tileSize * 0.3}px`,
+                        color: '#ff4444',
+                        fontFamily: 'Arial, sans-serif',
+                        fontStyle: 'bold',
+                        stroke: '#000000',
+                        strokeThickness: 2,
+                    }
+                ).setOrigin(0.5).setAlpha(1);
+                this.overlaysGroup.add(damageText);
+
+                this.tweens.add({
+                    targets: damageText,
+                    y: damageText.y - 40,
+                    alpha: 0,
+                    duration: 800,
+                    delay: 100,
+                    ease: 'Quad.easeOut',
+                    onComplete: () => damageText.destroy(),
+                });
+                totalDuration = Math.max(totalDuration, 900);
+            }
+
+            if (t === 'heal' && tid != null && event.amount != null) {
+                const container = entityContainers.get(tid);
+                if (container) {
+                    const healText = this.add.text(
+                        container.x + (Math.random() - 0.5) * 20,
+                        container.y - 20,
+                        `+${event.amount}`,
+                        {
+                            fontSize: `${this.tileSize * 0.3}px`,
+                            color: '#44ff44',
+                            fontFamily: 'Arial, sans-serif',
+                            fontStyle: 'bold',
+                            stroke: '#000000',
+                            strokeThickness: 2,
+                        }
+                    ).setOrigin(0.5).setAlpha(1);
+                    this.overlaysGroup.add(healText);
+
+                    this.tweens.add({
+                        targets: healText,
+                        y: healText.y - 40,
+                        alpha: 0,
+                        duration: 800,
+                        delay: 100,
+                        ease: 'Quad.easeOut',
+                        onComplete: () => healText.destroy(),
+                    });
+                    totalDuration = Math.max(totalDuration, 900);
+                }
+            }
+
+            if (t === 'ability_use' && tid != null) {
+                // Flash the actor
+                const container = entityContainers.get(tid);
+                if (container) {
+                    // Show ability name above entity for a moment
+                    const abilName = event.ability_name || 'Ability';
+                    const abilText = this.add.text(
+                        container.x,
+                        container.y - this.tileSize * 0.5,
+                        abilName,
+                        {
+                            fontSize: `${this.tileSize * 0.16}px`,
+                            color: '#ffdd44',
+                            fontFamily: 'Arial, sans-serif',
+                            fontStyle: 'bold',
+                            stroke: '#000000',
+                            strokeThickness: 2,
+                        }
+                    ).setOrigin(0.5).setAlpha(0);
+                    this.overlaysGroup.add(abilText);
+
+                    this.tweens.add({
+                        targets: abilText,
+                        alpha: 1,
+                        y: abilText.y - 10,
+                        duration: 300,
+                        ease: 'Quad.easeOut',
+                        yoyo: true,
+                        hold: 500,
+                        onComplete: () => abilText.destroy(),
+                    });
+                    totalDuration = Math.max(totalDuration, 1100);
+                }
+            }
         }
+
+        // After all animations, signal completion
+        this.time.delayedCall(totalDuration + 50, () => {
+            this.isAnimating = false;
+            this.onAnimComplete?.();
+        });
     }
 
     private showDamagePop(fromX: number, fromY: number, toPos: [number, number], onDone?: () => void) {

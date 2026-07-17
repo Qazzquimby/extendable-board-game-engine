@@ -70,6 +70,7 @@ class LogEntry(BaseModel):
     state: EngineState
     events: List[EventDescription] = []
     messages: List[str] = []
+    action_logs: List[str] = []  # Hierarchical logger output for this action
     done: bool = False
 
 

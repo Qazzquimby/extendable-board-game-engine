@@ -18,6 +18,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
   const logEndRef = useRef<HTMLDivElement>(null);
   const animatingRef = useRef(false);
   const pendingStepRef = useRef(false);
+  const logRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const goBack = useCallback(() => setCurrentStep((s) => Math.max(0, s - 1)), []);
   const goForward = useCallback(
@@ -74,10 +75,19 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goBack, goForward, togglePlay]);
 
-  // Auto-scroll log
+  // Auto-scroll log sidebar to current entry
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = logRefs.current[currentStep];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [currentStep]);
+
+  // Ensure logRefs array matches logs length
+  if (logRefs.current.length !== logs.length) {
+    logRefs.current = logRefs.current.slice(0, logs.length);
+    while (logRefs.current.length < logs.length) logRefs.current.push(null);
+  }
 
   const currentLogEntry = logs[currentStep];
   const stateToRender: EngineState | undefined = currentLogEntry?.state;
@@ -161,7 +171,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
           style={{
             width: '320px',
             borderRight: `1px solid ${theme.borders.subtle}`,
-            padding: '12px',
+            padding: '0',
             height: '100%',
             overflowY: 'auto',
             background: theme.bg.panel,
@@ -169,35 +179,81 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
           }}
         >
           <h3 style={{
-            margin: '0 0 8px',
+            margin: '0',
+            padding: '12px 12px 8px',
             fontSize: '14px',
             color: theme.fg.muted,
             textTransform: 'uppercase',
             letterSpacing: '1px',
+            borderBottom: `1px solid ${theme.borders.subtle}`,
+            position: 'sticky',
+            top: 0,
+            background: theme.bg.panel,
+            zIndex: 1,
           }}>
-            Turn Log
+            Game Log
           </h3>
-          {currentLogEntry?.messages?.length ? (
-            <>
-              {currentLogEntry.messages.map((msg, i) => (
-                <p
-                  key={i}
-                  style={{
-                    margin: '2px 0',
-                    fontSize: '13px',
-                    whiteSpace: 'pre-wrap',
-                    color: msg.startsWith('Missed') ? theme.accent.miss : msg.startsWith('Crit') ? theme.accent.crit : theme.fg.secondary,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {msg}
-                </p>
-              ))}
-              <div ref={logEndRef} />
-            </>
-          ) : (
-            <p style={{ fontSize: '13px', color: theme.fg.placeholder, fontStyle: 'italic' }}>No messages for this turn.</p>
-          )}
+          {logs.map((entry, idx) => {
+            const isCurrent = idx === currentStep;
+            const actionLogs = entry.action_logs || [];
+            return (
+              <div
+                key={idx}
+                ref={isCurrent ? (el) => { logRefs.current[idx] = el; } : undefined}
+                style={{
+                  padding: '8px 12px',
+                  borderBottom: `1px solid ${theme.borders.subtle}`,
+                  background: isCurrent ? theme.bg.surfaceHover : 'transparent',
+                  borderLeft: isCurrent ? `3px solid ${theme.accent.gold}` : '3px solid transparent',
+                  cursor: 'pointer',
+                }}
+                onClick={() => { setCurrentStep(idx); setIsPlaying(false); }}
+              >
+                <div style={{
+                  fontSize: '11px',
+                  color: isCurrent ? theme.fg.primary : theme.fg.muted,
+                  fontWeight: isCurrent ? 'bold' : 'normal',
+                  marginBottom: '4px',
+                }}>
+                  {entry.done ? '🏁 Game Over' : `Step ${idx}`}
+                  <span style={{ color: theme.fg.disabled, marginLeft: '4px' }}>
+                    r{entry.state.round_num}
+                    {entry.state.active_entity != null ? ` | #{${entry.state.active_entity}}` : ''}
+                  </span>
+                </div>
+                {actionLogs.length > 0 ? (
+                  actionLogs.map((msg, mi) => (
+                    <div
+                      key={mi}
+                      style={{
+                        fontSize: '12px',
+                        lineHeight: 1.5,
+                        color: msg.startsWith('--') ? theme.fg.disabled : isCurrent ? theme.fg.primary : theme.fg.secondary,
+                        paddingLeft: msg.startsWith('--') ? '0' : '0',
+                        marginLeft: (msg.match(/^--+/)?.[0]?.length || 0) * 8,
+                        fontStyle: msg.startsWith('--') ? 'italic' : 'normal',
+                      }}
+                    >
+                      {msg.replace(/^--+\s*/, '').replace(/^\.\s*/, '')}
+                    </div>
+                  ))
+                ) : (
+                  isCurrent ? (
+                    <div style={{ fontSize: '12px', color: theme.fg.placeholder, fontStyle: 'italic' }}>
+                      {idx === 0 ? 'Initial board' : 'Processing...'}
+                    </div>
+                  ) : null
+                )}
+                {entry.events && entry.events.length > 0 && (
+                  <div style={{ fontSize: '11px', color: theme.fg.disabled, marginTop: '4px' }}>
+                    {entry.events.length} event{entry.events.length !== 1 ? 's' : ''}
+                    {': '}{Array.from(new Set(entry.events.map(e => e.type))).join(', ')}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div ref={logEndRef} />
         </div>
 
         {/* Main view */}
@@ -280,6 +336,7 @@ export function PlaybackScreen({ gameLog, onBack }: PlaybackScreenProps) {
           {stateToRender && (
             <PhaserComponent
               engineState={stateToRender}
+              events={currentLogEntry?.events || []}
               onAnimationComplete={handleAnimationComplete}
             />
           )}

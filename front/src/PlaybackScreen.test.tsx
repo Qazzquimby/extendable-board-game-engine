@@ -73,6 +73,27 @@ describe('PlaybackScreen', () => {
     expect(screen.getByText(/Step 1 \/ 1/)).toBeInTheDocument();
   });
 
+  it('shows action_logs in the sidebar', () => {
+    const gameLog: GameLog = {
+      winner_team: null,
+      logs: [
+        mockGameLog.logs[0],
+        {
+          state: mockGameLog.logs[0].state,
+          events: [{ type: 'damage', target_id: 1, amount: 3 }],
+          action_logs: ['Axe used Battle Hunger.', '-- Axe dealt 3 damage to Necrophos.'],
+          done: false,
+        },
+      ],
+    };
+    render(<PlaybackScreen gameLog={gameLog} onBack={() => {}} />);
+    // Step to entry 1
+    fireEvent.click(screen.getByText('Next ▶'));
+    expect(screen.getByText(/Axe used Battle Hunger/)).toBeInTheDocument();
+    expect(screen.getByText(/Axe dealt 3 damage/)).toBeInTheDocument();
+    // Check sidebar shows the entry (several 'Step 1' on page, pick via container)
+  });
+
   it('shows event summary for frames with events', () => {
     const gameLog: GameLog = {
       winner_team: 0,
@@ -93,6 +114,8 @@ describe('PlaybackScreen', () => {
     // Step to entry 1
     fireEvent.click(screen.getByText('Next ▶'));
     expect(screen.getByText(/Battle Hunger/)).toBeInTheDocument();
-    expect(screen.getByText(/damage/)).toBeInTheDocument();
+    // We'll check that the sidebar renders event type summary
+    const sidebarEls = screen.getAllByText(/damage/);
+    expect(sidebarEls.length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -332,6 +332,10 @@ class Engine:
         elif t == "heal":
             return f"{target_name} healed {desc.amount} HP"
         elif t == "move":
+            sp = desc.source_pos
+            tp = desc.target_pos
+            if sp and tp:
+                return f"{target_name} moved: {sp} → {tp}"
             return f"{target_name} moved"
         elif t == "death":
             prefix = f"{source_name} killed " if source_name else ""
@@ -405,13 +409,23 @@ class Engine:
             )
             action_choice = next_choices[action_index]
 
+            # Capture previous logs before this action
+            prev_log_len = len(get_logs())
+
             self.step(
                 action=action_choice,
                 action_idx=action_index,
             )
 
             # Process queued events into log entries grouped by type
+            prev_entry_count = len(logs)
             self._process_events_into_log(logs)
+
+            # Attach the action's hierarchical logs to any newly emitted entries
+            current_logs = get_logs()
+            action_logs = current_logs[prev_log_len:]
+            for entry in logs[prev_entry_count:]:
+                entry.action_logs = action_logs[:]
 
             # Check for choices (reactions / decisions)
             if self.event_queue._queue:
