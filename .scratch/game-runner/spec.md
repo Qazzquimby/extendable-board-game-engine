@@ -24,7 +24,6 @@ This replaces the current drag-drop-log workflow entirely.
 5. As a player, I want to press a "Play" button to run the game, so that the AI plays out the matchup.
 6. As a player, I want to step through the game turn by turn with arrow keys, so that I can understand each action.
 7. As a player, I want to see each individual action as its own step, so that I can follow chains of reactions.
-
 8. As a player, I want to see health bars and status effects on each entity, so that I can assess unit state quickly.
 9. As a player, I want to see damage numbers, ability names, and attack animations play out, so that combat is legible.
 10. As a player, I want to see a written log alongside the visual display, so that I can read a description of what happened.
@@ -47,28 +46,32 @@ POST /run-game
 
 Request body:
 {
-  "seed": int,             // RNG seed for reproducibility (optional, default random)
-  "grid_size": int,        // Grid dimensions (e.g., 5 = 5x5)
+  "seed": int,
+  "grid_size": int,
   "teams": [
-    {
-      "heroes": [
-        { "class": "Axe", "pos": [0, 0] },
-        { "class": "Necrophos", "pos": [0, 1] }
-      ]
-    },
-    {
-      "heroes": [
-        { "class": "MeleeHero", "pos": [4, 3] },
-        { "class": "Viktoria", "pos": [4, 4] }
-      ]
-    }
+    { "heroes": [{ "class": "Axe", "pos": [0, 0] }, ...] },
+    { "heroes": [{ "class": "MeleeHero", "pos": [4, 3] }, ...] }
   ]
 }
 
-Response: GameLog (the existing GameLog schema, unchanged)
+Response: GameLog
 ```
 
-The `"class"` field maps to the hero class names in `src/heroes/`. The field can also be sent as `"class_name"` (the Pydantic model accepts both). Invalid class names return a 400 error. Occupied positions (across all teams — no two entities may share a grid cell) also return a 400. Markers may overlap entities but are out of scope for now.
+The `"class"` field maps to hero class names in `src/heroes/`. Invalid class names → 400. Occupied positions → 400.
+
+### Log Format (Event-Based)
+
+No before/after state pairs. Each `LogEntry` contains:
+- `state: EngineState` — world state after this entry's events
+- `events: EventDescription[]` — what happened (type, actor_id, target_id, amounts, positions)
+- `messages: string[]` — human-readable descriptions
+- `done: boolean`
+
+**Merge logic**: Consecutive events with the same `(type, source_id)` merge into one entry. `AbilityUseEvent` always starts a new frame. This gives per-source granularity (Viktoria's damage ≠ Axe's counter-attack damage).
+
+**De-duplication**: The 3-phase event pipeline (BEFORE→RESOLVE→AFTER) re-enqueues each event twice. The log only captures descriptions during the RESOLVE phase (after `_resolve()` runs, before AFTER hooks), so each event produces exactly one description.
+
+**Initial frame**: Entry 0 has empty events array — the frontend shows the starting board.
 
 ### Setup Screen
 
@@ -76,28 +79,31 @@ The `"class"` field maps to the hero class names in `src/heroes/`. The field can
 - Center: grid display for placing heroes
 - Each team has a distinct color (blue/red)
 - Click a placed hero to remove and return to roster
-- "Play" button is enabled when both teams have at least 1 hero
+- "Play" button enabled when both teams have ≥1 hero
 
 ### Visualizer Improvements
 
-- **Entity rendering**: Replace text labels with colored circles/shapes. Team color fills, distinct border for active entity.
-- **Health bars**: Bar + numeric HP display.
-- **Status effects**: Icons or abbreviated text above entity.
-- **Reaction granularity**: Each event in a reaction chain is a separate step. The written log side panel shows the full event chain.
-- **Attack animation**: Arrow/thrown projectile from attacker to target, damage number popup.
-- **Movement animation**: Tween entity across intermediate grid positions.
-- **Auto-play**: Toggle auto-advance with configurable speed; pause and step revert to manual control.
+- **Entity rendering**: Colored circles/shapes with team fill, active-entity highlight ring (yellow).
+- **Health bars**: Below entity name, proportional to tileSize (~1.6× radius wide, 8px tall, at y=14 from center).
+- **Status effects**: Not yet implemented.
+- **Event-driven animation** (not yet implemented):
+  - `move` events: tween entity from `source_pos` to `target_pos` along path
+  - `damage` events: show damage number popup on target, attack arrow from source→target
+  - `ability_use` events: flash actor, show ability name
+  - `heal` events: green heal number popup
+  - `death` events: red flash / fade-out
+- **Auto-play**: Toggle auto-advance with configurable speed (150–1500ms); pause reverts to manual.
+- **Viewport lock**: The page uses `height: 100vh; overflow: hidden` — never scrolls. Log sidebar scrolls internally.
 
 ### Backend Changes
 
-- A new `backend/` directory at repo root containing `main.py` (FastAPI app) and a `requirements.txt` adding `fastapi` and `uvicorn`.
-- The existing `src/` modules are imported directly — no restructuring.
-- A `GET /heroes` endpoint returns the list of available hero classes for the roster.
+- `backend/main.py` — FastAPI app with `POST /run-game` and `GET /heroes`
+- `backend/requirements.txt` — fastapi + uvicorn
+- The existing `src/` modules are imported directly.
 
-### Setup Screen Data
+### Game Log Sidebar
 
-- The hero roster is populated by reading hero classes from `src/heroes/`. This avoids duplicating hero definitions.
-- Each hero class exposes: name, health, speed, and a list of abilities for tooltip display.
+The written log sidebar shows `messages` from the current `LogEntry`. Future enhancement: show full event chain with targeting info, source→target names, per-event detail rows.
 
 ## Testing Decisions
 
@@ -107,38 +113,35 @@ Test external behavior at the seam boundary, not internal implementation details
 
 ### Backend tests
 
-- **API integration test**: `POST /run-game` with a valid team config returns 200 and a valid `GameLog` with non-empty logs.
-- **API error case**: `POST /run-game` with an invalid hero class returns 400.
-- **API error case**: `POST /run-game` with overlapping positions (same team or cross-team) returns 400.
+- **API integration test**: `POST /run-game` returns 200 + valid `GameLog`
+- **API error case**: Invalid hero class → 400
+- **API error case**: Overlapping positions → 400
 
 These sit in `tests/test_api.py` and use FastAPI's `TestClient`.
 
 ### Frontend tests
 
-- **Setup screen renders hero roster**: mock hero API response renders the expected hero names.
-- **Setup screen places hero on grid**: clicking a hero then clicking a grid cell places it.
-- **Setup screen removes hero**: clicking the × button on a team entry removes the hero and returns it to the roster.
-- **Visualizer renders game state**: given a mock `EngineState`, the playback screen shows the correct number of entities in the correct positions.
-
-These use Vitest + React Testing Library in the `front/` directory. Since the visualizer uses Phaser directly, visualizer tests may test at the React wrapper level rather than deep Phaser internals.
+- Setup screen renders hero roster, places hero, removes hero
+- Playback screen renders game state from mock
+- Uses Vitest + React Testing Library
 
 ### Unit tests
 
-The existing `tests/` directory already covers engine internals. No new unit tests are needed for the engine — the API test validates integration.
+65 existing engine unit tests (pytest). No new unit tests needed for the engine.
 
 ## Out of Scope
 
 - Economy systems (buy, sell, interest, leveling)
 - Shop/reroll mechanics
-- Synergy bonuses in the engine (bonuses for fielding multiple units of the same type)
+- Synergy bonuses
 - Multiplayer
-- Save/load game states
+- Save/load
 - Build pipeline or deployment
 - Styling polish beyond basic clarity
 
 ## Further Notes
 
-- The existing `Agent` classes (rule-based, MCTS, random) are all usable. The default agent for auto-play is `RuleBasedAgent` since it's deterministic and fast. MCTS can be offered as an option later.
-- The current grid size is 5x5 by default. The API accepts configurable grid sizes.
-- The `GameLog` schema captures the full sequence of before/after state pairs. The frontend should cache the loaded log in memory — no need for state management beyond React state.
-- Seed is exposed for reproducibility: the same seed + same team config = identical game.
+- Default agent is `RuleBasedAgent` (deterministic, fast)
+- Grid size configurable via API (5×5 default, up to 10×10)
+- Seed exposed for reproducibility
+- Engine's 3-phase event pipeline (BEFORE→RESOLVE→AFTER) is a core design — frontend log processors must handle de-duplication
