@@ -218,9 +218,7 @@ def reaction_value_of_instructions(
     return total
 
 
-def point_is_in_aiming_result(
-    point: "Point", aiming_result: AimingResult
-) -> bool:
+def point_is_in_aiming_result(point: "Point", aiming_result: AimingResult) -> bool:
     """True if `to_pos` is outside ALL of the trigger event's target/included points.
 
     This means the actor has fully escaped the attack's area and cannot be hit.

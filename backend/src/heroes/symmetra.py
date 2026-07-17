@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union, Optional
+from typing import Union
 
 from abilities import (
     Ability,
@@ -28,9 +28,8 @@ from modifiers import (
     SummonModifier,
     Token,
     SlowToken,
-    ClearAtStartOfTurnMixin,
 )
-from events import after, before
+from events import after
 from event_library import (
     TurnStartEvent,
     TurnEndEvent,
@@ -41,25 +40,10 @@ from event_library import (
     HealEvent,
 )
 from point import Point
-from queries import QueryDefense
 from valence import Valence
 
 
 # region Photon Orb
-@dataclass(kw_only=True)
-class PhotonOrbMissChance(Modifier, ClearAtStartOfTurnMixin):
-    valence = Valence.BAD
-
-    @before(QueryDefense)
-    def add_miss_chance(self, engine: "Engine", event: QueryDefense):
-        if (
-            event.ability
-            and event.ability.name == "Photon Orb"
-            and event.ability.owner_id == self.owner_id
-        ):
-            event.result += 2
-
-
 class PhotonOrb(Ability):
     def __init__(self, owner_id: str):
         super().__init__(
@@ -68,6 +52,7 @@ class PhotonOrb(Ability):
             aiming=TargetEntity(in_range=4),
             instructions=[DamageInstruction(amount=4)],
             is_default=True,
+            defense=2,
             owner_id=owner_id,
         )
 
@@ -669,7 +654,6 @@ class Symmetra(Hero):
         self.add_modifier(engine, photon_beam_manager)
         self.abilities.append(PhotonBeam(owner_id=self.id, tracker=photon_beam_manager))
 
-        self.add_modifier(engine, PhotonOrbMissChance())
         self.abilities.append(PhotonOrb(owner_id=self.id))
 
         self.add_modifier(engine, SentryTurretManager())

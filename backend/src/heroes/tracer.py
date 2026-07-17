@@ -130,9 +130,11 @@ class Recall(Ability):
             # Recall moves to a FIXED position, not a chosen one
             # So we check if that position escapes the trigger
             recall_pos = tracker.recorded_pos if tracker else None
-            if recall_pos: # todo reuse this logic for any instant-movement effect
+            if recall_pos:  # todo reuse this logic for any instant-movement effect
                 aiming_result = getattr(trigger, "aiming_result", None)
-                if aiming_result and point_is_in_aiming_result(point=recall_pos, aiming_result=aiming_result):
+                if aiming_result and point_is_in_aiming_result(
+                    point=recall_pos, aiming_result=aiming_result
+                ):
                     base += reaction_value_of_instructions(
                         trigger, actor, engine, recall_pos
                     )
@@ -229,8 +231,12 @@ class Blink(Ability):
         trigger = getattr(engine, "_reaction_trigger_event", None)
         if trigger is not None:
             # Avoid harmful instructions
-            if hasattr(trigger, "aiming_result") and not point_is_in_aiming_result(point=target_pt, aiming_result=trigger.aiming_result):
-                base += reaction_value_of_instructions(trigger, actor, engine, target_pt)
+            if hasattr(trigger, "aiming_result") and not point_is_in_aiming_result(
+                point=target_pt, aiming_result=trigger.aiming_result
+            ):
+                base += reaction_value_of_instructions(
+                    trigger, actor, engine, target_pt
+                )
 
         base -= reaction_resource_conservation(self, engine)
 
