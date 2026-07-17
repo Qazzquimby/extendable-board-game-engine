@@ -26,6 +26,8 @@ from event_library import (
 from modifiers import Modifier
 from point import Point
 from queries import QueryDefense
+from util import EntityId
+from valence import Valence
 
 
 class RecallTracker(Modifier):
@@ -42,6 +44,8 @@ class RecallTracker(Modifier):
 
 
 class RecallInstruction(Instruction):
+    valence = Valence.GOOD
+
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         owner = engine.get_entity_by_id(ctx.source_id)
         tracker = owner.get_modifier(RecallTracker)
@@ -140,7 +144,7 @@ class Blink(Ability):
 
 
 class PulsePistols(Ability):
-    def __init__(self, owner_id: str):
+    def __init__(self, owner_id: EntityId):
         super().__init__(
             name="Pulse Pistols",
             text="Range 1, 4dmg.",
@@ -152,13 +156,15 @@ class PulsePistols(Ability):
 
 
 class PulseBombAttached(Modifier):
-    def __init__(self, source_id: str):
+    def __init__(self, source_id: EntityId):
         self.source_id = source_id
 
 
 class PulseBombMarker(Marker):
-    def __init__(self, engine: "Engine", pos: Point, team: int, source_id: str):
-        super().__init__(engine=engine, name="Pulse Bomb", pos=pos, team=team)
+    def __init__(self, engine: "Engine", pos: Point, team: int, source_id: EntityId):
+        super().__init__(
+            engine=engine, name="Pulse Bomb", pos=pos, team=team, summoner_id=source_id
+        )
         self.source_id = source_id
 
 

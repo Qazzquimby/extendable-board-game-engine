@@ -156,7 +156,7 @@ class Instruction:
     """Base class for all ability effects."""
 
     aiming_name: Optional[str] = None
-    valence: Valence = field(init=False, default=False)
+    valence: Valence
 
     def __deepcopy__(self, memo):
         return self
