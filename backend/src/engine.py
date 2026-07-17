@@ -141,6 +141,7 @@ class Engine:
         "current_choices",
         "is_resolving_action",
         "event_queue",
+        "_absorbing_ability",
     )
 
     def __init__(
@@ -173,6 +174,7 @@ class Engine:
         self.active_entity: Optional["Entity"] = None
         self.activation_queue: List["Entity"] = []
         self.activation_index: int = -1
+        self._absorbing_ability: bool = False
         self._next_id: int = 1
         self.current_choices = None
         self.is_resolving_action = False
@@ -362,31 +364,58 @@ class Engine:
 
         Each flush captures a snapshot of hierarchical logs at that point so per-entry
         logs show what was known when that entry was emitted.
+
+        Absorption rule: after an ability_use event, all subsequent same-action
+        events (damage, heals, moves, modifiers) are absorbed into the same
+        frame. This keeps "Viktoria used Enchanted Katana" + "dealt 4 damage"
+        in one step. Absorption ends at the NEXT ability_use or queue drain.
         """
         current_key = None
         current_events: List[EventDescription] = []
-        checkpoint = len(get_logs())  # Track log position for incremental capture
+        absorbing = self._absorbing_ability
 
         while self.event_queue._queue:
             event = self.event_queue._queue[0]
 
-            if isinstance(event, (ReactionOpportunityEvent, DecisionEvent)):
+            # Handle ReactionOpportunityEvent: if no reaction choices available,
+            # consume it and continue processing (so damage events from the current
+            # action get described and merged into the right entry instead of
+            # being lost to advance_until_choice).
+            if isinstance(event, ReactionOpportunityEvent):
+                choices, _ = event.get_choices(engine=self)
+                if choices:
+                    # AI needs to choose — preserve absorption across the break
+                    self._absorbing_ability = absorbing
+                    break
+                else:
+                    # No one can react — pop and continue
+                    self.event_queue._queue.pop(0)
+                    continue
+
+            if isinstance(event, DecisionEvent):
                 break
 
             key = self._event_merge_key(event)
             is_ability = key is not None and key[0] == "ability_use"
 
-            # Emit current batch before starting a new ability or type boundary
-            if current_events and (is_ability or key != current_key):
-                snapshot = get_logs()[:]
-                self._flush_events(logs, current_events, snapshot)
+            if is_ability and event.state == "BEFORE":
+                # New ability use — always starts a new frame
+                if current_events:
+                    self._flush_events(logs, current_events, get_logs()[:])
+                    current_events = []
+                absorbing = True
+                self._absorbing_ability = True
+                current_key = key
+            elif absorbing:
+                # Absorb all same-action events into the ability frame
+                # No boundary check — just keep adding
+                pass
+            elif current_events and key != current_key:
+                # Normal type/source boundary: emit frame
+                self._flush_events(logs, current_events, get_logs()[:])
                 current_events = []
-                checkpoint = len(get_logs())
-                if is_ability:
-                    current_key = key
-                else:
-                    current_key = key
-            elif not is_ability:
+                current_key = key
+            else:
                 current_key = key
 
             # Describe events at BEFORE state (first time we see them).
@@ -397,13 +426,29 @@ class Engine:
 
             self.event_queue.process_one(engine=self)
 
+            # After processing, if we're absorbing, check if the next event is
+            # a new ability_use — if so, end absorption and flush on next iteration
+            if absorbing and self.event_queue._queue:
+                next_ev = self.event_queue._queue[0]
+                if isinstance(next_ev, (ReactionOpportunityEvent,)):
+                    pass  # Keep absorbing — no-op reactions were already consumed
+                elif isinstance(next_ev, (DecisionEvent,)):
+                    absorbing = False
+                else:
+                    next_key = self._event_merge_key(next_ev)
+                    if next_key is not None and next_key[0] == "ability_use":
+                        # Next ability_use ends absorption (flush on next iteration)
+                        pass
+
+        self._absorbing_ability = absorbing and len(self.event_queue._queue) > 0
         if current_events:
-            snapshot = get_logs()[:]
-            self._flush_events(logs, current_events, snapshot)
+            self._flush_events(logs, current_events, get_logs()[:])
 
     def run_game(self) -> GameLog:
         logs: List[LogEntry] = []
         winner_team = None
+
+        self._absorbing_ability = False
 
         # Initial frame — board state before anything happens
         logs.append(LogEntry(state=self.to_model(), events=[]))
