@@ -1,0 +1,683 @@
+    name: Team Fortress 2
+    color: [ 0.59, 0.31, 0.13 ]
+    description: |-
+      High mobility, high damage, lots of buffs and debuffs.
+    #    rules:
+    #      - REFERENCE_RuleInstant
+    #      - REFERENCE_RuleUltimate
+    #      - REFERENCE_RuleFlying
+    #      - REFERENCE_RuleFacing
+    #      - REFERENCE_RuleCriticalMoment
+    heroes:
+      - name: Spy
+        complexity: 4
+        polish: [ needs_testing ]
+        description: |-
+          Bluffs true location to make massive plays. Deletes markers.
+        art: hero.jpg
+        health: 6
+        speed: 3
+        default_abilities:
+          - name: Revolver
+            text: |-
+              ⌖Unlimited range: *irreducible* 2dmg. If this has a Kill counter, remove one and increase to 4 damage.
+        passives:
+          - name: Disguise
+            text: |-
+              Enemy abilities treat you as an ally.
+              When an enemy targets another enemy within range 2 of you, and you are also a valid target, you may change the target to you.
+          - name: Backstab
+            text: |-
+              When an enemy in range 2 moves away from you, or uses an ability that does not include you:
+                You may move 1 towards them.
+                ⌖That enemy within range 1: 100dmg. 
+                Gain a Kill Counter, and move 2.
+        tokens:
+          - REFERENCE_Kill
+        abilities:
+          - name: Stealth
+            text: |-
+              *Tap*
+              Place 4 **Possible Location** markers in range 4, face down. Remove your figurine from the board.
+              
+              Abilities targeting your **Possible Location** markers have +4 *miss*.
+              Your **Possible Location** markers have:
+                When this would be damaged or destroyed, reveal if. If "real", replace this with creator, else destroy this.
+                At any time, creator may reveal and destroy all their **Possible Location** markers to place themself at the "real" marker.
+                As a Move Action, creator can remove any number of their **Possible Location** markers to place them within in range 3 of any of the markers that were not placed this turn.
+            tokens:
+              - REFERENCE_PossibleLocation
+              - name: SpyFake
+                art: _spy_location.jfif
+                back_art: _real.png
+              - name: SpyFake
+                art: _spy_location.jfif
+                back_art: _fake.png
+              - name: SpyFake
+                art: _spy_location.jfif
+                back_art: _fake.png
+              - name: SpyFake
+                art: _spy_location.jfif
+                back_art: _fake.png
+          - name: Sapper
+            text: |-
+              Free Action, **tap**:
+              ⌖Object in range1: Give 4 **Damage over Time**.
+              Gain a kill counter.
+            tokens:
+              - REFERENCE_DamageOverTime
+          - name: Deadringer
+            text: |-
+              1/game, when you would take damage:
+                You have resistance to that damage.
+                Remove any number of conditions.
+                Use Stealth (even if it would normally not be usable).
+
+      - name: Heavy
+        complexity: 3
+        description: |-
+          Stance changing area denial tank with stacking self buffs.
+        art: hero.jpg
+        health: 12
+        speed: 2
+
+        default_abilities:
+          - name: Minigun
+            text: |-
+              If you have **Charged**: Choose one --
+                - Range 1, 6dmg.
+                - Range 3, 4dmg.
+              Otherwise, gain a **Charged** token.
+          - name: K.G.B. Punch
+            text: |-
+              ⌖Range 1: +2 *crit*, 2dmg. On hero kill, gain **K.G.B Boost**.
+        passives:
+          - name: Spun Up
+            text: |-
+              You have *slow* -2 and **undefendable** while you have **Charged**.
+              As a Free Action at the start of your turn, you can lose **Charged**.
+          - name: On Deployment
+            text: Gain **Bare Fists**.
+        conditions:
+          - name: K.G.B Boost
+            art: KGB.png
+            text: You deal +100% damage.
+          - name: Bare Fists
+            art: fists.png
+            text: At the start of your turn, you may destroy this to gain **Gloves of Running Urgently** or **Firsts of Steel**.
+          - name: Gloves of Running Urgently
+            art: gru.jpg
+            text: |-
+              At the start of your turn, you may destroy this to gain **Bare Fists** or **Firsts of Steel**.
+              
+              You have +2 Speed
+              You receive +50% damage.
+          - name: Fists of Steel
+            art: fists_of_steel.jpg
+            text: |-
+              At the start of your turn, you may destroy this to gain **Bare Fists** or **Gloves of Running Urgently**.
+              
+              You receive +100% damage from abilities from range 1.
+              You have *resistance* to all other damage.
+        tokens:
+          - REFERENCE_Charged
+        abilities:
+          - name: Snack
+            text: |-
+              1/game, choose one --
+              - Free Action: Create a **Sandvich** marker in a space in range 2 (can be occupied). It has: When a damaged unit is in this space, they heal half their maximum hp and destroy this.
+              - Move + Standard: Heal 4 and gain **Eating Sandvich**.
+              - Move + Standard Action: Gain **Buffalo Steak Rage**.
+            tokens:
+              - name: Snack Pickup
+                art: sandvich.jpg
+                is_marker: true
+                text: |-
+                  When a damaged unit is in this space, they heal half their maximum hp and destroy this.
+            conditions:
+              - name: Buffalo Steak Rage
+                art: buffalo_steak.jpg
+                text: |-
+                  You have +1 speed.
+                  You deal +50% damage, but cannot deal damage to targets farther than range 1.
+                  You receive +1 damage.
+              - name: Eating Sandvich
+                art: sandvich.jpg
+                text: |-
+                  You are *undefendable*.
+                  At the start of your activation, heal yourself 8, and destroy this.
+
+      - name: Sniper
+        complexity: 2
+        description: |-
+          Charge up sniper with permanent damage boosts.
+        health: 6
+        speed: 3
+        art: hero.jpg
+        default_abilities:
+          - name: Sniper Rifle
+            text: |-             
+              Choose one --
+              - ⌖Range 3+: +2 *crit*, 2dmg.
+              - Note your *facing* and gain **Charged**.
+          - name: Bushwacka
+            text: |-
+              ⌖Range 1: +2 *crit*, 2dmg.
+              Damage increases affecting this ability are applied twice.
+        passives:
+          - name: Scoped In
+            text: |-
+              At the start of your activation, lose **Charged**. If you did:
+                ⌖Range 2+ in facing: 4dmg. Choose one --
+                  - +4 *crit*.
+                  - Give **Jarate**.
+          - name: At the start of your activation
+            text: Heal yourself 1
+          - name: Darwin's Danger Shield
+            text: You take no damage from **Damage over Time**.
+        hints:
+          - REFERENCE_FacingHint
+        tokens:
+          - REFERENCE_Charged
+        conditions:
+            - name: Jarate
+              art: Jarate.jpg
+              tags:
+                - Mark
+              text: You receive +50% damage.
+        abilities:
+          - name: Huntsman
+            text: |-
+              ⌖Range 4: +3 *miss*, +2 *crit*, 3dmg.
+              If you have **Damage over Time**, remove it and, give the target a **Damage over Time**.
+            conditions:
+              - REFERENCE_DamageOverTime
+          - name: Cleaner's Carbine
+            text: |-
+              This starts with 1 charge.
+              When this deals damage, gain that much charge.
+              While this has 4 or more charge, all damage you deal has +50%.
+              
+              ⌖Range 2: 2dmg.
+            dice:
+              - name: Charge
+                color: orange
+                values: [ 1 ]
+          - name: Jarate
+            text: |-
+              1/game
+              ✺2x2 in range 3: Give **Jarate**
+      - name: Medic
+        complexity: 3
+        description: |-
+          Heals, overshield, and powerful support ultimates
+        health: 8
+        speed: 3
+        art: hero.jpg
+        passives:
+          - name: Start of your activation
+            text: |-
+              Heal yourself 1
+              Heal units with **Healing Target** 4. They gain any healing in excess of their maximum health as *overshield*.
+              Increase your speed this turn to match a unit with **Healing Target**, if higher than yours.             
+              All units lose **Healing Target**.
+        default_abilities:
+          - name: Medigun
+            text: |-
+              All units lose **Healing Target**.
+              ⌖Unit in path 3: *Undefendable*, heal them 2. Give them **Healing Target**.
+          - name: Blutsauger
+            text: |-
+              ⌖Range 3: 2dmg. Heal yourself equal to damage dealt.
+        conditions:
+          - name: Healing Target
+            art: healing_target.jpg
+            text: |-
+              If you are ever not within path 4 of creator, destroy this.
+              When you move for any reason other than a Basic Move, creator may move the same amount.
+        hints:
+          - REFERENCE_OvershieldHint
+        dice:
+          - name: Overshield (Bonus health, doesn't stack)
+            color: blue
+            values: [ 1 ]
+        abilities:
+          - name: Crossbow
+            text: |-
+              Allies can't voluntarily skip the attack roll for this attack.
+              Choose one --
+              - ⌖Range 3: +2 *miss*, either 2dmg or heal target 4.
+              - ⌖Range 4+: +4 *miss*, either 3dmg or heal target 8.
+          - name: Ubersaw
+            text: |-
+              ⌖Range 1: +2 *crit*, 2dmg, lower your ultimate costs by 2.
+          - name: Amputator Song
+            text: |-
+              Move + Standard Action:
+              ✺Allies in range 3: heal each 3. (This includes you.)
+          - name: Activate Ubercharge
+            text: |-
+              *Ultimate* 5, *instant* +3: 
+              Choose one --
+              - You and units with **Healing Target** get **Ubercharged**.
+              - You and units with **Healing Target** get **Kritzkrieged**.
+            dice:
+              - name: Required Ultimate
+                color: white
+                values: [ 5 ]
+            conditions:
+              - name: Ubercharged
+                art: ubercharge.jpg
+                text: |-
+                  You are are immune to damage.
+                  You cannot interact with objectives.
+              - name: Krtizkrieged
+                art: kritzkrieg.png
+                text: |-
+                  You and your Healing Target deal +100% damage.
+            hints:
+              - REFERENCE_InstantHint
+              - REFERENCE_UltimateHint
+
+      - name: Engineer
+        complexity: 3
+        description: |-
+          Build and protect powerful objects.
+        art: hero.jpg
+        health: 8
+        speed: 3
+        conditions:
+          - REFERENCE_Silence
+        tokens:
+          - name: Upgrade
+            art: upgrade.jpg
+            text: ''
+        default_abilities:
+          - name: Rescue Ranger
+            text: |-
+              Choose one --
+              - ⌖Range 3: 2dmg. 
+              - ⌖Object in unlimited range: You may teleport it to a space in range 1 and *tap* it, and you may heal it 2.
+          - name: Wrench
+            text: |-
+              Choose one --
+              - Range 1: +2 *crit*, 2dmg.
+              - Summon in range 1: You may give it an **Upgrade** token and *tap* it, and you may heal it 4.
+        abilities:
+          - name: Erect Build
+            text: |-
+              Empty space in range 1: Create a **Sentry** or **Dispenser** (max 1 of each in game, remove existing) and *tap* it.
+          - name: Create Short Circuit
+            text: |-
+              ✺2x2 in range 2: 1dmg to all. Create a **Short Circuit** in the area.
+            tokens:
+              - name: Short Circuit
+                art: short_circuit.jpg
+                is_marker: true
+                text: |-
+                  Enemy abilities passing through this must make an attack roll (even if they have no target).
+                  On a roll of 1-3, the ability is cancelled.
+                  
+                  At start of creator's activation, destroy this.
+          - name: Eureka Effect
+            text: |-
+              Move + Standard Action:
+              Teleport to any space in your deployment zone or in range 1 of a **Dispenser**.
+        units:
+          - name: Sentry
+            art: sentry.jpg
+            health: 4
+            speed: 0
+            passives:
+              - name: If this has an **Upgrade**, it has +4 max hp.
+                text: ''
+              - name: There is an enemy in range 5, and this is not tapped.
+                text: |-
+                  Mandatory *instant*:
+                  *Tap* this.
+                  If upgraded:
+                    ⌖Nearest enemy in range 5: *undefendable*, 5dmg.
+                    ✺1dmg all in burst 1 of targeted space.
+                  Else:
+                    ⌖Nearest enemy in range 5: *undefendable*, 3dmg.
+                  
+                  If this attack passes through an ally, it hits that ally instead.
+          - name: Dispenser
+            art: dispenser.jpg
+            health: 4
+            speed: 0
+            passives:
+              - name: If this has an **Upgrade**, it has +4 max hp.
+                text: ''
+              - name: End of turn
+                text: |-
+                  *Tap*:
+                  If upgraded:
+                    ✺Other allies in burst 1, heal them 4.
+                  Else:
+                    ✺Other allies in range 1, heal them 2.
+      - name: Demoman
+        complexity: 2
+        description: |-
+          Mobile unreliable nuker and area control.
+        art: hero.jpg
+        health: 10
+        speed: 3
+        passives:
+          - name: When you're damaged by an ability that can affect multiple targets
+            text: |-
+              You have *resistance* to that damage.
+              If you're the attacker, you may *fly* equal to the unreduced damage.
+        hints:
+          - REFERENCE_ResistanceHint
+          - REFERENCE_FlyingHint
+        default_abilities:
+          - name: Grenade Launcher
+            text: |-
+              ⌖Range 4: +3 *miss*, 3dmg.
+              On hit, ✺Burst 1 of target: 1dmg. 
+              On miss, create a **Grenade** marker in a nearest empty space.
+              
+              It has: 
+              At the start of creator's activation:
+                ✺Everything in this space, 3dmg.
+                ✺Burst 1 of this: 1dmg.
+                Destroy this.
+          - name: Eyelander
+            text: |-
+              ⌖Range 2: +2 *crit*, 2dmg.
+              On hero kill gain a **Kill** counter, heal yourself 2, and take any **Kill** counters the target had. 
+              
+              ---
+              Passive:
+                You have +1 speed per Kill counter.
+        tokens:
+          - name: Grenade
+            art: grenade.jpg
+            is_marker: true
+            text: |-
+              At the start of creator's activation:
+                ✺Everything in this space, 3dmg.
+                ✺Burst 1 of this: 1dmg.
+                Destroy this.
+          - REFERENCE_Kill
+        abilities:
+          - name: Sticky Bomb Launcher
+            text: |-
+              Create a **Sticky Bomb* object in an empty space in range 4, place a Sticky Bomb, with 1hp.
+              
+              ---
+              Free Action at start of turn:
+                Each **Sticky Bomb** simultaneously does ✺Burst 1: 4dmg. Destroy all **Sticky Bomb**s.
+            tokens:
+              - name: Sticky Bomb
+                art: sticky_bomb.jpg
+                is_marker: true
+          - name: Chargin' Targe
+            text: |-
+              1/game, Move Action:
+              Move any distance in a straight line. Remove any number of conditions.
+              If you moved at least 4, your next attack this turn deals +100% damage.
+          - name: Ullapool Caber
+            text: |-
+              1/game:
+              ⌖Range 1, 2dmg.
+              On hit, ✺Burst 1 of target: 4dmg.
+          - name: Pain Train
+            text: |-
+              Free Action at start of turn
+              You may activate or deactivate **Pain Train Stance**.
+              While active, you count twice for objectives. You take +50% damage.
+            tokens:
+              - name: Pain Train stance
+                art: pain_train.jpg
+                back_art: black.png
+                text: While active, you count twice for objectives. You take +50% damage.
+      - name: Pyro
+        complexity: 2
+        description: |-
+          Give out damage over time and convert into burst damage.
+        art: hero.jpg
+        health: 10
+        speed: 4
+        passives:
+          - name: You cannot have Damage over Time.
+            text: ''
+        tokens:
+          - REFERENCE_DamageOverTime
+        default_abilities:
+          - name: Flamethrower
+            text: |-
+              ✺All in line 2:
+                If they have **Damage over Time**: 3dmg
+                    Else: 1dmg and give them **Damage over Time**.
+          - name: Airblast
+            text: |-
+              *Tap*, *instant* +2 or interrupt a unit moving:
+              ✺All in line 2: Push 2.
+              If this interrupted an ability with Range 3+ which passes into the area, cancel and recast the interrupted ability.
+            hints:
+              - REFERENCE_InstantHint
+        abilities:
+          - name: Flare Gun
+            text: |-
+              ⌖Range 4: +2 *miss*.
+                If the target has **Damage over Time**: 4dmg.
+                Else: 2dmg and give them **Damage over Time**.
+          - name: Axe
+            text: |-
+              ⌖Range 1:
+                If the target has **Damage over Time**, 4dmg, and they lose all **Damage over Time**.
+                Else: 2dmg.
+              Deal the same amount of damage to any unit who healed or was healed by the target since your last turn.
+              On kill, move 2 and heal 3.
+          - name: Mmmph
+            text: |-
+              You start with 0 **Mmmph** charges.
+              At the end of your activation, gain 1 **Mmmph** charge for each enemy with **Damage over Time**.
+              
+              Discard 4 **Mmmph** charges, Move + Standard Action:
+                Gain passive:
+                  You deal +100% damage.
+            dice:
+              - name: Mmmph
+                color: orange
+                values: [ 1 ]
+          - name: Thermal Thruster
+            text: |-
+              *Fly* 5.
+              ✺All in burst 1: 1dmg, push 1.
+            hints:
+              - REFERENCE_FlyingHint
+      - name: Soldier
+        complexity: 3
+        description: |-
+          Mobile splash damage and team-wide buffs.
+        art: hero.jpg
+        health: 10
+        speed: 3
+        default_abilities:
+          - name: Rocket Launcher
+            text: |-
+              ⌖Range 4: 2dmg to target and push 1.
+              ✺Burst 1 of targeted space: 1dmg.
+          - name: Rocket Jump
+            text: |-
+              Move Action
+              ✺Others in burst 1: 1dmg.
+              Do 3 damage to self.
+              *Fly* 5.
+            hints:
+              - REFERENCE_FlyingHint
+        abilities:
+          - name: Banner
+            text: |-
+              When you deal damage to an enemy, gain that many Banner charges.
+              ---
+              Spend 8 charges: choose one --
+                - Allies deal +50% damage.
+                - Allies have *armor* and do not receive extra damage from *crit*s.
+                - Allies have +1 speed and heal 1 when they deal damage.
+            hints:
+              - REFERENCE_ArmorHint
+            dice:
+              - name: Banner
+                color: orange
+                values: [ 1 ]
+            conditions:
+              - name: Buff Banner
+                art: buff_banner.jpg
+                text: Allies deal +50% damage.
+              - name: Battalion's Backup
+                art: battalions_backup.jpg
+                text: Allies have *armor* and do not receive extra damage from *crit*s.
+              - name: Concherer
+                art: concheror.jpg
+                text: Allies have +1 speed and heal 1 when they deal damage.
+          - name: Pickaxe
+            text: |-
+              If you have 4 or less health, choose one --
+              - Move 5.
+              - Move 2. ⌖Range 1: +2 *crit*, 3dmg.
+              
+              Gain passive until the start of your next activation:
+                You take +100% damage.
+          - name: Disciplinary Action
+            text: |-
+              ⌖Range 2: You may move 2. The target may move 2.
+          - name: Pain Train
+            text: |-
+              Free Action at start of turn
+              You may activate or deactivate **Pain Train Stance**.
+              While active, you count twice for objectives. You take +50% damage.
+            tokens:
+              - name: Pain Train stance
+                art: pain_train.jpg
+                back_art: black.png
+                text: While active, you count twice for objectives. You take +50% damage.
+      - name: Scout
+        complexity: 3
+        description: |-
+          High speed assassin.
+        art: hero.jpg
+        health: 6
+        speed: 5
+        passives:
+          - name: While moving, you have *flying*.
+            text: ''
+          - name: Abilities targeting you have +2 *miss*
+            text: ''
+#          - name: When you make a Basic Move
+#            text: You may use any unspent movement at the end of your turn.
+          # Re add if this stops being a base rule
+          - name: You count twice for objectives.
+            text: ''
+        hints:
+          - REFERENCE_FlyingHint
+        default_abilities:
+          - name: Scattergun
+            text: |-
+              ⌖Range 1: 4dmg, push 1.
+              
+              You may push yourself 1 away from the targeted space.
+        abilities:
+          - name: Drink Bonk Atomic Punch
+            text: |-
+              Move + Standard Action:
+              Gain **Bonk Atomic Punch**
+            conditions:
+              - name: Bonk Atomic Punch
+                art: bonk.jpg
+                text: |-
+                  You are immune to damage.
+                  You can't use standard actions.
+                  
+                  Move Action:
+                    Lose this passive.
+          - name: Drink Crit-a-Cola
+            text: |-
+              Move + Standard Action:
+              Gain **Crit-a-Cola**
+            conditions:
+              - name: Crit-a-Cola
+                art: critacola.jpg
+                text: |-
+                  You deal and receive +50% damage.
+          - name: Throw Mad Milk
+            text: |-
+              1/game:
+              ✺2x2 in range 3: Allies lose **Damage over Time**. Enemies get **Covered in Milk**
+            conditions:
+              - name: Covered in Milk
+                art: milk.jpg
+                text: |-
+                  When a unit damages you, they heal 1/2 the damage dealt.
+          - name: Flying Guillotine
+            text: |-
+              1/game:
+              ⌖Range 4: +2 *miss*, 3dmg, give **Damage over Time**.
+            conditions:
+              - REFERENCE_DamageOverTime
+          - name: The Sandman
+            text: |-
+              1/game:
+              ⌖Range 4+: +4 *miss*, target gets **Full Stun**.
+            conditions:
+              - REFERENCE_FullStun
+          - name: Fan O'War
+            text: |-
+              ⌖Range 1: Target gets **Fan O'War Mark**
+            conditions:
+              - name: Fan O'War Mark
+                art: fanowar.jpg
+                tags:
+                  - Mark
+                text: |-
+                  You receive +50% damage.
+
+    maps:
+      - name: Granary
+        art: cp_granary.png
+        tokens:
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+        hints:
+          - REFERENCE_HeightDifferenceHint
+          - REFERENCE_HealthPack
+          - REFERENCE_CapturePointHint
+          - REFERENCE_CoverHint
+      - name: Nucleus
+        art: cp_nucleus.png
+        tokens:
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+        hints:
+          - REFERENCE_HeightDifferenceHint
+          - REFERENCE_HealthPack
+          - REFERENCE_CapturePointHint
+          - REFERENCE_DeadlyFallHint
+          - REFERENCE_CoverHint
+      - name: Viaduct
+        art: cp_viaduct.png
+        tokens:
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+          - REFERENCE_HealthPack
+        hints:
+          - REFERENCE_HeightDifferenceHint
+          - REFERENCE_HealthPack
+          - REFERENCE_CapturePointHint
+          - REFERENCE_CoverHint
+    intro_setup:
+      map: Granary
+      blue:
+        - Scout
+        - Heavy
+        - Sniper
+      red:
+        - Medic
+        - Soldier
+        - Pyro

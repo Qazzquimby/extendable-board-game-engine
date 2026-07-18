@@ -31,6 +31,8 @@ from event_library import (
 from modifiers import Modifier
 from point import Point
 
+# todo this has little to do with the spy's definition in sample_heroes.yaml
+
 
 class SpyDecoyEntity(Entity):
     """Entity that looks like a Spy to the enemy. 1 HP, no activation."""
@@ -115,9 +117,7 @@ class SpyInvisibilityManager(Modifier):
         for decoy_id in self.decoy_ids:
             decoy = engine.get_entity_by_id(decoy_id)
             if decoy and decoy.pos is not None:
-                new_decoy_pos = Point(
-                    decoy.pos.x + dx, decoy.pos.y + dy
-                )
+                new_decoy_pos = Point(decoy.pos.x + dx, decoy.pos.y + dy)
                 # Clamp to grid bounds
                 new_decoy_pos = Point(
                     max(0, min(engine.grid.width - 1, new_decoy_pos.x)),
@@ -145,6 +145,7 @@ class SpyInvisibilityManager(Modifier):
 
 class RevealOnHit(Modifier):
     """Reveals Spy when damaged — removes invisibility decoys."""
+
     valence = Valence.BAD
 
     @after(DamageEvent)
