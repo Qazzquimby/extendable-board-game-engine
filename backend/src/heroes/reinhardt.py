@@ -1,3 +1,11 @@
+"""
+Reinhardt — heavy tank with charge and barrier shield.
+
+Shield: placed on the edge in front of Reinhardt, blocks enemy LOS.
+Moves with Reinhardt along the Y axis.
+Entities positioned behind the shield benefit from cover.
+"""
+
 from dataclasses import dataclass
 from typing import Iterator, Set
 
@@ -11,11 +19,11 @@ from instruction_library import (
     AddTokenInstruction,
     ApplyModifierInstruction,
 )
-from aimings import IncludeArea
+from aimings import IncludeArea, TargetSelf
 from areas import Square, PathArea, Line
 from engine import Engine
-from entities import Hero
-from events import before
+from entities import Hero, Marker
+from events import before, after
 from modifiers import Immobile, ImmobileToken, Modifier
 from abilities import ActionContext, Instruction
 
@@ -25,16 +33,11 @@ from point import Point
 
 
 class PathAllInRangeArea(PathArea):
-    def __init__(
-        self,
-        length: int,
-        in_range: int = 0,
-    ):
+    def __init__(self, length: int, in_range: int = 0):
         super().__init__(length=length, in_range=in_range)
 
     def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
         unlimited_selections = super().get_selections(grid=grid, start=start)
-
         points_in_range_1 = grid.get_points_in_range(
             start=start, max_range=self.in_range
         )
@@ -48,10 +51,8 @@ class ChargeInstruction(Instruction):
     valence: Valence = Valence.BAD
 
     def score(self, engine, actor, target, ctx) -> float:
-        # Charge is high-value: damage up to 6 + displacement
         if target.team == actor.team:
             return 0.0
-        # The first enemy hit takes 6, others take 1 — score the best case
         from abilities import score_damage
         return score_damage(6, target.hp)
 
@@ -63,39 +64,39 @@ class ChargeInstruction(Instruction):
         if not path_points:
             return
 
-        # Find first enemy in path
-        first_enemy = None
-        first_enemy_idx = -1
+        # Find ALL enemies in the charge path, recording their positions before any movement
+        enemies_on_path = []  # list of (entity, original_path_index)
         for i, pt in enumerate(path_points):
             entity = engine.entity_at(pt)
             if entity and entity != source:
-                first_enemy = entity
-                first_enemy_idx = i
-                break
+                enemies_on_path.append((entity, i))
 
-        if first_enemy:
-            # Damage first enemy for 6
-            engine.event_queue.enqueue(
-                DamageEvent(source=source, subject=first_enemy, amount=6)
-            )
-            # Push first enemy to end of path (last empty cell)
-            dest_idx = len(path_points) - 1
-            # Find last empty cell in path going forward
-            while dest_idx >= 0 and engine.entity_at(path_points[dest_idx]):
-                dest_idx -= 1
-            if dest_idx >= 0:
-                first_enemy.pos = path_points[dest_idx]
+        if enemies_on_path:
+            # Damage each enemy (first for 6, rest for 1)
+            for i, (ent, _) in enumerate(enemies_on_path):
+                amount = 6 if i == 0 else 1
                 engine.event_queue.enqueue(
-                    ChangeLocationEvent(subject=first_enemy, new_pos=path_points[dest_idx])
+                    DamageEvent(source=source, subject=ent, amount=amount)
                 )
-            # Reinhardt moves to just behind the enemy's starting position
-            rein_pos = path_points[max(0, first_enemy_idx - 1)] if first_enemy_idx > 0 else path_points[0]
+
+            # Push all enemies to the end of the path, farthest enemy goes farthest
+            dest_idx = len(path_points) - 1
+            for i, (ent, orig_idx) in enumerate(reversed(enemies_on_path)):
+                push_idx = dest_idx - i
+                if push_idx >= 0:
+                    ent.pos = path_points[push_idx]
+                    engine.event_queue.enqueue(
+                        ChangeLocationEvent(subject=ent, new_pos=path_points[push_idx])
+                    )
+
+            # Reinhardt moves to just behind the nearest enemy's original position
+            nearest_enemy_idx = enemies_on_path[0][1]
+            rein_pos = path_points[max(0, nearest_enemy_idx - 1)] if nearest_enemy_idx > 0 else path_points[0]
             source.pos = rein_pos
             engine.event_queue.enqueue(
                 ChangeLocationEvent(subject=source, new_pos=rein_pos)
             )
         else:
-            # No enemies hit — Reinhardt charges to the end
             source.pos = path_points[-1]
             engine.event_queue.enqueue(
                 ChangeLocationEvent(subject=source, new_pos=path_points[-1])
@@ -112,6 +113,21 @@ class CannotBePushedOrPulled(Modifier):
         event.canceled = True
 
 
+# ── Barrier Shield ──
+
+@dataclass(kw_only=True)
+class BarrierShieldModifier(Modifier):
+    """Blocks LOS for enemies. The shield sits on the edge in front of Reinhardt."""
+
+    shield_team: int = 0
+    valence = Valence.GOOD
+
+    def blocks_los_for(self, engine: "Engine", viewer: "Entity") -> bool:
+        if viewer.team != self.shield_team:
+            return True
+        return False
+
+
 class Reinhardt(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -120,14 +136,26 @@ class Reinhardt(Hero):
 
         self.add_modifier(engine, CannotBePushedOrPulled())
 
+        # Create barrier shield marker on the left edge (team 0 defends left)
+        edge_x = 0 if team == 0 else (engine.grid.width - 1)
+        shield_pos = Point(edge_x, pos.y)
+        self.shield_marker = Marker(
+            engine=engine,
+            name=f"{'Allies' if team == 0 else 'Enemies'}_Barrier",
+            pos=shield_pos,
+            team=team,
+            summoner_id=self.id,
+        )
+        shield_mod = BarrierShieldModifier(shield_team=team)
+        self.shield_marker.modifiers.append(shield_mod)
+        shield_mod.owner_id = self.shield_marker.id
+        engine.router.subscribe(shield_mod)
+
         self.abilities.append(
             Ability(
                 name="Rocket Hammer",
                 aiming=IncludeArea(
-                    area=PathAllInRangeArea(
-                        length=3,
-                        in_range=1,
-                    )
+                    area=PathAllInRangeArea(length=3, in_range=1),
                 ),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
@@ -163,3 +191,11 @@ class Reinhardt(Hero):
                 owner_id=self.id,
             )
         )
+
+    def start_turn(self):
+        super().start_turn()
+        # Move shield marker to track Reinhardt's Y position
+        if self.pos and self.shield_marker and self.shield_marker.pos is not None:
+            edge_x = self.shield_marker.pos.x
+            new_pos = Point(edge_x, self.pos.y)
+            self.shield_marker.pos = new_pos
