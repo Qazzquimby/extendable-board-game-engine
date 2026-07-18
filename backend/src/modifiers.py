@@ -34,9 +34,7 @@ class Modifier:
 
 
 class SummonModifier(Modifier):
-    owner: "Summon" = field(init=False)
     valence: Valence = Valence.GOOD
-
 
 @dataclass(kw_only=True)
 class Token(Modifier):

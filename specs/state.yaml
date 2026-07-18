@@ -2,10 +2,10 @@
 # Purpose: The cockpit
 # Status: All 8 epics completed, 30 stories done, 119 tests passing.
 
-active_flow: complete
-active_epic_id: null
+active_flow: sustain
+active_epic_id: e09
 active_story_id: null
-completed_epic: true
+completed_epic: false
 
 epic_cycle:
   current_step: complete
@@ -41,14 +41,17 @@ metrics:
 
 git:
   branch: master
-  hash: f56241b
+  hash: 03bbc17
   pushed: false
 
 handoff:
-  last_step_completed: "All 8 epics complete, 30 stories done, 119 tests passing"
+  last_step_completed: "Symmetra fixes: photon orb charge-fire, turrets fire, barrier line, dead SummonModifier field removed, quick_play.py"
   open_decisions:
-    - "Deferred: Symmetra, Reinhardt, Spy hero design (new epics)"
+    - "Deferred: Reinhardt, Spy hero design (new epics)"
     - "Deferred: Tween animations (Phaser integration)"
     - "Deferred: MCTS self-play pipeline"
+    - "Disabled: Teleporter (complex AI, deferred)"
+    - "Disabled: Floating Barrier (no edge UI, AI ineffective)"
+    - "Marker system: verified correct — not activatable, not targetable, no HP"
   required_reading: []
   next_skill: null
