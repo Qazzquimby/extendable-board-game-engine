@@ -112,16 +112,63 @@ def score_heal(amount: int, missing_hp: int) -> float:
 def score_add_token(token_class: "Type"):
     """Base priority for applying a token/modifier to a single target.
 
-    Returns a simple default — specific abilities may want custom values.
-    Bad tokens on enemies = +2, Good tokens on allies = +1.
+    Uses individual valence and duration for contextual valuation.
+    Bad modifiers on enemies = 2 + min(duration, 3) * 0.5
+    Good modifiers on allies = 1 + min(duration, 3) * 0.25
     """
     from valence import Valence
 
     if token_class.valence == Valence.BAD:
-        return 2.0
+        duration = getattr(token_class, 'duration', None)
+        duration_bonus = min(duration or 0, 3) * 0.5
+        return 2.0 + duration_bonus
     elif token_class.valence == Valence.GOOD:
+        duration = getattr(token_class, 'duration', None)
+        duration_bonus = min(duration or 0, 3) * 0.25
+        return 1.0 + duration_bonus
+    return 0.0
+
+
+def score_ultimate(ability: "Ability", engine: "Engine") -> float:
+    """Base priority for an ultimate ability.
+
+    Flat 1.0 from ultimate_turn onward. Ultimates are always valuable
+    enough to use when available — they're limited per game.
+    """
+    if ability.ultimate_turn is not None and engine.round_num >= ability.ultimate_turn:
         return 1.0
     return 0.0
+
+
+def score_targets_in_area(
+    aiming_result: "AimingResult",
+    engine: "Engine",
+    actor: "Entity",
+    team_filter: str = "enemy",
+) -> int:
+    """Count valid targets in an aiming result's included/target points."""
+    all_pts = list(aiming_result.target_points) + list(aiming_result.included_points)
+    count = 0
+    for pt in all_pts:
+        target = engine.entity_at(pt)
+        if target:
+            if team_filter == "enemy" and target.team != actor.team:
+                count += 1
+            elif team_filter == "ally" and target.team == actor.team:
+                count += 1
+            elif team_filter == "any":
+                count += 1
+    return count
+
+
+def score_missing_hp(actor: "Entity") -> float:
+    """Priority based on how much HP the actor is missing.
+    Returns 0.0 at full HP, scales up to 3.0 when near death.
+    """
+    missing = actor.max_hp - actor.hp
+    if missing <= 0:
+        return 0.0
+    return min(missing * 0.5, 3.0)
 
 
 def reaction_value_of_instructions(

@@ -132,6 +132,75 @@ class BarrierShieldModifier(Modifier):
         return False
 
 
+class RocketHammerAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Rocket Hammer",
+            aiming=IncludeArea(area=PathAllInRangeArea(length=3, in_range=1)),
+            instructions=[DamageInstruction(amount=2)],
+            is_default=True,
+            owner_id=owner_id,
+        )
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        included = aiming_result.included_points
+        enemies = sum(1 for pt in included if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team)
+        return 2.5 * enemies  # Default attack, prefers hitting multiple
+
+
+class ChargeAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Charge",
+            aiming=IncludeArea(area=Line(length=6, in_range=0)),
+            instructions=[ChargeInstruction()],
+            action_cost=ActionCost.MOVE_AND_STANDARD,
+            max_charges=1,
+            owner_id=owner_id,
+        )
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        included = aiming_result.included_points
+        enemies = [pt for pt in included if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team]
+        return 2.0 * len(enemies)  # High value for multi-pin
+
+
+class FireStrikeAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Fire Strike",
+            aiming=IncludeArea(area=OrthogonalLine(length=99)),
+            instructions=[DamageInstruction(amount=3)],
+            taps=True,
+            owner_id=owner_id,
+        )
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        included = aiming_result.included_points
+        enemies = sum(1 for pt in included if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team)
+        return 1.5 * enemies  # Tap action — free extra damage
+
+
+class EarthshatterAbility(Ability):
+    def __init__(self, owner_id: str):
+        super().__init__(
+            name="Earthshatter",
+            aiming=IncludeArea(area=Square(side_length=3, in_range=2)),
+            instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
+            is_ultimate=True,
+            ultimate_turn=4,
+            owner_id=owner_id,
+        )
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        from scoring import score_ultimate, score_targets_in_area
+        ult_score = score_ultimate(self, engine)
+        if ult_score <= 0:
+            return 0.0
+        enemies = score_targets_in_area(aiming_result, engine, actor, "enemy")
+        return ult_score * enemies * 2.0
+
+
 class Reinhardt(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(
@@ -155,46 +224,10 @@ class Reinhardt(Hero):
         shield_mod.owner_id = self.shield_marker.id
         engine.router.subscribe(shield_mod)
 
-        self.abilities.append(
-            Ability(
-                name="Rocket Hammer",
-                aiming=IncludeArea(
-                    area=PathAllInRangeArea(length=3, in_range=1),
-                ),
-                instructions=[DamageInstruction(amount=2)],
-                is_default=True,
-                owner_id=self.id,
-            )
-        )
-        self.abilities.append(
-            Ability(
-                name="Charge",
-                aiming=IncludeArea(area=Line(length=6, in_range=0)),
-                instructions=[ChargeInstruction()],
-                action_cost=ActionCost.MOVE_AND_STANDARD,
-                max_charges=1,
-                owner_id=self.id,
-            )
-        )
-        self.abilities.append(
-            Ability(
-                name="Fire Strike",
-                aiming=IncludeArea(area=OrthogonalLine(length=99)),
-                instructions=[DamageInstruction(amount=3)],
-                taps=True,
-                owner_id=self.id,
-            )
-        )
-        self.abilities.append(
-            Ability(
-                name="Earthshatter",
-                aiming=IncludeArea(area=Square(side_length=3, in_range=2)),
-                instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
-                is_ultimate=True,
-                ultimate_turn=4,
-                owner_id=self.id,
-            )
-        )
+        self.abilities.append(RocketHammerAbility(owner_id=self.id))
+        self.abilities.append(ChargeAbility(owner_id=self.id))
+        self.abilities.append(FireStrikeAbility(owner_id=self.id))
+        self.abilities.append(EarthshatterAbility(owner_id=self.id))
 
     def start_turn(self):
         super().start_turn()

@@ -159,6 +159,55 @@ class RevealOnHit(Modifier):
                 invis.remove_decoys(engine)
 
 
+class RevolverAbility(Ability):
+    def __init__(self, owner_id):
+        super().__init__(name="Revolver",
+            aiming=TargetEntity(in_range=4, condition=is_enemy_or_decoy),
+            instructions=[DamageInstruction(amount=2)],
+            is_default=True, requires_target=False, owner_id=owner_id)
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        for pt in aiming_result.target_points:
+            target = engine.entity_at(pt)
+            if target and target.team != actor.team:
+                return 6.0
+            if isinstance(target, SpyDecoyEntity):
+                return 1.0  # Better than Do Nothing even if only decoy in range
+        return 0.0
+
+
+class KnifeAbility(Ability):
+    def __init__(self, owner_id):
+        super().__init__(name="Knife",
+            aiming=TargetEntity(in_range=1, condition=is_enemy_or_decoy),
+            instructions=[DamageInstruction(amount=4)],
+            max_charges=1, requires_target=False, owner_id=owner_id)
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        for pt in aiming_result.target_points:
+            target = engine.entity_at(pt)
+            if target:
+                if target.team != actor.team:
+                    return 7.0  # High damage, limited use
+                if isinstance(target, SpyDecoyEntity):
+                    return 2.0
+        return 0.0
+
+
+class GoInvisibleAbility(Ability):
+    def __init__(self, owner_id):
+        super().__init__(name="Go Invisible", text="Re-gain your spy decoys.",
+            aiming=TargetSelf(), instructions=[],
+            max_charges=1, requires_target=False, owner_id=owner_id)
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        # Check if decoys are missing (Spy was revealed)
+        invis = actor.get_modifier(SpyInvisibilityManager) if hasattr(actor, 'get_modifier') else None
+        if invis and len(invis.decoy_ids) < 2:
+            return 2.0  # Valuable — re-gain decoys
+        return 0.0
+
+
 class Spy(Hero):
     def __init__(self, engine: Engine, pos: Point, team: int):
         super().__init__(engine=engine, name="Spy", hp=6, speed=3, pos=pos, team=team)
@@ -173,39 +222,6 @@ class Spy(Hero):
         # Create decoys AFTER position is set (super().__init__ sets pos)
         self.invisibility.create_decoys(engine, self)
 
-        # Revolver — basic attack targeting enemies and decoys
-        self.abilities.append(
-            Ability(
-                name="Revolver",
-                aiming=TargetEntity(in_range=4, condition=is_enemy_or_decoy),
-                instructions=[DamageInstruction(amount=2)],
-                is_default=True,
-                requires_target=False,
-                owner_id=self.id,
-            )
-        )
-
-        # Knife — backstab (high damage, short range)
-        self.abilities.append(
-            Ability(
-                name="Knife",
-                aiming=TargetEntity(in_range=1, condition=is_enemy_or_decoy),
-                instructions=[DamageInstruction(amount=4)],
-                max_charges=1,
-                requires_target=False,
-                owner_id=self.id,
-            )
-        )
-
-        # Go Invisible — regain decoys after being revealed
-        self.abilities.append(
-            Ability(
-                name="Go Invisible",
-                text="Re-gain your spy decoys.",
-                aiming=TargetSelf(),
-                instructions=[],
-                max_charges=1,
-                requires_target=False,
-                owner_id=self.id,
-            )
-        )
+        self.abilities.append(RevolverAbility(owner_id=self.id))
+        self.abilities.append(KnifeAbility(owner_id=self.id))
+        self.abilities.append(GoInvisibleAbility(owner_id=self.id))

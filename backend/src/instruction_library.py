@@ -103,6 +103,13 @@ class AddModifierInstruction(Instruction):
             )
 
     def score(self, engine, actor, target, ctx) -> float:
+        from scoring import score_add_token
+        if target is None:
+            return 0.0
+        if self.modifier_class.valence == Valence.BAD and target.team == actor.team:
+            return 0.0
+        if self.modifier_class.valence == Valence.GOOD and target.team != actor.team:
+            return 0.0
         return score_add_token(self.modifier_class)
 
 
@@ -320,6 +327,13 @@ class ApplyModifierInstruction(Instruction):
         self.valence = self.modifier_class.valence
 
     def score(self, engine, actor, target, ctx) -> float:
+        from scoring import score_add_token
+        if target is None:
+            return 0.0
+        if self.modifier_class.valence == Valence.BAD and target.team == actor.team:
+            return 0.0
+        if self.modifier_class.valence == Valence.GOOD and target.team != actor.team:
+            return 0.0
         return score_add_token(self.modifier_class)
 
 

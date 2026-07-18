@@ -1,58 +1,44 @@
 # specs/product/SCOPE_LATEST.yaml
-# Scope for the Spy Decoy Object Redesign epic.
+# Scope for the Ability Priority Overhaul epic
 
 core_value: >
-  Replace the fragile custom-aiming hack for Spy decoys with proper Entity
-  objects, making the decoy system scalable, testable, and compatible with
-  the standard targeting pipeline.
+  Every hero ability gets a situational priority value so the AI uses
+  all tools available to it — not just the default attack.
 
 summary: >
-  Spy decoys are currently SpyDecoyMarker(Marker) objects targeted via a
-  custom TargetSpyOrDecoys Aiming subclass. This pattern is unscalable:
-  the custom Aiming was silently dropped by choices.py's isinstance chain,
-  causing Spy to never attack. Every new hero needing targetable objects
-  would require its own Aiming hack. This scope replaces Marker-based
-  decoys with SpyDecoyEntity(Entity) subclasses that have 1 HP, appear in
-  entity_at() lookups, and are targetable via standard TargetEntity.
-  The custom TargetSpyOrDecoys class and the isinstance hack in choices.py
-  are removed.
+  Currently many abilities return 0 priority from _auto_priority because
+  AddModifierInstruction.score returns 0, self-targeting buffs don't
+  score, and tap abilities aren't evaluated separately. This scope adds
+  general-purpose priority helpers to scoring.py, fixes the base score
+  methods, and adds get_priority overrides to every hero ability.
+  Verified via analyze_ability_usage.py.
 
 in_scope:
-  - "Create SpyDecoyEntity(Entity) subclass with 1 HP"
-  - "Decoys move with Spy via ChangeLocationEvent hook (existing mechanism)"
-  - "Decoys die when Spy is revealed or takes damage (existing mechanic)"
-  - "Revolver targets decoys AND enemies via TargetEntity(in_range=4, condition=is_enemy_or_decoy)"
-  - "Knife targets decoys AND enemies via TargetEntity(in_range=1, condition=is_enemy_or_decoy)"
-  - "Remove TargetSpyOrDecoys custom Aiming class"
-  - "Remove isinstance(ability.aiming, TargetSpyOrDecoys) hack from choices.py"
-  - "Update existing Spy tests to work with new Entity-based decoys"
-  - "Verify AI uses Revolver and Knife via analyze_ability_usage.py"
+  - "Fix AddModifierInstruction.score to return non-zero for all modifiers"
+  - "Add general priority helpers to scoring.py (score_modifier, score_tap, score_ultimate)"
+  - "Add get_priority to every ability without one"
+  - "Fix Soldier 76 Helix Rockets, Biotic Field, Tactical Visor priorities"
+  - "Fix Reinhardt Fire Strike, Earthshatter, Shield priorities"
+  - "Fix Scout Bonk, Crit-a-Cola, Fan O'War priorities"
+  - "Fix Zenyatta Orb of Harmony, Orb of Discord, Transcendence priorities"
+  - "Fix Spy Go Invisible priority"
+  - "Fix Necrophos Ghost Shroud priority"
+  - "Verify all heroes use all abilities over 5 games"
 
 out_of_scope:
-  - "General ability priority improvements (BUG-002) — deferred to separate work"
-  - "Spy Go Invisible priority fix (BUG-004) — deferred"
-  - "Other heroes' ability priority fixes (BUG-007, BUG-008, BUG-009) — deferred"
-  - "Movement AI optimal range (BUG-010) — deferred"
-  - "Zenyatta post-death damage fix (BUG-011) — deferred"
-  - "Necrophos Ghost Shroud timing fix (BUG-012) — deferred"
-  - "MCTS self-play pipeline"
-  - "Spy balance or ability tuning"
+  - "Game design balance changes (damage numbers, cooldowns)"
+  - "New hero creation"
+  - "Spy decoy redesign (already done)"
+  - "Zenyatta post-death modifier cleanup (BUG-011)"
 
 constraints:
-  - "All existing Spy tests must still pass after refactor"
-  - "No custom Aiming subclasses for Spy targeting"
-  - "choices.py must not contain isinstance hacks for Spy"
-  - "Decoys must be destroyable (1 HP)"
-  - "Decoys must move with Spy automatically"
+  - "Every ability must have a get_priority method"
+  - "Priority must reflect situation quality, not be a flat constant"
+  - "Only return 0 priority if ability is genuinely useless in current situation"
 
 success_criteria:
-  - "SpyDecoyEntity replaces SpyDecoyMarker — decoys are full Entity objects"
-  - "TargetSpyOrDecoys class is removed from codebase"
-  - "isinstance hack for Spy in choices.py is removed"
-  - "Spy uses Revolver and Knife in AI games (verify via analyze_ability_usage.py)"
-  - "All Spy tests pass"
-  - "All 143 existing tests pass"
-
-references:
-  - "BUG-001: specs/bugs/BUG-001-spy-decoys-objects.md"
-  - "CONVENTIONS.md: Hero & Ability Standards"
+  - "analyze_ability_usage.py HeroName --games 5 shows all abilities used at least once"
+  - "Default attack is used most often (highest priority in combat)"
+  - "Ultimates are used when available"
+  - "Defensive abilities used when threatened"
+  - "Healing abilities used when damaged"

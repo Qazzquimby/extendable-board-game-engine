@@ -1,0 +1,46 @@
+# specs/epics/e16-ability-priority/epic.yaml
+
+id: e16
+title: "Ability Priority System Overhaul"
+status: planned
+wsjf: 25
+summary: >
+  Fix all abilities to have get_priority() with situational values.
+  Fix default scoring for modifiers. Add general helpers to scoring.py.
+  Verify every hero ability is used by the AI.
+
+stories:
+  - id: e16s01
+    title: "Fix base priority system and add scoring helpers"
+    bcps: 5
+    status: planned
+    delta: MODIFIED
+    requirement: >
+      Fix AddModifierInstruction.score, add score_modifier/score_ultimate
+      helpers to scoring.py, fix _auto_priority for self-targeting buffs.
+      All existing tests must still pass.
+
+  - id: e16s02
+    title: "Add get_priority to Soldier 76, Reinhardt, Scout"
+    bcps: 5
+    status: planned
+    delta: MODIFIED
+    requirement: >
+      Add get_priority to all Soldier 76, Reinhardt, and Scout abilities.
+      Verify with analyze_ability_usage.py.
+
+  - id: e16s03
+    title: "Add get_priority to Zenyatta, Spy, Necrophos"
+    bcps: 3
+    status: planned
+    delta: MODIFIED
+    requirement: >
+      Add get_priority to Zenyatta, Spy Go Invisible, Necrophos Ghost Shroud.
+      Verify with analyze_ability_usage.py.
+
+references:
+  - "BUG-002: specs/bugs/BUG-002-ability-priority-missing.md"
+  - "BUG-007: specs/bugs/BUG-007-soldier76-abilities-never-used.md"
+  - "BUG-008: specs/bugs/BUG-008-reinhardt-abilities-never-used.md"
+  - "BUG-009: specs/bugs/BUG-009-scout-abilities-never-used.md"
+  - "CONVENTIONS.md: Hero & Ability Standards"

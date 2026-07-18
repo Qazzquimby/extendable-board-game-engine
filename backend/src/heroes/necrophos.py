@@ -286,16 +286,17 @@ Until the end of your next turn:
             max_charges=1,
         )
 
-    def get_priority(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        pos: "Point",
-        aiming_result: Union["AimingResult", "MultipleAimingResults"],
-    ) -> float:
+    def get_priority(self, engine, actor, pos, aiming_result):
+        """Use when HP is low AND enemies are nearby."""
         if actor.hp <= actor.max_hp / 2:
-            return 3.0
-        return 1.0
+            # Check if enemies are adjacent
+            enemies = [e for e in engine.living_entities if e.team != actor.team and e.pos]
+            if enemies:
+                min_dist = min(actor.pos.get_distance(e.pos) for e in enemies)
+                if min_dist <= 2:
+                    return 4.0  # Low HP + nearby enemies = good time to ghost
+            return 2.0  # Low HP but no immediate threat
+        return 0.0  # Don't waste it at full HP
 
 
 class DeathSeekerAbility(Ability):
