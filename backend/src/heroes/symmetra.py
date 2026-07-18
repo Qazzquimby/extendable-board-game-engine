@@ -721,12 +721,12 @@ class CreatePhotonBarrierInstruction(Instruction):
         dy = dir_pt.y - center.y
         is_horizontal = abs(dx) > abs(dy)
 
-        # Place a single barrier at the center of the chosen line
-        # The BlocksLOSModifier marks the entire row/column as LOS-blocking
+        # Place a single barrier at the center of the chosen line.
+        # The BlocksLOSModifier marks the entire row/column as LOS-blocking.
         if is_horizontal:
-            barrier_pos = Point(center.x, engine.grid.height // 2)
-        else:
             barrier_pos = Point(engine.grid.width // 2, center.y)
+        else:
+            barrier_pos = Point(center.x, engine.grid.height // 2)
 
         PhotonBarrier(
             engine=engine,
@@ -789,5 +789,7 @@ class Symmetra(Hero):
 
         # self.abilities.append(CreateTeleporter(owner_id=self.id))  # Teleporter: complex AI, deferred
         self.abilities.append(CreateShieldGenerator(owner_id=self.id))
-        self.abilities.append(CreateFloatingBarrier(owner_id=self.id))
+        # self.abilities.append(CreateFloatingBarrier(owner_id=self.id))
+        # Disabled: Floating Barrier doesn't move right now, the UI doesn't
+        # show which edge it's affecting, and the AI doesn't use it effectively.
         self.abilities.append(CreatePhotonBarrier(owner_id=self.id))
