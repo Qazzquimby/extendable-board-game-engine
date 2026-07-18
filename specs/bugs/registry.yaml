@@ -123,10 +123,10 @@ bugs:
 
   - id: BUG-020
     title: "Axe doesn't match docs/dota.yaml"
-    status: open
+    status: wontfix
     severity: major
     area: hero/axe
-    note: "Missing counterattack passive. Culling Blade: 3dmg irreducible, on kill refresh. Health should be 10."
+    note: "HALLUCINATED — Axe code actually matches docs. HP=10, counterattack+reflect passives exist, Culling Blade correct."
 
   - id: BUG-021
     title: "Viktoria not verified against source docs"
