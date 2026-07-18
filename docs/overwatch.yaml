@@ -1,0 +1,1504 @@
+name: Overwatch
+color: [ .94, .592, .114 ]
+description: |-
+  - Many once per game affects, and ultimate abilities that are only playable late game.
+  - Many instant speed defensive reactions.
+  - Clear tank and healer roles.
+
+#    rules:
+#      - REFERENCE_RuleInstant
+#      - REFERENCE_RuleUltimate
+#      - REFERENCE_RuleFlying
+#      - REFERENCE_RuleFacing
+#      - REFERENCE_RuleCriticalMoment
+heroes:
+  - name: Widowmaker
+    complexity: 2
+    description: |-
+      A charge-up sniper who quickly locks down a sightline.
+    health: 8
+    speed: 3
+    art: widowmaker/hero.jpg
+    default_abilities:
+      - name: Widow's Kiss SMG
+        text: |-
+          ⌖Range 2: 2dmg.
+      - name: Widow's Kiss Scoped
+        text: |-
+          Set your facing and gain **Charged**.
+    passives:
+      - name: Scoped in
+        text: |-
+          At the start of your turn, lose **Charged**. If you did:
+            ⌖Range 2+ in front: *undefendable*, +2 *crit*, 6dmg.
+    hints:
+      - REFERENCE_FacingHint
+      - REFERENCE_UndefendableHint
+      - REFERENCE_CritHint
+    tokens:
+      - REFERENCE_Charged
+    abilities:
+      - name: Create Venom Mine
+        art: venom_mine.jpg
+        text: |-
+          1/game:
+          Create a **Venom Mine** object in an emtpy space in range 3.
+          It has:
+            1hp.
+            When an enemy enters burst 1 of this, destroy this.
+            When destroyed: ✺Burst 1: Give **Damage Over Time**.
+        tokens:
+          - name: Venom Mine
+            art: venom_mine.jpg
+            is_marker: true
+            text: |-
+              1hp.
+              When an enemy enters ✺burst 1 of this, destroy this.
+              When destroyed: ✺Burst 1: Give **Damage Over Time**.
+        conditions:
+          - REFERENCE_DamageOverTime
+      - name: Grappling Hook
+        text: |-
+          1/game, Move Action:
+          *Fly* to an empty space in range 5 along a shortest path.
+        hints:
+          - REFERENCE_FlyingHint
+      - name: Infra-Sight
+        text: |-
+          *Ultimate* 4, Free Action:
+          Gain passive:
+            Enemies are *undefendable*.
+            Enemies cannot be *untargetable*.
+            All allies have +2 *crit*.
+        hints:
+          - REFERENCE_UltimateHint
+          - REFERENCE_UndefendableHint
+          - REFERENCE_UntargetableHint
+  - name: Tracer
+    complexity: 3
+    description: |-
+      Hypermobile dodging assassin.
+    health: 6
+    speed: 4
+    art: hero.jpg
+    default_abilities:
+      - name: Pulse Pistols
+        text: |-
+          ⌖Range 1: 4dmg.
+    passives:
+      - name: On Deployment
+        text: Place your **Recall Location** marker in your space.
+    tokens:
+      - name: Recall location reminder
+        art: _recall.jpg
+        is_marker: true
+    abilities:
+      - name: Blink
+        text: |-
+          3/game, *instant* +2:
+          Teleport to an empty space in range 3.
+        dice:
+          - name: Uses Remaining
+            color: white
+            values: [ 3 ]
+        hints:
+          - REFERENCE_InstantHint
+      - name: Recall
+        art: recall.jpg
+        text: |-          
+          1/game, *instant* +3:
+          Set your health to full.
+          Teleport to a space nearest to your **Recall Location** marker.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Create Pulse Bomb
+        art: pulse_bomb.jpg
+        text: |-
+          *Ultimate* 5:
+          Space in range 1:
+            If there's a unit in the space, ⌖attack them with +2 *miss*.
+            On hit, give them **Pulse Bomb**.
+            On miss, create **Pulse Bomb** in that space.
+          
+          Pulse Bomb has:
+            At the start of the creator's activation:
+            ✺This space: 6dmg.
+            ✺Burst 1: 3dmg.
+            Destroy this.
+        tokens:
+          - name: Pulse Bomb
+            art: pulse_bomb.jpg
+            is_marker: true
+            text: |-
+              At the start of creator's activation:
+              ✺This space: 6dmg.
+              ✺Burst 1: 3dmg.
+              Destroy this.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Mercy
+    complexity: 2
+    description: |-
+      Support with a strong heal, damage buff, and resurrection.
+    health: 8
+    speed: 3
+    art: hero.jpg
+    passives:
+      - name: Start of activation
+        text: If you did not take damage since the start of your last activation, heal yourself 3.
+      - name: Ally hero dies
+        text: |-
+          Place a **Corpse** marker in their space and note which ally it corresponds to.
+    conditions:
+      - name: Caduceus Staff Damage Boost
+        art: staff.jpg
+        is_positive: true
+        text: Until end of activation, deal +50% damage.
+    tokens:
+      - name: Took damage since start of last activation reminder
+        art: no_took_damage.png
+        back_art: took_damage.png
+        artist: game-icons.net
+        text: Flip this face down when you take damage, and face up at the start of your activation.
+      - REFERENCE_Corpse
+    default_abilities:
+      - name: Caduceus Staff (Heal)
+        text: |-
+          ⌖Range 3: *undefendable*, heal target 4.
+      - name: Caduceus Staff (Give Damage Boost)
+        text: |-
+          ⌖Range 3: *undefendable* give **Caduceus Staff Damage Boost**.
+          It has:
+            Until end of activation, deal +50% damage.
+      - name: Caduceus Blaster
+        text: |-
+          ⌖Range 3: 2dmg.
+    hints:
+      - REFERENCE_UndefendableHint
+    abilities:
+      - name: Guardian Angel
+        text: |-
+          *Fly* to an empty space in burst 1 of an ally or **corpse** marker along a shortest path.
+        hints:
+          - REFERENCE_FlyingHint
+      - name: Resurrect
+        text: |-
+          1/game, Free Action:
+          At the start of your next activation:
+            ⌖**Corpse** in range 1:
+            You may replace the **corpse** with its corresponding unit at full health in that space.
+        tokens:
+          - REFERENCE_Charged
+      - name: Valkyrie
+        text: |-
+          *Ultimate* 4, Free Action:
+          Gain Passive:
+            At the start of each your activation: Heal yourself 2.
+            Your **Caduceus Staff** abilities have "⌖Range 5, and optionally ⌖another target in range 2 of first".
+            You can use **Guardian Angel** as a Move Action.
+            You are always *flying*.
+        hints:
+          - REFERENCE_FlyingHint
+          - REFERENCE_UltimateHint
+  - name: Pharah
+    complexity: 3
+    description: |-
+      High flying rocket launcher.
+    health: 8
+    speed: 4
+    art: hero.jpg
+    passives:
+      - name: You are always Flying
+        text: ""
+    hints:
+      - REFERENCE_FlyingHint
+    default_abilities:
+      - name: Rocket Launcher
+        text: |-
+          ⌖Unlimited range: +3 *miss* if range 4+. 2dmg.
+          ✺Burst 1 of target: 1dmg.
+    abilities:
+      - name: Deplete Hover Jets
+        text: |-
+          *Tap*, Move Action:
+          Move 2. Gain **High Up**.
+        conditions:
+          - REFERENCE_HighUp
+        hints:
+          - REFERENCE_HighUpHint
+      - name: Jump Jet
+        text: |-
+          1/game, *instant* +2:
+          Move 2. Gain **High Up** until the start of your next activation.
+        tokens:
+          - REFERENCE_HighUp
+        hints:
+          - REFERENCE_InstantHint
+          - REFERENCE_TapHint
+          - REFERENCE_HighUpHint
+      - name: Concussive Blast
+        text: |-
+          Target space in range 4.
+          Units in burst 1 of the space but outside it: Push 1 away from the space.
+          Unit in the space: Push 2 in any direction.
+      - name: Barrage
+        text: |-
+          *Ultimate* 5, Move + Standard Action:
+          ✺2x2 in range 2: 4dmg.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Reaper
+    complexity: 1
+    description: |-
+      Close range, self healing tank buster.
+    health: 8
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: The Reaping
+        text: |-
+          When you deal damage, heal yourself 1/2 the amount.
+      - name: Soul Reaving
+        text: |-
+          When an enemy is destroyed, create a **Soul Globe** in their space.
+          When you enter a **Soul Globe's** space, destroy it and heal yourself 2.
+    tokens:
+      - name: Soul Globe
+        art: soul_globe.webp
+        is_marker: true
+    default_abilities:
+      - name: Hellfire Shotguns
+        text: |-
+          ⌖Range 1: 3dmg. If target has 10+ max hp, this deals +1dmg.
+    abilities:
+      - name: Wraith Form
+        art: wraith_form.jpg
+        text: |-
+          1/game, *instant* +2:
+          Move 2. Lose any number of conditions.
+          
+          Until the beginning of your next activation: You may prevent any ability from affecting you.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Shadow Step
+        text: |-
+          Move + Standard Action:
+          Range 8, empty space: Teleport to the space.
+      - name: Death Blossom
+        text: |-
+          *Ultimate* 5:
+          ✺Burst 1, 7dmg.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Reinhardt
+    complexity: 3
+    description: |-
+      Melee cleave tank with a sight-line shield and a rhino charge nuke. Late game area stun.
+    health: 12
+    speed: 3
+    art: hero.jpg
+    passives:
+      - name: Cannot be pushed or pulled.
+        text: ""
+      - name: You are *undefendable*.
+        text: ""
+    hints:
+      - REFERENCE_UndefendableHint
+    default_abilities:
+      - name: Rocket Hammer
+        text: |-
+          ✺3 adjacent spaces in burst 1: 2dmg.
+    abilities:
+      - name: Barrier Field
+        art: barrier.jpg
+        text: |-
+          *Instant* +3:
+          Enter shield stance:
+            You have facing and can freely set your facing at the end of your turn.
+            You are *slow* -2.
+            You can't take standard actions.
+          
+            There is a 3 space long Barrier *object* on the edge in front of you, centered on your position, which moves with you.
+            The barrier blocks line of sight for your enemies.
+            The barrier has 10hp and cannot be healed.
+          You can dismiss the stance as a Free Action if you have ended an activation with it active.
+
+#          TODO should have an illustration?
+        hints:
+          - REFERENCE_SlowHint
+          - REFERENCE_InstantHint
+          - REFERENCE_FacingHint
+          - REFERENCE_ObjectHint
+        dice:
+          - name: Barrier health
+            color: red
+            values: [ 6, 4 ]
+        Barrier: &Barrier
+          name: Barrier Field
+          art: barrier.jpg
+          is_marker: true
+          size: 0.5
+          text: This edge is part of the barrier.
+        tokens:
+          - *Barrier
+          - *Barrier
+          - *Barrier
+      - name: Charge
+        text: |-
+          1/game, Move + Standard Action:
+          Move as far as possible in a line.
+          When you would move into an enemy unit this way: ⌖Roll attack with +3 *miss*.
+          The first enemy hit this way: Push them with you as far as possible. 6dmg. Give *immobile*.
+          ✺Other enemies in the line: 1dmg. Push 1 away from the line.
+        tokens:
+          - REFERENCE_Immobile
+      - name: Fire Strike
+        text: |-
+          *Tap*:
+          ✺Unlimited line: 3dmg.
+        hints:
+          - REFERENCE_TapHint
+      - name: Earthshatter
+        text: |-
+          *Ultimate* 4:
+          ✺3x3 centered on range 2: Units in the area can move 1 and get **Immobile**. Units still in the area get **Full Stun**.
+        conditions:
+          - REFERENCE_Immobile
+          - REFERENCE_FullStun
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Torbjorn
+    complexity: 2
+    description: |-
+      Sets up a turret for sustained damage and controls space.
+    health: 10
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: Abilities targeting you have +2 *miss*.
+        text: ""
+    default_abilities:
+      - name: Rivet Gun
+        text: |-
+          ⌖Range 2: 2dmg.
+      - name: Forge Hammer
+        text: |-
+          ⌖Summon in range 1: Heal target 3.
+    abilities:
+      - name: Deploy Turret
+        art: turret.webp
+        text: |-
+          1/game:
+          Create a **Turret** in an empty space in range 4.
+      - name: Overload
+        text: |-
+          1/game, Free Action:
+          Gain 4 *overshield*.
+          Until the end of this activation:
+            You have +2 speed.
+            You have +1 Standard Action.
+          At end of your next activation, lose overshield gained with this ability.
+        dice:
+          - name: Overshield
+            color: blue
+            values: [ 4 ]
+        hints:
+          - REFERENCE_OvershieldHint
+      - name: Molten Core
+        art: molten_core.jpg
+        text: |-
+          Ultimate 4:
+          Create up to 3 2x2 **Molten Core** hazards in range 5.
+          They have: 
+            Hazard: 2dmg to creator's enemies.
+        tokens:
+          - name: Molten Core
+            art: molten_core.jpg
+            is_marker: true
+            size: 2
+            text: |-
+              Hazard: 2dmg to creator's enemies.
+        hints:
+          - REFERENCE_UltimateHint
+          - REFERENCE_HazardHint
+    units:
+      - name: Turret
+        health: 8
+        speed: 0
+        art: turret.webp
+        default_abilities:
+          - name: Automatic Fire
+            text: |-
+              Mandatory at start of your activation.
+              
+              ⌖Nearest enemy in unlimited range: *Undefendable*, 2dmg.
+        hints:
+            - REFERENCE_UndefendableHint
+  - name: Hanzo
+    complexity: 2
+    description: |-
+      Massive burst damage flexible sniper.
+    health: 8
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: Ignore terrain while moving.
+        text: ""
+    default_abilities:
+      - name: Storm Bow
+        text: |-
+          Move + Standard Action:
+          Move 1.
+          ⌖Unlimited range: +2 *miss*, +2 *crit*, 4dmg.
+    abilities:
+      - name: Create Sonic Arrow
+        art: sonic_arrow.jpg
+        text: |-
+          1/game, Free Action:
+          The next time you make a attack this activation:
+            On hit, give the target **Sonic Arrow**.
+            On miss, place a **Sonic Arrow** in the targeted space.
+          
+          Sonic Arrow has:
+            Enemies of the creator within within ✺burst 2 of a this are *undefendable*, cannot be *untargetable*, and receive +2 *crit*.
+        hints:
+          - REFERENCE_UndefendableHint
+        tokens:
+          - name: Sonic Arrow
+            art: sonic_arrow.jpg
+            is_marker: true
+            text: Enemies of the creator within within ✺burst 2 of a this are *undefendable*, cannot be *untargetable*, and receive +2 *crit*.
+      - name: Storm Arrows
+        text: |-
+          1/game, Free Action at start of activation:
+          Move 2.
+          Until the end of this activation:
+            You deal -1dmg. 
+            You can make a Default Action as a Free Action once per your activation.
+      - name: Lunge
+        text: |-
+          1/game, Free Action:
+          *Fly* 2, ignoring blocking terrain.
+        hints:
+          - REFERENCE_FlyingHint
+      - name: Create Dragonstrike
+        art: dragonstrike.jpg
+        text: |-
+          *Ultimate* 4:
+          Create **Dragonstrike**, an unlimited length line away from you, ignoring walls and continuing the the map edge, 2 spaces wide.
+          It has:
+            At the start of creator's next activation all spaces inside this are Hazard: 7dmg for creator's enemies.
+            At the start of creator's activation after that, destroy this.
+        tokens:
+          - name: Dragonstrike
+            art: dragonstrike.jpg
+            is_marker: true
+            size: 2
+            text: |-
+              (This is part of the Dragonstrike beam.)
+              At the start of creator's next activation all spaces inside this become Hazard: 7dmg for creator's enemies.
+              At the start of creator's activation after that, destroy this.
+        hints:
+          - REFERENCE_UltimateHint
+          - REFERENCE_HazardHint
+  - name: Winston
+    complexity: 2
+    description: |-
+      Mobile tank with area tickle damage.
+    health: 10
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: You are *undefendable*.
+        text: ""
+    default_abilities:
+      - name: Tesla Cannon
+        text: |-
+          Choose one --
+          - ✺3x3 in range 1: 1dmg.
+          - ⌖Range 4: +2 *miss*, 2dmg.
+    hints:
+      - REFERENCE_UndefendableHint
+      - REFERENCE_MissHint
+    abilities:
+      - name: Jump Pack
+        text: |-
+          *Tap*, Move Action:
+          Fly 6.
+          ✺Burst 1: 1dmg.
+        hints:
+          - REFERENCE_TapHint
+          - REFERENCE_FlyingHint
+      - name: Create Barrier Projector
+        art: barrier.jpg
+        text: |-
+          1/game, *instant* +2:
+          This can be used partway through any movement.
+          Create a Barrier Projector in your space.
+          It has:
+            6hp.
+            The edge of the burst 1 square around the this is blocking for creator's enemies' line of sight.
+        dice:
+          - name: Barrier health
+            color: red
+            values: [ 6 ]
+        tokens:
+          - name: Barrier
+            art: barrier.jpg
+            is_marker: true
+            text: |-
+              6hp.
+              The edge of the burst-1 square around the this line of sight for the creator's enemies.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Primal Rage
+        text: |-
+          *Ultimate* 4, *instant* +3:
+          Set your maximum and current health to 18.
+          Regain all uses of **Jump Pack**.
+          
+          Gain passive:
+            When you deal damage, also push the target 3.
+        hints:
+          - REFERENCE_InstantHint
+          - REFERENCE_UltimateHint
+  - name: Zenyatta
+    complexity: 3
+    description: |-
+      Support semi-sniper with passive healing and target marking.
+    health: 8
+    speed: 3
+    art: hero.jpg
+    tokens:
+      - REFERENCE_Charged
+    passives:
+      - name: You ignore non-blocking terrain when moving.
+        text: ""
+    default_abilities:
+      - name: Snap Kick
+        text: |-
+          ⌖Range 1: 2dmg. Push 2.
+      - name: Orb of Destruction
+        text: |-
+          Choose one --
+          - ⌖Range 4: +2 *miss*, +1 *crit*, 2dmg.
+          - Gain a **Charged** token. At the beginning of your activation if you have **Charged** you must: 
+              Move 1.
+              ⌖Unlimited range: +1 *miss*, +2 *crit*, 6dmg.
+              Lose a Standard Action.
+    abilities:
+      - name: Create Orb of Harmony
+        art: harmony.jpg
+        text: |-
+          1/activation, Free Action:
+          ⌖Unlimited range: Heal target 2. Give **Orb of Harmony** (max 1 in game, remove existing).
+          It has:
+            At start of creator's activation, creator heals you 2.
+        conditions:
+          - name: Orb of Harmony
+            art: harmony.jpg
+            is_positive: true
+            text: At start of creator's turn, creator heals you 2.
+      - name: Create Orb of Discord
+        art: discord.jpg
+        text: |-
+          1/activation, Free Action:
+          ⌖Unlimited range: Give target your **Orb of Discord** (max 1 in game, remove existing).
+          It has: You take +50% damage.
+        conditions:
+          - name: Orb of Discord
+            art: discord.jpg
+            tags:
+              - Mark
+            text: Take +50% damage
+      - name: Transcendence
+        text: |-
+          *Ultimate* 3, *instant* +2:
+          Heal yourself to full health. Lose any number of conditions.
+          ✺Each ally in burst 1: Heal them 5.
+          
+          Until the start of your next activation:
+            You cannot take damage.
+            You may choose not to gain any conditions.
+        hints:
+          - REFERENCE_InstantHint
+          - REFERENCE_UltimateHint
+  - name: Bastion
+    complexity: 3
+    polish: [ needs_testing ]
+    description: |-
+      Switch into a slow, high damage form.
+    health: 10
+    speed: 3
+    art: hero.webp
+    default_abilities:
+      - name: Light Machine Gun
+        text: |-
+          ⌖Range 4: 2dmg.
+      - name: Rotary Canon
+        text: |-
+          If you are in Assault Stance, choose one --
+          - ⌖Range 2: 6dmg.
+          - ⌖Range 4: 3dmg.
+    abilities:
+      - name: Configuration Assault
+        text: |-
+          Enter Assault Stance:
+            You have *armor*.
+            You are *immobile* and immune to forced movement.
+            Abilities targeting you from range 1 have +2 *crit*.
+            Exit stance when you lose an action, or as a Free Action at the end of your activation.
+        hints:
+          - REFERENCE_ImmobileHint
+          - REFERENCE_ArmorHint
+        tokens:
+          - name: Assault Stance
+            art: assault.webp
+      - name: A-36 Tactical Grenade
+        text: |-
+          ✺3x3 in range 4: 2dmg.
+      - name: Self Repair
+        text: |-
+          Move + Standard Action:
+          Heal yourself 3.
+      - name: Create Artillery
+        text: |-
+          *Ultimate* 4:
+          Create 3 2x2 **Artillery** markers anywhere globally.
+          
+          They have:
+          At the beginning of creator's activation:
+            ✺Units in area: 2dmg.
+            Destroy this.
+        marker:
+          - name: Artillery
+            size: 2
+            art: artillery.jpg
+            text: |-
+              At the beginning of creator's activation:
+                ✺Units in area: 2dmg.
+                Destroy this.
+          - name: Artillery
+            size: 2
+            art: artillery.jpg
+            text: |-
+              At the beginning of creator's activation:
+                ✺Units in area: 2dmg.
+                Destroy this.
+          - name: Artillery
+            size: 2
+            art: artillery.jpg
+            text: |-
+              At the beginning of creator's activation:
+                ✺Units in area: 2dmg.
+                Destroy this.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Symmetra
+    complexity: 4
+    polish:
+      - needs_testing
+    description: |-
+      Create a variety of utility objects.
+    health: 8
+    speed: 3
+    art: hero.jpg
+    default_abilities:
+      - name: Photon Beam
+        text: |-
+          ⌖Range 2: 
+            *Undefendable*, 2dmg + 2dmg for each **Photon Beam** token the target has.
+            Give target a **Photon Beam** token.
+          
+          At the end of your activation, each unit who did not gain a **Photon Beam** token this activation loses all Photon Beam tokens.
+      - name: Photon Orb
+        text: |-
+          Choose one --
+          - ⌖Range 4: +2 *miss*, 2dmg.
+          - At the beginning of your next activation: ⌖Range 4: +2 *miss*, 4dmg.
+    hints:
+      - REFERENCE_UndefendableHint
+    tokens:
+      - name: Photon Beam
+        art: photon_orb.jpg
+      - REFERENCE_Charged
+    abilities:
+      - name: Create Sentry Turret
+        art: sentry.jpg
+        text: |-
+          1/game:
+          Create 3 **Sentry Turret** objects in empty spaces in unlimited range.
+          They have:
+            1hp.
+            At start of creator's activation: ⌖Nearest enemy in range 2: *Undefendable*, 1dmg.
+            If another **Sentry Turret** already hit the target this activation, the target gets **slow** -1.
+        hints:
+          - REFERENCE_UndefendableHint
+        SentryTurret: &SentryTurret
+          name: Sentry Turret
+          art: sentry.jpg
+          is_marker: true
+          size: 0.5
+          text: |-
+            1hp.
+            At start of creator's activation: ⌖Nearest enemy in range 2: *Undefendable*, 1dmg.
+            If another **Sentry Turret** already hit the target this activation, the target gets **slow** -1.
+        tokens:
+          - REFERENCE_Slow
+          - *SentryTurret
+          - *SentryTurret
+          - *SentryTurret
+      - name: Create Teleporter
+        art: teleporter.jpg
+        text: |-
+          1/game:
+          Space in range 1, and space in unlimited range, neither containing an enemy:
+            Create a **Teleporter** object in each space.
+          They have:
+            8hp.
+            Any ally of the creator may, as a Free Action or reaction to something entering this space,
+            swap the positions of everything in this space and another **Teleporter's** space.
+        dice:
+          - name: Teleporter health
+            color: red
+            values: [ 6, 2 ]
+        tokens:
+          - name: Teleporter
+            art: teleporter.jpg
+            is_marker: true
+          - name: Teleporter
+            art: teleporter.jpg
+            is_marker: true
+      - name: Create Floating Barrier
+        art: floating_barrier.webp
+        text: |-
+          1/game:
+          Create a **Floating Barrier** marker in an edge in range 1, facing away from you.
+          It has:
+            This blocks line of sight for the creator's enemies.
+            At start of creator's activation: This moves forward 2 spaces.
+        tokens:
+          - name: Floating Barrier
+            art: floating_barrier.webp
+            is_marker: true
+            text: |-
+              This blocks line of sight for the creator's enemies.
+              At start of creator's activation: This moves forward 2 spaces.
+      - name: Create Shield Generator
+        art: shield_generator.webp
+        text: |-
+          *Ultimate* 3:
+          Create a **Shield Generator** object in an empty space in range 1.
+          Heal all allies 4.
+          It has:
+            4hp.
+            Allies of the creator have +4 maximum health.
+            When this is destroyed, allies of the creator lose 4 health.
+        tokens:
+          - name: Shield Generator
+            art: shield_generator.webp
+            is_marker: true
+            text: |-
+              Allies of the creator have +4 maximum health.
+              When this is destroyed, allies of the creator lose 4 health.
+      - name: Create Photon Barrier
+        art: photon_barrier.jpg
+        text: |-
+          *Ultimate* 4:
+          Choose any edge across the map.
+          Create a **Photon Barrier** object along that edge.
+          It has:
+            12hp.
+            This blocks line of sight for the creator's enemies.
+        dice:
+          - name: Barrier health
+            color: red
+            values: [ 6, 6 ]
+        tokens:
+          - name: Photon Barrier
+            art: photon_barrier.jpg
+            is_marker: true
+            text: |-
+              12hp.
+              This blocks line of sight for the creator's enemies.
+          - name: Photon Barrier
+            art: photon_barrier.jpg
+            is_marker: true
+            text: |-
+              12hp.
+              Blocks line of sight for the creator's enemies.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Zarya
+    description: |-
+      Interrupt attacks with shields that buff your damage.
+    health: 10
+    speed: 3
+    art: hero.jpg
+    passives:
+      - name: Energy
+        text: |-
+          You have an **Energy Die** starting at 1, which can increase up to 6.
+    default_abilities:
+      - name: Particle Cannon
+        text: |-
+          ⌖Range 3: Push 1. Deal damage equal to your energy die.
+    dice:
+      - name: Energy
+        color: yellow
+        values: [ 1 ]
+    abilities:
+      - name: Give Particle Barrier
+        art: barrier.jpg
+        text: |-
+          2/game, *instant*:
+          Target loses any number of conditions.
+          Give a **Particle Barrier** token.
+          It has:
+            You are immune to damage, and can choose not to be affected by abilities.
+            Once per any activation, when you would take damage, instead the creator increases their **Energy Die**.
+            
+            At the beginning of the creator's next activation, destroy this.
+        tokens:
+          - name: Particle Barrier
+            art: barrier.jpg
+            text: |-
+              You are immune to damage, and can choose not to be affected by abilities.
+              Once per any activation, when you would take damage, instead the creator increases their **Energy Die**.
+
+              At the beginning of the creator's next activation, destroy this.
+          - name: Particle Barrier
+            art: barrier.jpg
+            text: |-
+              You are immune to damage, and can choose not to be affected by abilities.
+              Once per any activation, when you would take damage, instead the creator increases their **Energy Die**.
+
+              At the beginning of the creator's next activation, destroy this.
+      - name: Graviton Surge
+        art: graviton.jpg
+        text: |-
+          *Ultimate* 5:
+            ✺Enemies in range 3 burst 2: 1dmg. Pull 2 towards the burst center. Give **Immobile**.
+        hints:
+          - REFERENCE_UltimateHint
+        tokens:
+          - name: Graviton Surge
+            art: graviton.jpg
+            size: 1
+        conditions:
+          - REFERENCE_Immobile
+  - name: Cassidy
+    description: |-
+      Ranged sustained and burst damage.
+    health: 8
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: On Deploy
+        text: Gain an ammo token.
+    default_abilities:
+      - name: Peacekeeper
+        text: |-
+          You deploy with an ammo token.
+
+          If you have ammo, choose one --
+          - ⌖Range 4: +1 *crit*, 2dmg.
+          - ⌖Range 1: 4dmg. Lose an **Ammo** token.
+          - ✺Line 4: 2dmg. Give each **Damage over Time**.
+    tokens:
+      - REFERENCE_Ammo
+    abilities:
+      - name: Reload
+        text: |-
+          If you have no **Ammo** tokens, gain an **Ammo** token.
+      - name: Combat Roll
+        text: |-
+          1/game, Free Action:
+          Move 2, ignoring units.
+          If you have no **Ammo** tokens, gain an **Ammo** token.
+      - name: Give Magnetic Grenade
+        art: magnetic_grenade.jpg
+        text: |-
+          1/game:
+          Range 3: *Undefendable*, give a **Magnetic Grenade** token.
+        hints:
+          - REFERENCE_UndefendableHint
+          - REFERENCE_SlowHint
+        conditions:
+          - name: Magnetic Grenade
+            art: magnetic_grenade.jpg
+            text: |-
+              You are *slow* -1.
+              At the start of the creator's activation:
+                ✺Creator's enemies in burst 1: 3dmg.
+                Destroy this.
+      - name: Deadeye
+        text: |-
+          *Ultimate* 4, Move + Standard Action:
+          
+          At the start of your next activation:
+            ✺Enemies in unlimited range: 8dmg.
+        hints:
+          - REFERENCE_UltimateHint
+          - REFERENCE_UndefendableHint
+  - name: D.Va
+    description: |-
+      Mobile frontline tank with a potential respawn.
+    health: 12
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: You are *undefendable*.
+        text: ""
+      - name: Abilities targeting you have +1 *crit*.
+        text: ""
+      - name: On Death
+        text: Create **Pilot D.va* in burst 1.
+    default_abilities:
+      - name: Fusion Cannons
+        text: |-
+          Can't be used on the same turn as your standard Move Action.
+          ⌖Range 2: 2dmg.
+    abilities:
+      - name: Create Defense Matrix
+        text: |-
+          1/game, *instant* +2:
+          Create a 2x2 **Defense Matrix** marker in range 1.
+          
+          It has:
+            Enemy abilities that draw range through this are cancelled without effect.
+            At start of creator's activation, destroy this.
+        hints:
+            - REFERENCE_InstantHint
+        tokens:
+          - name: Defense Matrix
+            art: defense_matrix.webp
+            size: 2
+            is_marker: true
+            text: |-
+              Enemy abilities that draw range through this are cancelled without effect.
+              At start of creator's activation, destroy this.
+      - name: Boosters
+        text: |-
+          *Tap*, Move Action:
+          *Fly* 6.
+          Each enemy you move through takes 1dmg, and 1 knockback to the side.
+        hints:
+          - REFERENCE_TapHint
+          - REFERENCE_FlyingHint
+      - name: Micro Missiles
+        text: |-
+          1/game, Free Action:
+          ⌖Range 2: 2dmg.
+          ✺Burst 1 of that target, 1dmg.
+      - name: Create Self-Destruction
+        text: |-
+          *Ultimate* 5:
+          Create a **Self-Destruction** marker in your space.
+          
+          Destroy this (triggering on-death effects). Move **Pilot D.Va** 2.
+          
+          **Self-Destruction** has:
+            This is blocking terrain.
+            At the start of your next activation:
+              ✺Enemies in burst 3: 7dmg.
+        hints:
+          - REFERENCE_UltimateHint
+        tokens:
+          - name: Self-Destruct
+            art: self_destruct.webp
+            is_marker: true
+            text: |-
+              This is blocking terrain.
+              At the start of your next activation:
+                ✺Enemies in burst 3: 7dmg.
+    units:
+      - name: Pilot D.Va
+        health: 4
+        speed: 3
+        art: pilot.jpg
+        default_abilities:
+          - name: Light Gun
+            text: |-
+              ⌖Range 3: 1dmg. Gain a **Mech Charge** token.
+          - name: Call Mech
+            text: Spend 1 **Mech Charge** token and destroy this to place D.Va with full health.
+        tokens:
+          - name: Mech Charge
+            art: mech_charge.jpg
+  - name: Soldier 76
+    description: |-
+      Mobile sustained ranged damage and self healing.
+    health: 8
+    speed: 3
+    art: hero.jpg
+    default_abilities:
+      - name: Heavy Pulse Rifle
+        text: Range 4, 3dmg.
+      - name: Sprint
+        text: Move 3.
+    abilities:
+      - name: Helix Rockets
+        text: |-
+          1/game:
+          ⌖Range 4: +2 *miss*, 3dmg. 
+          ✺Burst 1 of target: 1dmg.
+      - name: Create Biotic Field
+        art: biotic_field.jpg
+        text: |-
+          1/game:
+          Create a 2x2 **Biotic Field** marker overlapping your space.
+          It has:
+            At the start of creator's activation, heal all allies in this 2.
+        tokens:
+          - name: Biotic Field
+            art: biotic_field.jpg
+            size: 2
+            marker: true
+            text: At the start of creator's activation, heal all allies in this 2.
+      - name: Tactical Visor
+        text: |-
+          *Ultimate* 4, Free Action:
+          
+          Gain passive:
+            Your default abilities have unlimited range and are *undefendable*.
+            At the start of each your activations, you may use a default ability as a Free Action.
+        hints:
+          - REFERENCE_UltimateHint
+          - REFERENCE_UndefendableHint
+  - name: Genji
+    description: |-
+      Evasive fragile assassin quickly clears low health enemies.
+    health: 6
+    speed: 3
+    art: hero.webp
+    passives:
+      - name: +2def
+        text: ""
+      - name: All of your movement is flying.
+        text: ""
+    default_abilities:
+      - name: Shuriken
+        text: |-
+          Choose one --
+          - ⌖Range 4, 2dmg.
+          - ⌖Range 1, 4dmg.
+    abilities:
+      - name: Deflect
+        text: |-
+          1/game, *instant* +2:
+          
+          Until the start of your next activation:
+            When an ability with maximum range 2+ targets you, you may choose a new target, with you as the ability's origin.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Swift Strike
+        text: |-
+          1/game, *instant* +2:
+          Move exactly 4 spaces in a straight line, ignoring enemies.
+          ✺Each enemy moved through: 2dmg.
+          
+          When an enemy dies: refresh this ability.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Dragonblade
+        text: |-
+          *Ultimate* 5:
+          
+          Replace your default abilities with:
+            ✺Two adjacent spaces in burst 1: 4dmg.
+          
+          Gain passive:
+            You have +1 speed.
+        hints:
+          - REFERENCE_UltimateHint
+#      - name: Junkrat
+#        description: |-
+#          - Area denial
+#          - Splash damage
+#        health: 8
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/9/99/Junkrat-Portrait.png/revision/latest/scale-to-width-down/286?cb=20160620014456
+#        passives:
+#          - name: Used to It
+#            text: |-
+#              You are immune to damage from your own attacks. When you avoid damage this way, you may move 1 space.
+#          - name: Death
+#            text: |-
+#              Place a size 2 Payback field in range 0.
+#              At the beginning of your next turn, sacrifice the payback field and deal 3dmg to all enemies in inside.
+#            tokens:
+#              - name: Total Mayhem
+#                art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/1/18/Ability-Junkrat4.png/revision/latest/scale-to-width-down/100?cb=20150924023347
+#                size: 1
+#        default_abilities:
+#          - name: Frag Launcher
+#            text: |-
+#              Default
+#              1def + 1def/2 distance, 4dmg, and 1dmg to others in burst 1 of the hit target.
+#        abilities:
+#          - name: Concussion Mine
+#            text: |-
+#              1/Game
+#              Place a Concussion Mine in an empty space within range 2.
+#              At the start of your turn, or when anyone becomes adjacent to the mine's space, you may sacrifice the mine for def1, 4dmg and move 2 in any direction.
+#            tokens:
+#              - name: Concussion Mine
+#                art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/8/87/Ability-Junkrat2.png/revision/latest/scale-to-width-down/100?cb=20150924023319
+#                size: 1
+#          - name: Steel Trap
+#            text: |-
+#              1/Game
+#              Free Action
+#              Place a Steel Trap in range 2, with size 1, and 3hp.
+#              When an enemy enters the trap's space, they end their movement get rooted until the end of their next turn.
+#            tokens:
+#              - name: Steel Trap
+#                art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/9/9c/Ability-Junkrat3.png/revision/latest/scale-to-width-down/100?cb=20150924023330
+#                size: 1
+#          - name: RIP-Tire
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#                You are stunned.
+#                Summon a RIP-Tire with 4 health and 7 speed.
+#                At the beginning of your next turn, sacrifice the RIP-Tire.
+#                When RIP-Tire dies, it deals 8dmg in burst 1.
+#            tokens:
+#              - name: RIP-Tire
+#                art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/3/32/Ability-Junkrat5.png/revision/latest/scale-to-width-down/100?cb=20150924023400
+#                size: 1
+#      - name: Lucio
+#        description: |-
+#          - Highly mobile
+#          - Healing/speed aura
+#        health: 8
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/c/c1/Lucio-ow2-portrait.png/revision/latest/scale-to-width-down/148?cb=20191104073705
+#        passives:
+#          - name: Crossfade
+#            text: |-
+#              At the start of your turn, choose one:
+#              You and allies in burst 1 Heal 2.
+#              You and allies in burst 1 can move 1.
+#          - name: Wall Ride
+#            text: |-
+#              Once per turn when you move next to a wall, you may move one space for free.
+#        default_abilities:
+#          - name: Sonic Amplifier
+#            text: |-
+#              Default
+#              1def/2 distance, 2dmg.
+#          - name: Soundwave
+#            text: |-
+#              Default
+#              Range 1, 2dmg, kb 2.
+#        abilities:
+#          - name: Amp It Up
+#            text: |-
+#              Free Action, 1/Game
+#              Repeat your last Crossfade effect, twice.
+#          - name: Sound Barrier
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#                You and allies in burst 3 gain 6 overshield.
+#                At the start of your next turn, anyone who gained overshield this way loses that much overshield.
+#      - name: Mei
+#        description: |-
+#          - Slowing, stalling
+#        health: 10
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/d/da/Mei-ow2-portrait.png/revision/latest/scale-to-width-down/165?cb=20191104081317
+#        default_abilities:
+#          - name: Endothermic Blaster
+#            text: |-
+#              Default
+#              All in line 2, 2dmg, target is slowed
+#          - name: Icicle
+#            text: |-
+#              Default
+#              1def + 1def/2 distance, 3dmg
+#        abilities:
+#          - name: Cryo-Freeze
+#            text: |-
+#              1/Game
+#              Instant +2
+#              Heal 4
+#              Remove any unwanted conditions.
+#              Until the beginning of your next turn:
+#                You are immune to damage, forced movement, and unwanted conditions.
+#                You block line of sight.
+#          - name: Ice Wall
+#            text: |-
+#              1/Game
+#              Instant +2
+#              Create a 3x1 Ice Wall, at least partly within range 3, that lasts until the beginning of your next turn.
+#              The Ice Wall acts like a wall, and has 6 health.
+#            tokens:
+#              - name: Ice Wall Segment
+#                art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/e/ea/Ability-mei3.png/revision/latest/scale-to-width-down/100?cb=20221128011555
+#                size: 1
+#          - name: Blizzard
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#                Place a Size 3 Blizzard field in range 3.
+#                Enemies in the Blizzard are slowed and take 1dmg.
+#                At the beginning of your next turn, enemies in the blizzard are stunned and take 1dmg.
+#            tokens:
+#              - name: Blizzard
+#                art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/f/f0/Ability-mei4.png/revision/latest/scale-to-width-down/100?cb=20151107172516
+#                size: 3
+#      - name: Moira
+#        description: |-
+#          - Healing/Damage moving area
+#          - Escape ability
+#        health: 8
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/b/b5/Moira.png/revision/latest/scale-to-width-down/162?cb=20171104021652
+#        default_abilities:
+#          - name: Damage Biotic Grasp
+#            text: |-
+#              Range 4, 2dmg.
+#              Heal 1.
+#        abilities:
+#          - name: Healing Biotic Grasp
+#            text: |-
+#              Piercing cone 3.
+#              Allies Heal 3.
+#          - name: Fade
+#            text: |-
+#              1/Game
+#              Instant +3
+#              Teleport up to 4 spaces.
+#              You may purge any number of effects from yourself.
+#          - name: Summon Biotic Orb
+#            text: |-
+#              1/Game
+#              Choose Damage or Healing.
+#              Summon a Biotic Orb in range 1.
+#              Biotic Orb is a size 1 field with facing.
+#              Now, and at the beginning of each your turns, it performs:
+#                Healing: Burst 1, all allies Heal 2.
+#                Damage: Burst 1, 2dmg to all enemies.
+#                Then move 2 spaces forwards, reversing direction when blocked by a wall.
+#            tokens
+#              - name: Healing Biotic Orb
+#                art: https://pbs.twimg.com/profile_image_1332252696942956544/mRhKFbI2_400x400.jpg
+#                size: 1
+#              - name: Damage Biotic Orb
+#                art: https://pbs.twimg.com/profile_image_1595378173990035456/VyA7l6ri_400x400.jpg
+#                size: 1
+#          - name: Coalescence
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#                Move + Standard Action
+#                Heal 2.
+#                Move up to 2.
+#                Piercing line, 2dmg to enemies, allies Heal 4.
+#      - name: Orisa
+#        description: |-
+#          - Tank, Damage mitigation
+#        health: 12
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/d/d4/Orisa_Skin_Overwatch_2.png/revision/latest?cb=20221116224621
+#        passives:
+#          - name: Abilities targeting you have -2def
+#            text: ""
+#        default_abilities:
+#          - name: Fusion Driver
+#            text: |-
+#              Range 3, 2dmg.
+#        abilities:
+#          - name: Energy Javelin
+#            text: |-
+#              CD 2
+#              1def/2 distance, 2dmg.
+#              2dmg more if target is adjacent to a wall.
+#              Interrupt
+#          - name: Javelin Spin
+#            text: |-
+#              1/Game
+#              Instant +2
+#              You have facing. Turn and move 2 spaces forwards, pushing.
+#              Until the beginning of your next turn, you are immune to damage from your front.
+#          #            - name: Protective Barrier
+#          #              text: |-
+#          #                1/Game
+#          #                Reaction +2
+#          #                Create a 2x1 barrier in range 2.
+#          #                The barrier has 6 health.
+#          #              tokens
+#          #                - name: Barrier
+#          #                  art: todo
+#          #                  size: 1
+#          #                - name: Barrier
+#          #                  art: todo
+#          #                  size: 1
+#          #            - name: HaltREFERENCE_
+#          #              text: |-
+#          #                CD 2
+#          #                Empty space in range 3. Pull a unit in range 1 of the space into the empty space. They are slowed until the beginning of your next turn.
+#          - name: Fortify
+#            text: |-
+#              1/Game
+#              Instant +2
+#              Until the beginning of your next turn
+#                You have Resistance to damage
+#                You cannot be moved or prevented from moving or taken actions by enemy sources.
+#          #            - name: Supercharger
+#          #              text: |-
+#          #                Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#          #                Spend 5 charges:
+#          #              tokens
+#          #                - name: Supercharger
+#          #                  art: todo
+#          #                  size: 1
+#          - name: Terra Surge
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#                Move + Standard Action
+#                Pull all enemies in range 3 are 1 space towards you.
+#                Until the beginning of your next turn, enemies in range 3 are slowed.
+#                At the beginning of your next turn,
+#                  deal 9dmg to all enemies in range 1,
+#                  then deal 5dmg to all other enemies in range 2,
+#                  deal deal 2dmg to all other enemies in range 3.
+#      - name: Roadhog
+#        description: |-
+#          - Self healing tank
+#          - Counter low dodge
+#          - Pull out of position
+#        health: 12
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/c/ce/Roadhog-Portrait.png/revision/latest/scale-to-width-down/345?cb=20160620014755
+#        passives:
+#          - name: Abilities targeting you have -2def
+#            text: ""
+#        default_abilities:
+#          - name: Scrap Gun
+#            text: |-
+#              Range 1, 3dmg, 1def
+#              or Range 3, 3dmg, 3def
+#              2x damage to size 2+
+#        abilities:
+#          - name: Take a Breather
+#            text: |-
+#              1/Game
+#              Channel:
+#                Until the start of your next turn, you have Resistance
+#                At the start of your next turn, Heal 6.
+#          - name: Chain Hook
+#            text: |-
+#              1/Game
+#              Move Action
+#              Range 5, 1def/2 distance,
+#              1dmg, interrupt
+#              Pull target as close as possible.
+#          - name: Whole Hog
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#                Until end of Game, you can only use default actions, and scrap gun changes to:
+#                Range 1, 6 damage, kb 5
+#                or Range 2, 4dmg, kb 3
+#                or Range 3, 2dmg, kb 1
+#
+
+#      - name: Ana
+#        description: |-
+#          - Sniper healing
+#          - Long stun
+#          - Counter healing
+#        health: 8
+#        speed: 3
+#        art: https://static.wikia.nocookie.net/overwatch_gamepedia/images/7/76/Ana.png/revision/latest/scale-to-width-down/143?cb=20160715094551
+#        default_abilities:
+#          - name: Biotic Rifle
+#            text: |-
+#              Move + Standard Action
+#              You may move 1.
+#              Unlimited range, either Heal 3 or 2dmg.
+#        abilities:
+#          - name: Sleep Dart
+#            text: |-
+#              1/Game
+#              1def + 1def/2 distance
+#              Move + Standard Action
+#              Target does not act for their next two activations. If they take damage from another source, end this condition.
+#            tokens:
+#              - name: Sleeping
+#                art: https://static.wikia.nocookie.net/allstars_gamepedia/images/2/2b/Sleep_Dart_Icon.png/revision/latest?cb=20170918221723
+#              - name: Sleeping
+#                art: https://static.wikia.nocookie.net/allstars_gamepedia/images/2/2b/Sleep_Dart_Icon.png/revision/latest?cb=20170918221723
+#          - name: Biotic Grenade
+#            text: |-
+#              1/Game
+#              Range 4, size 2, 1def
+#              Allies in the area, Heal 3 and then receive +50% healing.
+#              Enemies in the area take 2dmg and cannot regain health.
+#            tokens:
+#              - name: Grenade Healing Buff
+#                art: https://static.wikia.nocookie.net/allstars_gamepedia/images/a/ae/Grenade_Spray.png/revision/latest/scale-to-width-down/120?cb=20170919004315
+#              - name: Grenade Healing Debuff
+#                art: https://static.wikia.nocookie.net/allstars_gamepedia/images/c/c4/Biotic_Grenade_Icon.png/revision/latest?cb=20170918221557
+#          - name: Nano Boost
+#            text: |-
+#              Ultimate 5: At the end of each round, if you activated, gain 1 persistent charge, up to 5.
+#              Spend 5 charges:
+#              Choose an ally in range 4. They deal +50% damage and have Resistance
+#            tokens:
+#              - name: Nano Boosted
+#                art: https://static.wikia.nocookie.net/allstars_gamepedia/images/9/9e/Nano_Boost_Icon.png/revision/latest?cb=20170918221647
+
+
+maps:
+  - name: Nepal Shrine
+    art: cp_nepal_sanctum.png
+    tokens:
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+    hints:
+      - REFERENCE_HealthPack
+      - REFERENCE_HeightDifferenceHint
+      - REFERENCE_CoverHint
+      - REFERENCE_CapturePointHint
+  - name: Nepal Village
+    art: cp_nepal_village.png
+    tokens:
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+    hints:
+      - REFERENCE_HealthPack
+      - REFERENCE_HeightDifferenceHint
+      - REFERENCE_CoverHint
+      - REFERENCE_CapturePointHint
+  - name: Nepal Sanctum
+    art: cp_nepal_sanctum.png
+    tokens:
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+      - REFERENCE_HealthPack
+    hints:
+      - REFERENCE_HealthPack
+      - REFERENCE_DeadlyFallHint
+      - REFERENCE_CoverHint
+      - REFERENCE_CapturePointHint
+intro_setup:
+  map: Nepal Village
+  blue:
+    - Pharah
+    - Mercy
+    - Reinhardt
+  red:
+    - Winston
+    - Reaper
+    - Hanzo

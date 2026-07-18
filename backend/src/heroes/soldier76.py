@@ -1,12 +1,30 @@
 """
-Soldier 76 — sustained DPS rifleman with healing field.
+Soldier 76 - 8 health, 4 speed
+- Sustained dps
+- Mobile
+- Healing field
+---
 
-Simplified for the grid engine:
-- Heavy Pulse Rifle: Range 4, 3dmg
-- Helix Rockets: Range 3, Burst 1, 2dmg (AoE)
-- Biotic Field: Heal 2, 1/Game
-- Tactical Visor (Ultimate 4): Default attacks undefendable, +1 range
+Heavy Pulse Rifle
+Range 4, 3dmg
+Helix Rockets
+Helix Rockets
+1/Game:
+Range 4, +2def, 3dmg.
+Others in burst 1 of target, 1dmg.
+Biotic Field
+Biotic Field
+1/Game:
+Place a size 2 Biotic Field, overlapping your space.
+Now, and at the beginning of each your turns, all allies in the field Heal 2.
+Tactical Visor
+Tactical Visor
+Ultimate 4:
+Your default abilities have +2 range and are undefendable.
+Now and at the start of each your turns, you can make a default attack as a Free Action.
 """
+
+# todo, actually follow character definition.
 
 from abilities import (
     Ability,
@@ -57,6 +75,7 @@ class HeavyPulseRifleAbility(Ability):
 
     def get_priority(self, engine, actor, pos, aiming_result):
         from scoring import score_expected_damage
+
         pts = aiming_result.target_points
         for pt in pts:
             target = engine.entity_at(pt)
@@ -97,6 +116,7 @@ class BioticFieldAbility(Ability):
 
     def get_priority(self, engine, actor, pos, aiming_result):
         from scoring import score_missing_hp
+
         # Only use when missing HP
         return score_missing_hp(actor)
 
@@ -114,6 +134,7 @@ class TacticalVisorAbility(Ability):
 
     def get_priority(self, engine, actor, pos, aiming_result):
         from scoring import score_ultimate
+
         return score_ultimate(self, engine) * 2.0  # Ultimates are very valuable
 
 

@@ -1,0 +1,675 @@
+name: Dota 2
+completion: BETA
+color: [ .67, .18, .08 ]
+description: |-
+  - STATUS: WIP maps. Heroes are fine and could play with maps from other games.
+  - Ultimates
+heroes:
+  - name: Axe
+    complexity: 1
+    description: |-
+      - Provoke and counterattack
+      - Reflect damage back to attackers
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/axe.png
+    health: 10
+    speed: 3
+    passives:
+      - name: Receive damage
+        text: |-
+          Enemies in burst 1, 1dmg
+      - name: Receive damage from a Default Ability
+        text: The attacker takes 1/2 the damage received, before Armor.
+    default_abilities:
+      - name: Axe
+        text: |-
+          Range 1, 2dmg
+    abilities:
+      - name: Berserker's Call
+        text: |-
+          1/Game, Free Action
+          Until the beginning of your next turn,
+            You have Armor
+            When an enemy starts their turn in range 1 of you,
+              they cannot move, and they must use a default attack targeting you, if possible, spending actions as normal.
+        hints:
+          - REFERENCE_ArmorHint
+      - name: Battle Hunger
+        text: |-
+          1/Game:
+          Range 3, give the 2 DoT and a Battle Hunger token:
+            Moving away from you costs twice as many spaces. When they kill a unit, they lose the token and clear all DoT.
+        tokens:
+          - REFERENCE_DoT
+          - name: Battle Hunger
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/0/00/Battle_Hunger_icon.png/revision/latest?cb=20121003222330
+            text: |-
+              Moving away from Axe costs you twice as many spaces.
+              When you kill a unit, lose this and clear all DoT.
+      - name: Culling Blade
+        text: |-
+          1/Game
+          Range 1, 3dmg irreducible
+          On kill:
+            The target does not trigger any on-death reactions.
+            Refresh this.
+            If the kill was a hero, for the rest of the game you have Armor.
+        tokens:
+          - REFERENCE_Armor
+    bot_cards:
+      passives:
+        - name: Receive damage
+          text: |-
+            Enemies in burst 1, 1dmg
+        - name: Receive damage from a Default Ability
+          text: The attacker takes 1/2 the damage received, before Armor.
+      default:
+        text: |-
+          Move 3 to nearest enemy
+          
+          Attack Range 1, 2dmg. +1 and irreducible if target has <=3 health. Target doesn't trigger on-death reactions.
+          Else Move 3 to nearest enemy
+      abilities:
+        - name: Default
+          text: ''
+          count: 3
+        - name: Battle Hunger
+          text: |-
+            Move 3 to nearest enemy
+            
+            Attack Range 3, give the 2 DoT and a Battle Hunger token, !Remove this!.
+              Moving away from you costs twice as many spaces. When they kill a unit, they lose the token and clear all DoT.
+            Else Move 3 to nearest enemy
+        - name: Berserker's Call
+          text: |-
+            Do a default action.
+            If there is an enemy at range 1:
+              Remove this
+              Until the beginning of your next turn,
+                You have Armor
+                When an enemy starts their turn in range 1 of you,
+                  they cannot move, and they must use a default attack targeting you, if possible, spending actions as normal.
+
+  - name: Crystal Maiden
+    complexity: 3
+    polish: [ needs_testing ]
+    description: |-
+      - Slow and nuke enemies
+      - Allies have an extra n/Game use.
+      - Awful speed and health
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/crystal_maiden.png
+    health: 6
+    speed: 2
+    passives:
+      - name: Deploy
+        text: |-
+          You and all allies can put an extra charge on a n/game ability.
+      - name: Chilled
+        text: |-
+          Slowed enemies deal -1 damage.
+    tokens:
+      - name: Extra Ability Use
+        image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/5/5a/Arcane_Aura_icon.png/revision/latest?cb=20111005085505
+        text: |-
+          Gain an extra 1/Game use of this ability. (Ultimates are 1/Game)
+    default_abilities:
+      - name: Ice Bolt
+        text: Range 4, 2dmg
+    abilities:
+      - name: Crystal Nova
+        text: |-
+          Tap:
+          Range 3 2x2, 3dmg, Slow
+        tokens:
+          - REFERENCE_Slow
+      - name: Frostbite
+        text: |-
+          Tap:
+          Range 3, 2dmg, give **immobile and disarm
+        tokens:
+          - REFERENCE_Immobile
+          - REFERENCE_Disarm
+      - name: Crystal Clone
+        text: |-
+          1/Game, Free Action
+          Move 2, and create a Crystal Clone marker in your previous space.
+          Crystal Clone marker has 1 hp and can be targeted like a unit.
+          At the beginning of your turn, destroy Crystal Clone.
+          
+          When Crystal Clone is destroyed, it deals burst 1, 2dmg immobilize and disarm.
+        tokens:
+          - name: Crystal Clone
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/a/a1/Crystal_Clone_icon.png/revision/latest/scale-to-width-down/128?cb=20230809011951
+            is_marker: true
+            text: |-
+              When destroyed, it deals burst 1, 2dmg immobilize and disarm.
+          - REFERENCE_Immobile
+          - REFERENCE_Disarm
+      - name: Freezing Field
+        text: |-
+          Ultimate 4, Free Action
+          Enemies in burst 3 ignoring walls, slow.
+          Enter freezing field stance:
+            At the start of your turn, you may spend Move+Standard Actions for
+              Enemies in burst 3 ignoring walls, 4dmg, slow.
+            If you don't, end this effect.
+        tokens:
+          - name: Freezing Field Stance
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/d/de/Freezing_Field_icon.png/revision/latest/scale-to-width-down/128?cb=20111005085503
+          - REFERENCE_Slow
+        hints:
+          - REFERENCE_UltimateHint
+    bot_cards:
+      passives:
+        - name: Deploy
+          text: |-
+            Each ally returns the first card they would remove from their deck
+        - name: Chilled
+          text: |-
+            Slowed enemies deal -1 damage.
+      default:
+        text: |-
+          Move 2 to range 4 of nearest enemy
+          
+          Attack Range 4, 2dmg
+          Else move 2 behind nearest ally
+      abilities:
+        - name: Default
+          text: ''
+          count: 3
+        - name: Crystal Nova
+          text: |-
+            Move 2 to range 3 of nearest enemy
+            
+            Range 3 2x2, 3dmg, Slow
+            Else move 2 behind nearest ally
+        - name: Frostbite
+          text: |-
+            Move 2 to range 3 of nearest enemy
+            
+            Range 3, 2dmg, immobilize and disarm
+            Else move 2 behind nearest ally
+        - name: Crystal Clone
+          text: |-
+            Use another action card, then
+            !Remove This!
+            Move 2 away from the nearest enemy, and create a Crystal Clone marker in your previous space.
+            Crystal Clone marker has 1 hp and can be targeted like a unit.
+            At the beginning of your turn, destroy Crystal Clone.
+
+            When Crystal Clone is destroyed, it deals burst 1, 2dmg immobilize and disarm.
+        - name: Freezing Field
+          text: |-
+            If turn is 1-3, redraw and shuffle this into the deck
+            
+            !Remove this!
+            Move 2 towards the nearest enemy
+            Enemies in burst 3 ignoring walls, slow.
+            Enter freezing field stance:
+              At the start of your turn, you may spend Move+Standard Actions for
+                Enemies in burst 3 ignoring walls, 4dmg, slow.
+              If you don't, end this effect.
+  - name: Dazzle
+    complexity: 3
+    description: |-
+      - Save ally from death
+      - Close range aoe damage and healing
+      - Likes long grouped up teamfights
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/dazzle.png
+    health: 8
+    speed: 3
+    default_abilities:
+      - name: Curse
+        text: |-
+          Range 3, 2dmg
+    abilities:
+      - name: Poison Touch
+        text: |-
+          1/Game
+          Range 4 2x2, 2dmg, get Poison Touch (At start of turn, take 2 damage).
+          
+          ---
+          At the end of your turn, each enemy you did not damage loses Poison Touch.
+        tokens:
+          - name: Poison Touch
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/0/09/Poison_Touch_icon.png/revision/latest?cb=20111005090005
+            text: |-
+              At start of turn, take 2 damage.
+      - name: Shallow Grave
+        text: |-
+          1/Game, Instant +3:
+          You are stunned.
+          Range 3, until the start of your next turn:
+           Target's hp cannot go below 1, they are not considered for objectives, and they receive +50% healing.
+        tokens:
+          - REFERENCE_Stun
+          - name: Shallow Grave
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/6/69/Shallow_Grave_icon.png/revision/latest?cb=20111005090004
+            text: Hp cannot go below 1.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Shadow Wave
+        text: |-
+          1/Game
+          Target yourself, then any number of times target another unit in range 2 of an existing target.
+          Heal each targeted unit 2.
+          All enemies in burst 1 of any targeted ally, 2dmg.
+      - name: Bad Juju
+        text: |-
+          Free Action
+          Take 3 irreducible damage.
+          Refresh all your abilities.
+  - name: Drow Ranger
+    complexity: 2
+    description: |-
+      - Ranged dps
+      - Slow enemies
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/drow_ranger.png
+    health: 8
+    speed: 3
+    passives:
+      - name: Marksmanship
+        text: |-
+          While there is no adjacent enemy,
+          When you or an ally in LoS uses an ability with range 3+, you deal +1 damage and irreducible damage.
+    default_abilities:
+      - name: Frost Arrows
+        text: |-
+          Range 4, 2dmg, slow
+    tokens:
+      - REFERENCE_Slow
+    abilities:
+      - name: Gust
+        text: |-
+          1/Game
+          Range 1 2x2, push 2, silence
+          Move 2
+        tokens:
+          - REFERENCE_Silence
+      - name: Multishot
+        text: |-
+          1/Game
+          Range 1 3x3, 2dmg, slow
+      - name: Glacier
+        text: |-
+          1/Game
+          Create a directional Glacier Wall markers on the edge in front of you, pointing away, and extend it one space to either side.
+          
+          Range drawn through the wall in the wall's direction (away from your starting position) is increased by 1.
+          LoS drawn through the wall against the wall's direction is blocked.
+          The wall blocks movement.
+          
+          The walls are destroyed at the start of your next turn.
+
+        tokens:
+          - name: Glacier Wall
+            image_url: https://media.discordapp.net/attachments/999104692233711676/1177524107278024804/qazzquimby_glacier_wall_top_down_df15fa65-8884-444b-84fe-45cf5ed9a819.png
+            is_marker: true
+            text: |-
+              Blocks movement.
+              Extends range by 1 in direction this points.
+              Blocks los in opposite direction.
+
+  - name: Earthshaker
+    complexity: 3
+    description: |-
+      - AoE stunning
+      - Create impassable barrier
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/earthshaker.png
+    health: 10
+    speed: 3
+    passives:
+      - name: After you use a non-default ability.
+        text: |-
+          Enemies in burst 1, 1dmg, tap one of their abilities.
+    dice:
+      - name: Enchant
+        color: orange
+        values: [ 1 ]
+    default_abilities:
+      - name: Totem Slam
+        text: |-
+          Range 1, 1dmg + 2dmg per Enchant counters you have. Lose all Enchant counters.
+    abilities:
+      - name: Enchant Totem
+        text: |-
+          Fly 3 in a straight line.
+          Gain an Enchant counter.
+        hints:
+          - REFERENCE_FlyingHint
+      - name: Fissure
+        text: |-
+          1/Game
+          Infinite line, push 1 to a free space on either side if possible.
+          Fill empty spaces in the line with Fissure markers which block movement but not LoS.
+          Enemies adjacent to at least one Fissure marker: 2dmg and tap one of their abilities. 
+          
+          Fissure Markers are destroyed at the start of your next turn.
+        tokens:
+          - name: Fissure
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/2/24/Fissure_icon.png/revision/latest?cb=20111005114408
+            is_marker: true
+            text: Blocks movement but not LoS.
+      - name: Echo Slam
+        text: |-
+          Ultimate 4
+          Enemies in burst 3, 2dmg + 1dmg per enemy in the area, tap one of their abilities.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Lich
+    complexity: 3
+    description: |-
+      - Give ally armor
+      - Punish grouped enemies
+      - Debuff mobility
+      - AoE chip damage
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/lich.png
+    health: 6
+    speed: 3
+    passives:
+      - name: On death
+        text: |-
+          You may remove any number of Chain Frost tokens and markers, from units or the map. 
+          Cast Chain Frost.
+    default_abilities:
+      - name: Frost Blast
+        text: |-
+          Range 3, 1dmg
+          Burst 1 of target, 1dmg, they deal -1 damage until the end of their next turn.
+    tokens:
+      - REFERENCE_MinusOneDamage
+    abilities:
+      - name: Frost Shield
+        text: |-
+          1/Game
+          Ally in LoS gets a Frost Shield marker:
+            Armor
+            At end of turn, enemies in burst 2, 1dmg.
+        hints:
+          - REFERENCE_ArmorHint
+        tokens:
+          - name: Frost Shield
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/1/1b/Frost_Shield_icon.png/revision/latest?cb=20181124214838
+            text: |-
+              You have Armor
+              At end of turn, enemies in burst 2, 1dmg.
+      - name: Sinister Gaze
+        text: |-
+          1/Game, Move+Standard Action:
+          Range 4, pull 2, paralyze
+        tokens:
+          - REFERENCE_Paralyze
+      - name: Summon Ice Spire
+        text: |-
+          1/Game
+          Range 4, create an Ice Spire
+      - name: Chain Frost
+        text: |-
+          1/Game
+          Enemy or Ice Spire without a Chain Frost marker in range 2, not blocked by units, 
+          if enemy: 2dmg + 2dmg per Chain Frost marker on this, slow.
+          
+          Remove all Chain Frost markers and tokens not on this.
+          If this missed, remove all Chain Frost markers on this.
+          Else put a Chain Frost marker on this, on the target, and on the target's space.
+          ---
+          If there is a Chain Frost marker on the map, at the start of your turn:
+          This ability repeats, cast from the Chain Frost marker on the map.
+        tokens:
+          - name: Chain Frost
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/7/77/Chain_Frost_icon.png/revision/latest?cb=20111005120429
+          - REFERENCE_Slow
+          - name: Chain Frost
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/7/77/Chain_Frost_icon.png/revision/latest?cb=20111005120429
+            is_marker: true
+      - name: Sacrifice
+        text: |-
+          Destroy an allied unit in range 4.
+          Ready all your abilities.
+    units:
+      - name: Ice Spire
+        health: 4
+        speed: 0
+        image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/7/7b/Ice_Spire_icon.png/revision/latest?cb=20201219001057
+        passives:
+          - name: End of turn
+            text: |-
+              Enemies in burst 2, 1dmg, they deal -1 damage until the end of their next turn.
+        tokens:
+          - REFERENCE_MinusOneDamage
+  - name: Lina
+    complexity: 3
+    polish: [ needs_testing ]
+    description: |-
+      - Speed and damage increases as more abilities are used
+      - Very high midrange damage
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/lina.png
+    health: 6
+    speed: 2
+    passives:
+      - name: You are always Flying
+        text: ""
+      - name: You have +1 move speed per Fiery Soul charge
+        text: ""
+    hints:
+      - REFERENCE_FlyingHint
+    dice:
+      - name: Fiery Soul
+        color: orange
+        values: [ 1 ]
+    default_abilities:
+      - name: Fireball
+        text: |-
+          Range 3, 1dmg + 1dmg per Fiery Soul charge.
+    abilities:
+      - name: Dragon Slave
+        text: |-
+          1/Game
+          Line 4, 1dmg + 1dmg per Fiery Soul charge, 1 DoT
+          
+          Gain 1 Fiery Soul charge.
+        tokens:
+          - REFERENCE_DoT
+      - name: Light Strike Array
+        text: |-
+          1/Game
+          Range 3, 2x2, 2dmg + 1dmg per Fiery Soul charge, tap one of their abilities.
+          
+          Gain 1 Fiery Soul charge.
+      - name: Laguna Blade
+        text: |-
+          1/Game
+          Range 4, 3dmg per Fiery Soul charge
+          
+          Fill your Fiery Soul charges up to 2.
+  - name: Lion
+    complexity: 3
+    polish: [ needs_testing ]
+    description: |-
+      - Powerful disables
+      - Drain ability uses from enemies
+      - Ultimate nuke
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/lion.png
+    health: 6
+    speed: 3
+    default_abilities:
+      - name: Hellspike
+        text: Range 4, 2dmg
+    abilities:
+      - name: Impale
+        text: |-
+          1/Game
+          Range range 1 4x2 pointing away from you, 2dmg, push 1 in any direction, tap one of their abilities.
+      - name: Hex
+        text: |-
+          1/Game
+          Range 3, until start of your next turn, target has no abilities or passives, has base speed 1, and is not considered for objectives.
+        tokens:
+          - name: Hex
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/2/2c/Hex_%28Lion%29_icon.png/revision/latest?cb=20111006055821
+            text: |-
+              No abilities or passives.
+              Base speed 1.
+              Not considered for objectives.
+      - name: Mana Drain
+        text: |-
+          Move+Standard Action:    
+          Range 3
+          If target is an enemy, give a non-default ability CD 1, twice. Refresh an ability.
+          Else, push target 2 in any direction and target refreshes an ability.
+      - name: Finger of Death
+        text: |-
+          Ultimate 5
+          Range 4 2x2, 5dmg
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Mirana
+    complexity: 2
+    description: |-
+      - Mobile
+      - AoE damage
+      - Team invisibility
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/mirana.png
+    health: 8
+    speed: 3
+    default_abilities:
+      - name: Archery
+        text: |-
+          Range 4, 2dmg
+    abilities:
+      - name: Starstorm
+        text: |-
+          Tap:
+          Enemies in burst 4, 1dmg 
+          Nearest enemy in burst 1, 1dmg
+      - name: Sacred Arrow
+        text: |-
+          Tap:
+          First enemy in unlimited line ignoring walls, +2def if you are in target's Los.
+          2dmg, paralyze if target at range 6 or more.
+        tokens:
+          - REFERENCE_Paralyze
+      - name: Leap
+        text: |-
+          3/Game, Free Action
+          Fly 2 in a straight line. At end of turn, move 1.
+        hints:
+          - REFERENCE_FlyingHint
+        dice:
+          - name: Charges
+            color: white
+            values: [ 3 ]
+      - name: Moonlight Shadow
+        text: |-
+          Ultimate 4
+          At the end of each your turns, you and your allies become invisible and may Fly 1.
+        hints:
+          - REFERENCE_FlyingHint
+          - REFERENCE_UltimateHint
+        tokens:
+          - REFERENCE_Invisible
+  - name: Morphling
+    complexity: 3
+    polish: [ needs_testing ]
+    description: |-
+      - Slippery
+      - Can focus damage or durability
+      - Ultimate copies target's abilities
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/morphling.png
+    health: 8
+    speed: 3
+    default_abilities:
+      - name: Splash
+        text: Range 1, 2dmg
+    abilities:
+      - name: Waveform
+        text: |-
+          Tap, Instant +2:
+          Fly 2x your move speed in a straight line, ignoring units. Units moved through take 2dmg.
+        hints:
+          - REFERENCE_FlyingHint
+          - REFERENCE_InstantHint
+      - name: Attribute Shift
+        text: |-
+          Free action at start of turn. Choose one --
+          - Enter strength stance:
+              You have -1 speed.
+              You have resistance to damage. Units have resistance to damage from you.
+          - Enter agility stance: 
+              You have +1 speed.
+              Receive and deal +50% damage. 
+          - Exit your stance.
+        hints:
+          - REFERENCE_ResistanceHint
+        tokens:
+          - name: Strength Stance
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/2/27/Attribute_Shift_%28Strength_Gain%29_icon.png/revision/latest?cb=20120926231603
+            text: |-
+              You have -1 speed.
+              You have resistance to damage. Units have resistance to damage from you.
+          - name: Agility Stance
+            image_url: https://static.wikia.nocookie.net/dota2_gamepedia/images/a/a0/Attribute_Shift_%28Agility_Gain%29_icon.png/revision/latest?cb=20120926231600
+            text: |-
+              You have +1 speed.
+              Receive and deal +50% damage.
+      - name: Adaptive Strike
+        text: |-
+          Tap:
+          Range 4
+          If in strength stance:
+            Push 3, immobilize
+          If in agility stance:
+            2dmg
+        tokens:
+          - REFERENCE_Immobile
+      - name: Morph
+        text: |-
+          Ultimate 4, Free Action:
+          Range 4, gain ready copies of all of the target's non-passive, non-ultimate abilities. You may use their default abilities.
+        hints:
+          - REFERENCE_UltimateHint
+  - name: Necrophos
+    complexity: 1
+    polish: [ needs_testing ]
+    description: |-
+      - Large aura damage and healing
+    image_url: https://cdn.cloudflare.steamstatic.com/apps/dota2/videos/dota_react/heroes/renders/necrolyte.png
+    health: 8
+    speed: 3
+    passives:
+      - name: Start of turn
+        text: |-
+          Enemies in Burst 3, irreducible 1dmg + 1dmg per 2 Kill counters. 
+          Heal 1 per Kill counter
+      - name: On killing a unit with 4 or more health
+        text: Gain a Kill counter
+    tokens:
+      - REFERENCE_Kill
+    default_abilities:
+      - name: Death Pulse
+        text: |-
+          Enemies in burst 3, 1dmg
+          You and allies in burst 3, heal 1
+    abilities:
+      - name: Ghost Shroud
+        text: |-
+          1/Game, Instant +3
+          Until the end of your next turn:
+            You cannot be affected by default abilities.
+            You deal +100% healing.
+            You receive +1 damage.
+        hints:
+          - REFERENCE_InstantHint
+      - name: Death Seeker
+        text: |-
+          1/Game
+          Teleport to a space adjacent to an enemy in range 3.
+          Use a default ability.
+      - name: Reaper's Scythe
+        text: |-
+          1/Game
+          Range 3, immobilize.
+          At the start of your next turn, deal irreducible damage the target equal to their missing health.
+          On kill, gain 2 additional Kill counters.
+        tokens:
+          - REFERENCE_Paralyze
+          - REFERENCE_Immobile
