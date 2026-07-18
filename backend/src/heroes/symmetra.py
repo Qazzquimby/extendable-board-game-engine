@@ -15,13 +15,13 @@ from aimings import (
     TargetSelf,
     AimingResult,
     MultipleAimingResults,
+    AimingCondition,
 )
 from engine import Engine
 from entities import (
     Entity,
     Object,
     Hero,
-    Marker,
 )
 from modifiers import (
     Modifier,
@@ -244,12 +244,27 @@ class CreateSentryTurretInstruction(Instruction):
                 )
 
 
+def _is_near_any_enemy_max_range(engine: "Engine", actor: "Entity", point: "Point", max_range: int = 2) -> bool:
+    """Check if point is within turret firing range of any enemy entity."""
+    for e in engine.living_entities:
+        if e.team != actor.team and e.pos is not None:
+            if engine.grid.get_range(point, e.pos) <= max_range:
+                return True
+    return False
+
+
 class CreateSentryTurret(Ability):
     def __init__(self, owner_id: str):
         super().__init__(
             name="Create Sentry Turret",
             aiming=MultipleAiming(
-                [TargetPoint(in_range=None, empty=True) for _i in range(3)]
+                [
+                    TargetPoint(
+                        in_range=None, empty=True,
+                        condition=lambda e, a, p: _is_near_any_enemy_max_range(e, a, p),
+                    )
+                    for _i in range(3)
+                ]
             ),
             instructions=[CreateSentryTurretInstruction()],
             max_charges=1,
@@ -264,7 +279,23 @@ class CreateSentryTurret(Ability):
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        return 5.0
+        # Score placement: prefer positions near enemies and spread apart
+        if not aiming_result or not aiming_result.target_points:
+            return 0.0
+        turret_positions = aiming_result.target_points
+        # Count how many enemies are within range 2 of each turret
+        total_coverage = 0
+        for tp in turret_positions:
+            for e in engine.living_entities:
+                if e.team != actor.team and e.pos is not None:
+                    if engine.grid.get_range(tp, e.pos) <= 2:
+                        total_coverage += 1
+        # Reward spread: sum distances between all turret pairs
+        spread = 0.0
+        for i in range(len(turret_positions)):
+            for j in range(i + 1, len(turret_positions)):
+                spread += turret_positions[i].get_distance(turret_positions[j])
+        return 5.0 + total_coverage * 0.5 + spread * 0.1
 
 
 # endregion
@@ -442,7 +473,7 @@ class CreateShieldGeneratorInstruction(Instruction):
                     summoner=source,
                 )
                 for entity in engine.living_entities:
-                    if entity.team == source.team and entity.name != "Shield Generator":
+                    if entity.team == source.team and isinstance(entity, Hero):
                         entity.max_hp += 4
                         engine.event_queue.enqueue(HealEvent(subject=entity, amount=4))
 
@@ -477,12 +508,11 @@ class FloatingBarrierModifier(Modifier):
     valence = Valence.GOOD
 
     def __init__(self, direction: Point):
+        super().__init__()
         self.direction = direction
 
     def blocks_los_for(self, engine: "Engine", viewer: "Entity") -> bool:
-        owner = next(
-            (m for m in getattr(engine, "markers", []) if m.id == self.owner_id), None
-        )
+        owner = engine.get_entity_by_id(self.owner_id)
         if not owner:
             return False
         creator = (
@@ -496,17 +526,15 @@ class FloatingBarrierModifier(Modifier):
 
     @after(TurnStartEvent)
     def move_forward(self, engine: "Engine", event: TurnStartEvent):
-        owner = next(
-            (m for m in getattr(engine, "markers", []) if m.id == self.owner_id), None
-        )
+        owner = engine.get_entity_by_id(self.owner_id)
         if not owner or not owner.pos:
             return
-        creator = (
+        summoner = (
             engine.get_entity_by_id(owner.summoner_id)
             if hasattr(owner, "summoner_id")
             else None
         )
-        if creator and event.subject_id == creator.id:
+        if summoner and event.subject_id == summoner.id:
             for _ in range(2):
                 next_pos = owner.pos + self.direction
                 if (
@@ -515,6 +543,21 @@ class FloatingBarrierModifier(Modifier):
                 ):
                     if not engine.grid.is_movement_blocked(owner.pos, next_pos):
                         owner.pos = next_pos
+
+
+class FloatingBarrier(Object):
+    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity, direction: Point):
+        super().__init__(
+            engine=engine,
+            name="Floating Barrier",
+            hp=8,
+            pos=pos,
+            team=team,
+            summoner=summoner,
+        )
+        self.add_modifier(engine, FloatingBarrierModifier(direction=direction))
+        from entities import DoNothingAbility
+        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -529,13 +572,13 @@ class CreateFloatingBarrierInstruction(Instruction):
         dy = 1 if raw_dir.y > 0 else (-1 if raw_dir.y < 0 else 0)
         direction = Point(dx, dy)
 
-        marker = Marker(
-            engine=engine, name="Floating Barrier", pos=target_point, team=source.team, summoner_id=source.id
+        FloatingBarrier(
+            engine=engine,
+            pos=target_point,
+            team=source.team,
+            summoner=source,
+            direction=direction,
         )
-        mod = FloatingBarrierModifier(direction=direction)
-        mod.owner_id = marker.id
-        marker.modifiers.append(mod)
-        engine.router.subscribe(mod)
 
 
 class CreateFloatingBarrier(Ability):

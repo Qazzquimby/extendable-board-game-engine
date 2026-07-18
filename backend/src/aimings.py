@@ -366,6 +366,8 @@ class TargetPoint(Aiming):
                 if self.in_range is not None:
                     if engine.grid.get_range(start_pos, p) > self.in_range:
                         continue
+                if self.condition and not self.condition(engine, actor, p):
+                    continue
                 if require_los:
                     blocked_points = get_blocked_points(engine, actor)
                     visible, _ = engine.grid.get_line_of_sight(
