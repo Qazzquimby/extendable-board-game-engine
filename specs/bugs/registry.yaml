@@ -1,6 +1,5 @@
 # specs/bugs/registry.yaml
 # Flat registry of all filed bugs.
-# New issues get sequential IDs starting at BUG-001.
 
 bugs:
   - id: BUG-001
@@ -20,7 +19,6 @@ bugs:
     status: fixed
     severity: minor
     area: code-quality
-    note: "Resolved by user — file sizes refactored in BUG-003 branch"
 
   - id: BUG-004
     title: "Spy Go Invisible never used (no instructions, no priority)"
@@ -63,7 +61,6 @@ bugs:
     status: fixed
     severity: major
     area: ai/movement
-    note: "Resolved — get_optimal_range on Hero, fallback prefers optimal distance"
 
   - id: BUG-011
     title: "Zenyatta damage persists after death"
@@ -78,7 +75,7 @@ bugs:
     area: hero/necrophos
 
   - id: BUG-013
-    title: "No CONVENTIONS.md existed — no enforced standards for code quality"
+    title: "No CONVENTIONS.md existed — no enforced standards"
     status: fixed
     severity: major
     area: process
@@ -88,3 +85,77 @@ bugs:
     status: fixed
     severity: minor
     area: process
+
+  - id: BUG-015
+    title: "Soldier 76 doesn't match docs/overwatch.yaml"
+    status: open
+    severity: major
+    area: hero/soldier76
+    note: "Speed 3 not 4. Missing Sprint default. Helix Rockets: 1/game, range 4, +2miss, 3dmg. Biotic Field: creates 2x2 marker, not self-heal. Tactical Visor: unlimited range + undefendable."
+
+  - id: BUG-016
+    title: "Zenyatta doesn't match docs/overwatch.yaml"
+    status: open
+    severity: major
+    area: hero/zenyatta
+    note: "Orb of Destruction missing charged mode. Orb of Harmony: should be Free Action, unlimited range, creates auto-heal condition. Orb of Discord: Free Action, unlimited range. Transcendence missing immunity phase."
+
+  - id: BUG-017
+    title: "Reinhardt doesn't match docs/overwatch.yaml"
+    status: open
+    severity: major
+    area: hero/reinhardt
+    note: "Missing undefendable passive. Barrier: instant+3, 10hp barrier. Charge: first enemy 6dmg+immobile, rest 1dmg+push. Earthshatter: should give FullStun, not just Immobile."
+
+  - id: BUG-018
+    title: "Scout doesn't match docs/tf2.yaml"
+    status: open
+    severity: major
+    area: hero/scout
+    note: "Missing passives (flying while moving, +2miss). Scattergun missing self-push. Bonk/Crit-a-Cola cost wrong (Move+Standard not tap). Missing Mad Milk, Flying Guillotine, Sandman."
+
+  - id: BUG-019
+    title: "Spy doesn't match docs/tf2.yaml — Stealth completely wrong"
+    status: open
+    severity: critical
+    area: hero/spy
+    note: "Stealth should place 4 Possible Location objects and remove Spy from board. Not same-team decoys. Missing Backstab, Disguise, Sapper, Deadringer. Revolver needs unlimited range + kill counter."
+
+  - id: BUG-020
+    title: "Axe doesn't match docs/dota.yaml"
+    status: open
+    severity: major
+    area: hero/axe
+    note: "Missing counterattack passive. Culling Blade: 3dmg irreducible, on kill refresh. Health should be 10."
+
+  - id: BUG-021
+    title: "Viktoria not verified against source docs"
+    status: open
+    severity: major
+    area: hero/viktoria
+
+  - id: BUG-022
+    title: "Necrophos not verified against source docs"
+    status: open
+    severity: major
+    area: hero/necrophos
+
+  - id: BUG-023
+    title: "score_targets_in_area should be split into ally/enemy variants"
+    status: open
+    severity: minor
+    area: ai/priority
+
+  - id: BUG-024
+    title: "Mixed valence abilities get 0 priority from default _auto_priority"
+    status: open
+    severity: major
+    area: ai/priority
+    note: "Mixed valence instruction valence produces MIXED, which returns 0 from score_add_token. Needs override or fix."
+
+  - id: BUG-025
+    title: "Modifier duration field exists but has no lifecycle effect"
+    status: open
+    severity: minor
+    area: engine
+    note: "Modifier.duration was added to scoring but nothing in the engine removes modifiers when duration expires."
