@@ -1,6 +1,6 @@
 ---
 id: BUG-003
-status: open
+status: in-progress
 severity: minor
 area: code-quality
 ---
@@ -18,6 +18,17 @@ Multiple source files exceed the 400-line standard for module size:
 | `backend/src/engine.py` | 700+ | Game engine with event loop, agents, game runner |
 | `backend/src/events.py` | 250+ | Event base, turn events, ability events |
 | `backend/src/instruction_library.py` | 360+ | All instruction types |
+
+## Progress (2025-07-17)
+
+| File | Before | After | Status |
+|------|--------|-------|--------|
+| `backend/src/choices.py` | 444 | 137 | ✓ Split — `planner.py` (323) extracted |
+| `backend/src/abilities.py` | 785 | 405 | ✓ Split — `ability_base.py` (144) + `scoring.py` (296) extracted |
+| `backend/src/engine.py` | 741 | 706 | Partial — `agents.py` (49) extracted |
+| `backend/src/heroes/symmetra.py` | 795 | 795 | ✗ Not yet split |
+| `backend/src/instruction_library.py` | 353 | 353 | ✓ Under 400 |
+| `backend/src/events.py` | 333 | 333 | ✓ Under 400 |
 
 ## Required Fix
 
