@@ -236,6 +236,8 @@ class UseAnAbilityInstruction(Instruction):
                 for ability in valid_abilities
             ]
         )
+        if not choices:
+            return  # No valid abilities to choose from
         if self.subject_chooses:
             choosing_team = subject.team
         else:

@@ -224,6 +224,8 @@ class SentryTurret(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, TurretAttack())
+        from entities import DoNothingAbility
+        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -251,6 +253,7 @@ class CreateSentryTurret(Ability):
             ),
             instructions=[CreateSentryTurretInstruction()],
             max_charges=1,
+            requires_target=False,
             owner_id=owner_id,
         )
 
@@ -334,6 +337,9 @@ class Teleporter(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, TeleporterModifier())
+        from entities import DoNothingAbility
+        from aimings import TargetSelf
+        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -364,6 +370,7 @@ class CreateTeleporter(Ability):
             ),
             instructions=[CreateTeleporterInstruction()],
             max_charges=1,
+            requires_target=False,
             owner_id=owner_id,
         )
 
@@ -415,6 +422,9 @@ class ShieldGenerator(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, ShieldGeneratorModifier())
+        from entities import DoNothingAbility
+        from aimings import TargetSelf
+        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -445,6 +455,7 @@ class CreateShieldGenerator(Ability):
             instructions=[CreateShieldGeneratorInstruction()],
             is_ultimate=True,
             ultimate_turn=3,
+            requires_target=False,
             owner_id=owner_id,
         )
 
@@ -513,16 +524,14 @@ class CreateFloatingBarrierInstruction(Instruction):
     def execute(self, engine: "Engine", ctx: ActionContext) -> None:
         source = engine.get_entity_by_id(ctx.source_id)
         target_point = ctx.target_points[0]
-        direction = Point(target_point.x - source.pos.x, target_point.y - source.pos.y)
-        if direction.x != 0:
-            direction.x = 1 if direction.x > 0 else -1
-        if direction.y != 0:
-            direction.y = 1 if direction.y > 0 else -1
+        raw_dir = Point(target_point.x - source.pos.x, target_point.y - source.pos.y)
+        dx = 1 if raw_dir.x > 0 else (-1 if raw_dir.x < 0 else 0)
+        dy = 1 if raw_dir.y > 0 else (-1 if raw_dir.y < 0 else 0)
+        direction = Point(dx, dy)
 
         marker = Marker(
-            engine=engine, name="Floating Barrier", pos=target_point, team=source.team
+            engine=engine, name="Floating Barrier", pos=target_point, team=source.team, summoner_id=source.id
         )
-        marker.summoner_id = source.id
         mod = FloatingBarrierModifier(direction=direction)
         mod.owner_id = marker.id
         marker.modifiers.append(mod)
@@ -541,6 +550,7 @@ It has:
             aiming=TargetPoint(in_range=1, empty=True),
             instructions=[CreateFloatingBarrierInstruction()],
             max_charges=1,
+            requires_target=False,
             owner_id=owner_id,
         )
 
@@ -629,6 +639,7 @@ It has:
             instructions=[CreatePhotonBarrierInstruction()],
             is_ultimate=True,
             ultimate_turn=4,
+            requires_target=False,
             owner_id=owner_id,
         )
 

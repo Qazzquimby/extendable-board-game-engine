@@ -268,7 +268,7 @@ class Summon(Entity):
         )
         self.summoner = summoner
         self.activator = summoner.activator
-        event = SummonEvent(engine=engine, summoner=self.summoner, subject=self)
+        event = SummonEvent(summoner=self.summoner, subject=self)
         engine.event_queue.enqueue(event)
 
 

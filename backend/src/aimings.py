@@ -353,6 +353,10 @@ class TargetPoint(Aiming):
         if not start_pos:
             start_pos = actor.pos
 
+        # Limit plausible positions: when no range limit, return only nearest N
+        # This prevents combinatorial explosion from MultipleAiming with TargetPoint
+        MAX_PLAUSIBLE = 4
+
         res = []
         for x in range(engine.grid.width):
             for y in range(engine.grid.height):
@@ -370,6 +374,13 @@ class TargetPoint(Aiming):
                     if not visible:
                         continue
                 res.append(AimingResult(target_points=[p]))
+
+        # When no range limit, return only the nearest MAX_PLAUSIBLE positions
+        # This keeps strategic accuracy while limiting combinatorial explosion
+        if self.in_range is None and len(res) > MAX_PLAUSIBLE:
+            res.sort(key=lambda r: start_pos.get_distance(r.target_points[0]) if r.target_points else 999)
+            res = res[:MAX_PLAUSIBLE]
+
         return res
 
 
