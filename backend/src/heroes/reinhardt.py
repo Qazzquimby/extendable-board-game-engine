@@ -19,8 +19,8 @@ from events import before
 from modifiers import Immobile, ImmobileToken, Modifier
 from abilities import ActionContext, Instruction
 
-from event_library import PushEvent, PullEvent, DamageEvent
-from grid import Grid
+from event_library import PushEvent, PullEvent, DamageEvent, ChangeLocationEvent
+from grid import Grid, Direction
 from point import Point
 
 
@@ -47,55 +47,59 @@ class PathAllInRangeArea(PathArea):
 class ChargeInstruction(Instruction):
     valence: Valence = Valence.BAD
 
-    def execute(self, ctx: ActionContext) -> None:
+    def score(self, engine, actor, target, ctx) -> float:
+        # Charge is high-value: damage up to 6 + displacement
+        if target.team == actor.team:
+            return 0.0
+        # The first enemy hit takes 6, others take 1 — score the best case
+        from abilities import score_damage
+        return score_damage(6, target.hp)
+
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        source = engine.get_entity_by_id(ctx.source_id)
+        if not source:
+            return
+        path_points = list(ctx.included_points)
+        if not path_points:
+            return
+
+        # Find first enemy in path
         first_enemy = None
-        last_point = ctx.source.pos
-
-        # todo
-        #  Everything technically targets a point.
-        #  need to be able to efficiently get content of point.
-        #  Need easy guard against two entities being in same point (markers are not limited that way).
-        #  It's usually more convenient to treat targets as entities since its usually immediately resolved.
-        #  Don't want to need an expensive lookup many times during event handling.
-
-        # todo
-        #  For each space, check if there's a collision. The first collided entity is pushed along with you.
-        #  For each space that you or the collided entity is pushed into, try to push its content to the side (choose randomly if both are unoccupied).
-        #  If any space cannot be emptied, stop.
-        #  The below is teleporting to the end of the range and does nothing to prevent ending on top of another entity.
-
-        path = [ctx.source.pos] + ctx.included_points
-        last_point = path[-1]
-        second_last_point = path[-2]
-
-        for point in ctx.included_points:
-            entity = ctx.engine.entity_at(point)
-            if not entity:
-                continue
-            if not first_enemy:
+        first_enemy_idx = -1
+        for i, pt in enumerate(path_points):
+            entity = engine.entity_at(pt)
+            if entity and entity != source:
                 first_enemy = entity
-                DamageEvent(
-                    engine=ctx.engine,
-                    source=ctx.source,
-                    subject=entity,
-                    amount=6,
-                    ability=ctx.ability,
-                ).resolve()
-                AddTokenInstruction(token_class=ImmobileToken).execute(ctx=ctx)
-                entity.pos = last_point
-            else:
-                DamageEvent(
-                    engine=ctx.engine,
-                    source=ctx.source,
-                    subject=entity,
-                    amount=1,
-                    ability=ctx.ability,
-                ).resolve()
+                first_enemy_idx = i
+                break
 
         if first_enemy:
-            ctx.source.pos = second_last_point
+            # Damage first enemy for 6
+            engine.event_queue.enqueue(
+                DamageEvent(source=source, subject=first_enemy, amount=6)
+            )
+            # Push first enemy to end of path (last empty cell)
+            dest_idx = len(path_points) - 1
+            # Find last empty cell in path going forward
+            while dest_idx >= 0 and engine.entity_at(path_points[dest_idx]):
+                dest_idx -= 1
+            if dest_idx >= 0:
+                first_enemy.pos = path_points[dest_idx]
+                engine.event_queue.enqueue(
+                    ChangeLocationEvent(subject=first_enemy, new_pos=path_points[dest_idx])
+                )
+            # Reinhardt moves to just behind the enemy's starting position
+            rein_pos = path_points[max(0, first_enemy_idx - 1)] if first_enemy_idx > 0 else path_points[0]
+            source.pos = rein_pos
+            engine.event_queue.enqueue(
+                ChangeLocationEvent(subject=source, new_pos=rein_pos)
+            )
         else:
-            ctx.source.pos = last_point
+            # No enemies hit — Reinhardt charges to the end
+            source.pos = path_points[-1]
+            engine.event_queue.enqueue(
+                ChangeLocationEvent(subject=source, new_pos=path_points[-1])
+            )
 
 
 class CannotBePushedOrPulled(Modifier):
@@ -114,7 +118,7 @@ class Reinhardt(Hero):
             engine=engine, name="Reinhardt", hp=12, speed=3, pos=pos, team=team
         )
 
-        self.add_modifier(CannotBePushedOrPulled())
+        self.add_modifier(engine, CannotBePushedOrPulled())
 
         self.abilities.append(
             Ability(
@@ -133,7 +137,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Charge",
-                aiming=IncludeArea(area=Line(length=99, in_range=0)),
+                aiming=IncludeArea(area=Line(length=6, in_range=0)),
                 instructions=[ChargeInstruction()],
                 action_cost=ActionCost.MOVE_AND_STANDARD,
                 max_charges=1,
