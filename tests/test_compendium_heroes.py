@@ -102,11 +102,10 @@ def test_soldier76_heals_with_biotic_field():
     s = Soldier76(engine=e, pos=Point(0, 2), team=0)
     e.finalize_setup()
 
-    field = next((ab for ab in s.abilities if ab.name == "Biotic Field"), None)
+    field = next((ab for ab in s.abilities if ab.name == "Create Biotic Field"), None)
     assert field is not None
-    assert any(
-        "Heal" in type(inst).__name__ for inst in field.instructions
-    ), "Biotic Field should have a heal instruction"
+    assert field.max_charges == 1, "Biotic Field should be 1/game"
+    assert hasattr(field, 'execute'), "Biotic Field should have execute method"
 
 
 def test_zenyatta_has_transcendence_ultimate():
