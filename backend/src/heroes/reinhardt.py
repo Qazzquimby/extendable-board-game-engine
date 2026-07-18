@@ -64,31 +64,34 @@ class ChargeInstruction(Instruction):
         if not path_points:
             return
 
-        # Find first enemy in path
-        first_enemy = None
-        first_enemy_idx = -1
+        # Find ALL enemies in the charge path, recording their positions before any movement
+        enemies_on_path = []  # list of (entity, original_path_index)
         for i, pt in enumerate(path_points):
             entity = engine.entity_at(pt)
             if entity and entity != source:
-                first_enemy = entity
-                first_enemy_idx = i
-                break
+                enemies_on_path.append((entity, i))
 
-        if first_enemy:
-            engine.event_queue.enqueue(
-                DamageEvent(source=source, subject=first_enemy, amount=6)
-            )
-            # Push first enemy to end of path (last empty cell)
-            dest_idx = len(path_points) - 1
-            while dest_idx >= 0 and engine.entity_at(path_points[dest_idx]):
-                dest_idx -= 1
-            if dest_idx >= 0:
-                first_enemy.pos = path_points[dest_idx]
+        if enemies_on_path:
+            # Damage each enemy (first for 6, rest for 1)
+            for i, (ent, _) in enumerate(enemies_on_path):
+                amount = 6 if i == 0 else 1
                 engine.event_queue.enqueue(
-                    ChangeLocationEvent(subject=first_enemy, new_pos=path_points[dest_idx])
+                    DamageEvent(source=source, subject=ent, amount=amount)
                 )
-            # Reinhardt moves to just behind the enemy's starting position
-            rein_pos = path_points[max(0, first_enemy_idx - 1)]
+
+            # Push all enemies to the end of the path, farthest enemy goes farthest
+            dest_idx = len(path_points) - 1
+            for i, (ent, orig_idx) in enumerate(reversed(enemies_on_path)):
+                push_idx = dest_idx - i
+                if push_idx >= 0:
+                    ent.pos = path_points[push_idx]
+                    engine.event_queue.enqueue(
+                        ChangeLocationEvent(subject=ent, new_pos=path_points[push_idx])
+                    )
+
+            # Reinhardt moves to just behind the nearest enemy's original position
+            nearest_enemy_idx = enemies_on_path[0][1]
+            rein_pos = path_points[max(0, nearest_enemy_idx - 1)] if nearest_enemy_idx > 0 else path_points[0]
             source.pos = rein_pos
             engine.event_queue.enqueue(
                 ChangeLocationEvent(subject=source, new_pos=rein_pos)
@@ -116,19 +119,11 @@ class CannotBePushedOrPulled(Modifier):
 class BarrierShieldModifier(Modifier):
     """Blocks LOS for enemies. The shield sits on the edge in front of Reinhardt."""
 
+    shield_team: int = 0
     valence = Valence.GOOD
 
     def blocks_los_for(self, engine: "Engine", viewer: "Entity") -> bool:
-        owner = engine.get_entity_by_id(self.owner_id)
-        if not owner:
-            return False
-        # Find Reinhardt (the modifier's owner is the marker, we need Reinhardt)
-        rein = None
-        for e in engine.entities:
-            if isinstance(e, Reinhardt) and hasattr(e, 'shield_marker') and e.shield_marker.id == self.owner_id:
-                rein = e
-                break
-        if rein and viewer.team != rein.team:
+        if viewer.team != self.shield_team:
             return True
         return False
 
@@ -151,7 +146,7 @@ class Reinhardt(Hero):
             team=team,
             summoner_id=self.id,
         )
-        shield_mod = BarrierShieldModifier()
+        shield_mod = BarrierShieldModifier(shield_team=team)
         self.shield_marker.modifiers.append(shield_mod)
         shield_mod.owner_id = self.shield_marker.id
         engine.router.subscribe(shield_mod)
