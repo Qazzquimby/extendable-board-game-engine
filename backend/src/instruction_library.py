@@ -14,6 +14,7 @@ from event_library import (
     PushEvent,
     PullEvent,
     ChangeLocationEvent,
+    SummonEvent,
 )
 from grid import Direction
 from modifiers import Modifier, Token
@@ -364,4 +365,37 @@ class PushInstruction(Instruction):
             )
 
     def score(self, engine, actor, target, ctx) -> float:
+        return 0.0
+
+
+@dataclass(kw_only=True)
+class SummonInstruction(Instruction):
+    """Creates a new Entity/Object/Marker at the target position."""
+    entity_factory: Type
+    entity_kwargs: dict = field(default_factory=dict)
+    is_marker: bool = False
+    valence: Valence = Valence.GOOD
+
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        source = engine.get_entity_by_id(ctx.source_id)
+        if not source:
+            return
+        pos = ctx.subject_point
+        if self.is_marker:
+            marker = self.entity_factory(
+                engine=engine, pos=pos, team=source.team,
+                summoner_id=source.id, **self.entity_kwargs
+            )
+        else:
+            entity = self.entity_factory(
+                engine=engine, pos=pos, team=source.team,
+                summoner=source, **self.entity_kwargs
+            )
+            engine.event_queue.enqueue(SummonEvent(summoner=source, subject=entity))
+
+    def score(self, engine, actor, target, ctx) -> float:
+        """Default score for summoning — 2.0 if target is a valid position."""
+        from scoring import score_add_token
+        if target and target.team == actor.team:
+            return 2.0
         return 0.0
