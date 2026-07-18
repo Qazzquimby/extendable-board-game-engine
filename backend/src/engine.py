@@ -151,7 +151,7 @@ class Engine:
             return True
 
         # Only heroes matter for game over (objects don't keep a team in the game)
-        alive_heroes = [e for e in self.living_entities if not hasattr(e, 'summoner')]
+        alive_heroes = [e for e in self.living_entities if not hasattr(e, "summoner")]
         alive_teams = {e.team for e in alive_heroes}
         return len(alive_teams) <= 1
 
@@ -311,7 +311,12 @@ class Engine:
             return f"{prefix}{target_name} died"
         return f"{t}: {target_name}"
 
-    def _flush_events(self, logs: List[LogEntry], events: List[EventDescription], action_logs: Optional[List[str]] = None):
+    def _flush_events(
+        self,
+        logs: List[LogEntry],
+        events: List[EventDescription],
+        action_logs: Optional[List[str]] = None,
+    ):
         """Emit a LogEntry for a batch of events with generated messages."""
         if not events:
             return
@@ -386,7 +391,11 @@ class Engine:
                 current_key = key
 
             # Describe events at BEFORE state (first time we see them).
-            desc = event.describe(self) if (key is not None and event.state == "BEFORE") else None
+            desc = (
+                event.describe(self)
+                if (key is not None and event.state == "BEFORE")
+                else None
+            )
 
             if desc:
                 current_events.append(desc)
@@ -434,34 +443,17 @@ class Engine:
             )
             action_choice = next_choices[action_index]
 
-            # Reset logger so we capture EXACTLY this action's hierarchical logs.
-            # step() emits the top-level "Axe used Battle Hunger..." log.
-            # _process_events_into_log processes events (BEFORE→RESOLVE→AFTER),
-            #   which triggers modifiers that emit logs like "dealt X damage...".
-            # advance_until_choice processes remaining events (damage, modifiers)
-            #   so their logs ("gained X Token", "dealt X damage") are included.
             reset_logs()
 
             self.step(
                 action=action_choice,
                 action_idx=action_index,
             )
-
-            # Process queued events into log entries grouped by type.
-            # Each flush captures a log snapshot at that point.
             self._process_events_into_log(logs)
-
-            # Check for choices (reactions / decisions)
-            # advance_until_choice also processes remaining events (damage,
-            # modifiers), generating logs like "dealt X damage", "gained X Token".
             if self.event_queue._queue:
                 next_choices = self.advance_until_choice()
             else:
                 next_choices = self.advance_until_choice()
-
-            # Append any NEW logs generated during advance_until_choice (from
-            # DamageEvent._resolve, ApplyModifierEvent._resolve, etc.) to the
-            # last entry so damage/modifier logs appear in the sidebar.
             if logs and len(get_logs()) > 0:
                 existing = set(logs[-1].action_logs or [])
                 all_new = [l for l in get_logs() if l not in existing]
@@ -656,8 +648,16 @@ class Engine:
         if not self.is_done:
             return None
         # Only count heroes for victory condition (objects don't keep teams alive)
-        team_0 = [e for e in self.living_entities if e.team == 0 and not hasattr(e, 'summoner')]
-        team_1 = [e for e in self.living_entities if e.team == 1 and not hasattr(e, 'summoner')]
+        team_0 = [
+            e
+            for e in self.living_entities
+            if e.team == 0 and not hasattr(e, "summoner")
+        ]
+        team_1 = [
+            e
+            for e in self.living_entities
+            if e.team == 1 and not hasattr(e, "summoner")
+        ]
         if len(team_0) > len(team_1):
             return 0
         elif len(team_1) > len(team_0):
