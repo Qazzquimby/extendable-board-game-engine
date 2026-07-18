@@ -270,7 +270,6 @@ class CullingBlade(Ability):
                 """,
             aiming=TargetEntity(in_range=1),
             instructions=[CullingBladeInstruction()],
-            is_ultimate=True,
             max_charges=1,
             owner_id=owner_id,
         )

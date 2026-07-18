@@ -156,7 +156,6 @@ class Reinhardt(Hero):
                 instructions=[ApplyModifierInstruction(modifier_class=Immobile)],
                 is_ultimate=True,
                 ultimate_turn=4,
-                max_charges=1,
                 owner_id=self.id,
             )
         )
