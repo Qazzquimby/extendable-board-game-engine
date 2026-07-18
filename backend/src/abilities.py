@@ -132,6 +132,28 @@ def score_damage(amount: int, target_hp: int) -> float:
     return float(effective)
 
 
+def score_expected_damage(
+    amount: int,
+    target_hp: int,
+    target_defense: int = 0,
+    ability_defense: int = 0,
+    attacker_crit: int = 0,
+) -> float:
+    """Score for dealing `amount` damage, adjusted for miss/crit probability.
+
+    Uses the 1d6 combat roll: hit if roll > defense, crit if roll >= 7-crit_chance.
+    Accounts for the fact that crit is a subset of hit.
+    """
+    total_defense = min(4, target_defense + ability_defense)  # Cap at 4 (impossible to hit)
+    hit_values = max(0, 6 - total_defense)  # Rolls that hit: D+1 .. 6
+    crit_values = min(attacker_crit, 6 - total_defense)  # Crit rolls, capped at remaining hit values
+    # Expected damage = P(hit_no_crit) * amount + P(crit) * amount * 2
+    exp_dmg = (hit_values - crit_values) / 6.0 * amount + crit_values / 6.0 * amount * 2
+    if exp_dmg <= 0:
+        return 0.0
+    return score_damage(int(round(exp_dmg)), target_hp)
+
+
 def score_heal(amount: int, missing_hp: int) -> float:
     """Score for healing `amount` on a target missing `missing_hp` HP.
 

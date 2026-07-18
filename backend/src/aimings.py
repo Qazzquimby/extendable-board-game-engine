@@ -28,12 +28,20 @@ def get_blocked_points(engine: "Engine", actor: "Entity") -> set[Point]:
             for mod in ent.modifiers
         ):
             blocked_points.add(ent.pos)
+            # Line barriers block the entire row/column
+            for mod in ent.modifiers:
+                if hasattr(mod, "get_blocked_line"):
+                    blocked_points.update(mod.get_blocked_line(engine))
     for marker in getattr(engine, "markers", []):
         if marker.pos and any(
             getattr(mod, "blocks_los_for", lambda e, a: False)(engine, actor)
             for mod in marker.modifiers
         ):
             blocked_points.add(marker.pos)
+            # Line barriers block the entire row/column
+            for mod in marker.modifiers:
+                if hasattr(mod, "get_blocked_line"):
+                    blocked_points.update(mod.get_blocked_line(engine))
     return blocked_points
 
 

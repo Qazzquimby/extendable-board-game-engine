@@ -185,7 +185,9 @@ class Engine:
         if self.round_num > NUM_ROUNDS:
             return True
 
-        alive_teams = {e.team for e in self.living_entities}
+        # Only heroes matter for game over (objects don't keep a team in the game)
+        alive_heroes = [e for e in self.living_entities if not hasattr(e, 'summoner')]
+        alive_teams = {e.team for e in alive_heroes}
         return len(alive_teams) <= 1
 
     def advance_until_active_entity(self) -> "Entity":
@@ -687,8 +689,9 @@ class Engine:
     def get_winning_player(self) -> Optional[int]:
         if not self.is_done:
             return None
-        team_0 = [e for e in self.living_entities if e.team == 0]
-        team_1 = [e for e in self.living_entities if e.team == 1]
+        # Only count heroes for victory condition (objects don't keep teams alive)
+        team_0 = [e for e in self.living_entities if e.team == 0 and not hasattr(e, 'summoner')]
+        team_1 = [e for e in self.living_entities if e.team == 1 and not hasattr(e, 'summoner')]
         if len(team_0) > len(team_1):
             return 0
         elif len(team_1) > len(team_0):

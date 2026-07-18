@@ -153,7 +153,7 @@ class PhotonBeam(Ability):
         if not target:
             return 0.0
         token_count = target.get_token_count(engine, PhotonBeamToken)
-        return 2.0 + token_count * 2.0
+        return 3.0 + token_count * 2.0
 
 
 # endregion
@@ -175,16 +175,14 @@ class SentryTurretManager(Modifier):
 class TurretAttack(SummonModifier):
     valence = Valence.GOOD
 
-    @after(TurnStartEvent)
+    @after(TurnStartEvent, only_self=False)
     def fire_at_nearest(self, engine: "Engine", event: TurnStartEvent):
         owner = engine.get_entity_by_id(self.owner_id)
         if not owner or owner.pos is None:
             return
         # Only fire if it's the summoner's turn start
-        try:
-            summoner = summoner = engine.get_entity_by_id(owner.summoner_id)
-        except AttributeError:
-            print("Turret attack not on a summon")
+        summoner = getattr(owner, "summoner", None)
+        if not summoner:
             return
         if event.subject_id != summoner.id:
             return
@@ -572,21 +570,14 @@ class CreateFloatingBarrierInstruction(Instruction):
         dy = 1 if raw_dir.y > 0 else (-1 if raw_dir.y < 0 else 0)
         direction = Point(dx, dy)
 
-        # Place on the grid edge in the chosen direction
-        # Barrier moves inward (toward center) from the edge
-        edge_pos = Point(
-            target_point.x if dx == 0 else (engine.grid.width - 1 if dx > 0 else 0),
-            target_point.y if dy == 0 else (engine.grid.height - 1 if dy > 0 else 0),
-        )
-        # Movement direction: inward from the edge (toward center)
-        inward_direction = Point(-dx, -dy)
-
+        # Place at target point (within range 1).
+        # The barrier drifts forward (in the chosen direction) 2 spaces each activation.
         FloatingBarrier(
             engine=engine,
-            pos=edge_pos,
+            pos=target_point,
             team=source.team,
             summoner=source,
-            direction=inward_direction,
+            direction=direction,
         )
 
 
@@ -623,6 +614,11 @@ It has:
 class BlocksLOSModifier(Modifier):
     valence = Valence.GOOD
 
+    def __init__(self, is_horizontal: bool = False, line_index: int = 0):
+        super().__init__()
+        self.is_horizontal = is_horizontal
+        self.line_index = line_index
+
     def blocks_los_for(self, engine: "Engine", viewer: "Entity") -> bool:
         owner = engine.get_entity_by_id(self.owner_id)
         if not owner:
@@ -636,9 +632,18 @@ class BlocksLOSModifier(Modifier):
             return True
         return False
 
+    def get_blocked_line(self, engine: "Engine") -> list["Point"]:
+        owner = engine.get_entity_by_id(self.owner_id)
+        if not owner or not owner.pos:
+            return []
+        if self.is_horizontal:
+            return [Point(x, self.line_index) for x in range(engine.grid.width)]
+        else:
+            return [Point(self.line_index, y) for y in range(engine.grid.height)]
+
 
 class PhotonBarrier(Object):
-    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity):
+    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity, is_horizontal: bool = False):
         super().__init__(
             engine=engine,
             name="Photon Barrier",
@@ -647,7 +652,10 @@ class PhotonBarrier(Object):
             team=team,
             summoner=summoner,
         )
-        self.add_modifier(engine, BlocksLOSModifier())
+        self.add_modifier(engine, BlocksLOSModifier(
+            is_horizontal=is_horizontal,
+            line_index=pos.y if is_horizontal else pos.x,
+        ))
 
 
 @dataclass(kw_only=True)
@@ -661,15 +669,22 @@ class CreatePhotonBarrierInstruction(Instruction):
 
         dx = dir_pt.x - center.x
         dy = dir_pt.y - center.y
+        is_horizontal = abs(dx) > abs(dy)
 
-        if abs(dx) > abs(dy):
-            points = [Point(x, center.y) for x in range(engine.grid.width)]
+        # Place a single barrier at the center of the chosen line
+        # The BlocksLOSModifier marks the entire row/column as LOS-blocking
+        if is_horizontal:
+            barrier_pos = Point(center.x, engine.grid.height // 2)
         else:
-            points = [Point(center.x, y) for y in range(engine.grid.height)]
+            barrier_pos = Point(engine.grid.width // 2, center.y)
 
-        for pt in points:
-            if not engine.entity_at(pt):
-                PhotonBarrier(engine=engine, pos=pt, team=source.team, summoner=source)
+        PhotonBarrier(
+            engine=engine,
+            pos=barrier_pos,
+            team=source.team,
+            summoner=source,
+            is_horizontal=is_horizontal,
+        )
 
 
 class CreatePhotonBarrier(Ability):
@@ -722,7 +737,7 @@ class Symmetra(Hero):
         self.add_modifier(engine, SentryTurretManager())
         self.abilities.append(CreateSentryTurret(owner_id=self.id))
 
-        self.abilities.append(CreateTeleporter(owner_id=self.id))
+        # self.abilities.append(CreateTeleporter(owner_id=self.id))  # Teleporter: complex AI, deferred
         self.abilities.append(CreateShieldGenerator(owner_id=self.id))
         self.abilities.append(CreateFloatingBarrier(owner_id=self.id))
         self.abilities.append(CreatePhotonBarrier(owner_id=self.id))

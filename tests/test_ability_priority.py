@@ -222,6 +222,12 @@ class MockEntity:
         self.max_hp = max_hp
         self.team = team
 
+    def get_defense(self, engine=None, attack_source=None, ability=None):
+        return 0
+
+    def get_crit(self, engine=None, subject=None, ability=None):
+        return 0
+
 
 def test_auto_priority_damage_simple():
     """AxeSwing: 2 damage on 5hp enemy → score_damage(2,5)=2.0."""

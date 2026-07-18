@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Type, Optional
 
 from abilities import Instruction, DynamicInt, ActionContext, resolve_int, DynamicPoint
-from abilities import score_damage, score_heal, score_add_token
+from abilities import score_damage, score_expected_damage, score_heal, score_add_token
 from engine import Engine
 from event_library import (
     DamageEvent,
@@ -48,7 +48,16 @@ class DamageInstruction(Instruction):
         if target.team == actor.team:
             return 0.0
         dmg = resolve_int(self.amount, ctx) if callable(self.amount) else self.amount
-        return score_damage(dmg, target.hp) if isinstance(dmg, int) else 1.0
+        if isinstance(dmg, int):
+            target_def = getattr(target, 'get_defense', lambda **kw: 0)(engine=engine, attack_source=actor, ability=ctx.ability)
+            target_def = target_def if isinstance(target_def, int) else 0
+            ability_def = getattr(ctx.ability, 'defense', 0)
+            if not isinstance(ability_def, int):
+                ability_def = 0
+            crit = getattr(actor, 'get_crit', lambda **kw: 0)(engine=engine, subject=target, ability=ctx.ability)
+            crit = crit if isinstance(crit, int) else 0
+            return score_expected_damage(dmg, target.hp, target_def, ability_def, crit)
+        return 1.0
 
 
 @dataclass(kw_only=True)
