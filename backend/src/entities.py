@@ -192,6 +192,15 @@ class Entity:
         nearest_enemy = min(enemies, key=lambda e: self.pos.get_distance(e.pos))
         return nearest_enemy.pos
 
+    def get_optimal_range(self) -> int:
+        """Optimal engagement distance from the nearest enemy.
+
+        0 = no preference (move adjacent). Override in Hero to return
+        the max range of the default weapon. Abilities can also override
+        this — e.g. Shield Generator placement wants maximum distance.
+        """
+        return 0
+
     def add_modifier(
         self,
         engine: "Engine",
@@ -257,7 +266,22 @@ class Hero(Entity):
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
         )
         self.activator = self
-        # Heroes block enemy movement through their cells
+
+    def get_optimal_range(self) -> int:
+        """Maximum range of this hero's default ability.
+
+        Heroes default to wanting to fight at max weapon range.
+        Override in specific hero classes for different behavior.
+        """
+        from aimings import TargetEntity, IncludeArea
+        for ab in self.abilities:
+            if ab.is_default:
+                aiming = ab.aiming
+                if isinstance(aiming, TargetEntity):
+                    return aiming.in_range or 0
+                if isinstance(aiming, IncludeArea):
+                    return aiming.area.in_range or 0
+        return 0
 
 
 class Summon(Entity):

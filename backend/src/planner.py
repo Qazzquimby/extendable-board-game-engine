@@ -73,17 +73,29 @@ def get_plausible_movements(
         if len(proposed_moves) == 1:
             pref_pos = actor.get_preferred_position(engine)
             if pref_pos:
-                best_move = min(
-                    reachable_points,
-                    key=lambda p: (
-                        p.get_distance(pref_pos),
-                        p.get_distance(actor.pos),
-                    ),
-                )
+                optimal_range = actor.get_optimal_range()
+                if optimal_range > 0:
+                    # Prefer positions at optimal range from the nearest enemy
+                    best_move = min(
+                        reachable_points,
+                        key=lambda p: (
+                            abs(p.get_distance(pref_pos) - optimal_range),
+                            p.get_distance(actor.pos),
+                        ),
+                    )
+                else:
+                    # No range preference — move toward enemy
+                    best_move = min(
+                        reachable_points,
+                        key=lambda p: (
+                            p.get_distance(pref_pos),
+                            p.get_distance(actor.pos),
+                        ),
+                    )
                 if best_move != actor.pos:
-                    proposed_moves = {best_move: "Move towards preferred position"}
+                    proposed_moves = {best_move: f"Move to range {optimal_range} of enemy"}
 
-    return proposed_moves
+        return proposed_moves
 
 
 def get_plausible_actions_after_movement(
