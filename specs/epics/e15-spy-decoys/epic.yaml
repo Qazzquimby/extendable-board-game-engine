@@ -1,0 +1,38 @@
+# specs/epics/e15-spy-decoys/epic.yaml
+# Spy decoy redesign: Marker → real Entity objects
+
+id: e15
+title: "Spy Decoy Object Redesign"
+status: planned
+wsjf: 20
+summary: >
+  Replace the fragile TargetSpyOrDecoys custom-aiming hack with proper
+  SpyDecoyEntity(Entity) objects. Decoys get 1 HP, appear in entity_at()
+  lookups, and are targeted via standard TargetEntity. Remove the custom
+  Aiming class and the isinstance hack from choices.py.
+
+stories:
+  - id: e15s01
+    title: "SpyDecoyEntity class with targeting via TargetEntity"
+    bcps: 5
+    status: planned
+    delta: MODIFIED
+    requirement: >
+      SpyDecoyEntity replaces SpyDecoyMarker. Decoys are Entity subclass
+      with 1 HP. Revolver and Knife target them via TargetEntity + condition
+      check (entity must be Hero or SpyDecoyEntity). ChangeLocationEvent
+      hook keeps decoys moving with Spy. RevealOnHit removes decoys.
+
+  - id: e15s02
+    title: "Remove TargetSpyOrDecoys and choices.py hack"
+    bcps: 2
+    status: planned
+    delta: REMOVED
+    requirement: >
+      Delete the TargetSpyOrDecoys class from spy.py. Remove the
+      isinstance(ability.aiming, TargetSpyOrDecoys) type-name hack from
+      choices.py. Verify AI Spy uses abilities correctly.
+
+references:
+  - "BUG-001: specs/bugs/BUG-001-spy-decoys-objects.md"
+  - "SCOPE_LATEST: specs/product/SCOPE_LATEST.yaml"

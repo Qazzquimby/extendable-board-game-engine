@@ -1,46 +1,36 @@
 # specs/planning-context.yaml
-# Written by: elaborate-spec (Step 5)
-# Purpose: Captures the elaborated understanding of the project.
-#   Consumed by scope-work and slice-tasks in the planning spine.
-# What this file is: The output of the DISCOVER phase — what we know
-#   about the problem, solution boundaries, and key decisions so far.
+# Written by elaborate-spec for the Spy decoy redesign epic.
 
-feature_name: "Overwatch-style Tactical Game Engine"
-
+feature_name: "Spy decoys as real objects"
 problem_statement: >
-  Build a tactical teamfight game engine with a simulation API and
-  React/Phaser frontend. The engine handles a 3-phase event pipeline
-  (BEFORE→RESOLVE→AFTER), composable reactions (instant abilities),
-  grid-based movement with line-of-sight, attack rolls with crit/miss,
-  and hierarchical combat logging. The API serves game simulations
-  over HTTP, returning frame-by-frame logs for frontend playback.
+  Spy decoys are currently implemented as SpyDecoyMarker(Marker) with a custom
+  TargetSpyOrDecoys Aiming subclass. This is an unscalable pattern: the custom
+  Aiming isn't recognized by choices.py's isinstance chain (was silently dropped,
+  causing Spy to never attack), and every new hero needing targetable objects
+  would require its own Aiming hack. Markers have no HP, no entity_at lookup,
+  and can't be targeted by standard targeting systems.
 
 constraints:
-  - "Python backend, React/Phaser frontend"
-  - "FastAPI HTTP API for game simulation"
-  - "3-phase event pipeline (BEFORE → RESOLVE → AFTER)"
-  - "Grid-based, non-diagonal movement"
-  - "Attack rolls with defense, miss, and crit mechanics"
-  - "Reactions via ActionCost.INSTANT abilities with composable priority"
-  - "Hierarchical combat log via Logger with scoped context managers"
-  - "Event merge key (type, source_id) for frame grouping"
-  - "AbilityUseEvent always starts a new frame (absorption model)"
-  - "6 rounds per game, heroes activate left-to-right"
+  - "Decoys must be targetable by standard TargetEntity logic"
+  - "Decoys must move with Spy via ChangeLocationEvent"
+  - "Decoys must die when Spy is revealed or takes damage"
+  - "Decoys must have HP (1hp) so they can be destroyed"
+  - "choices.py must have no special-case isinstance hacks for Spy"
+  - "All existing Spy tests must pass after refactor"
 
 out_of_scope:
-  - "Multiplayer networking / real-time sync"
-  - "Persistent save/load of game state"
-  - "Undo/replay system"
-  - "AI training pipeline (MCTS self-play is separate)"
+  - "MCTS self-play pipeline"
+  - "Spy balance or ability tuning"
+  - "Other heroes' targeting systems"
+  - "Spy Go Invisible priority improvements (separate bug BUG-004)"
+  - "General ability priority refactor (separate bug BUG-002)"
 
 key_decisions:
-  - decision: "3-phase event pipeline instead of flat processing"
-    rationale: "Modifiers hook BEFORE/AFTER phases for reactions, dmg mods, and effects"
-  - decision: "Event merge by (type, source_id) with ability absorption"
-    rationale: "Groups related events per frame; ability use is the frame boundary"
-  - decision: "Hierarchical Logger with context manager scopes"
-    rationale: "Tree-structured logs per action instead of flat text"
-  - decision: "Reactions via instant abilities with composable priority functions"
-    rationale: "Per-hero reaction behavior; priority functions compose to pick the best"
-  - decision: "RuleBasedAgent for AI decisions"
-    rationale: "Deterministic AI for simulation; ties broken by lowest distance moved"
+  - decision: "Decoys become SpyDecoyEntity(Entity) with 1hp, not Marker"
+    rationale: "Entity subclasses appear in entity_at(), are targetable by TargetEntity, and can have HP/be destroyed"
+  - decision: "Remove TargetSpyOrDecoys entirely"
+    rationale: "No longer needed; standard TargetEntity with condition check replaces it"
+  - decision: "Keep ChangeLocationEvent hook for decoy movement"
+    rationale: "Decoys follow Spy, this mechanism works correctly"
+  - decision: "Keep removal-on-damage mechanic from RevealOnHit modifier"
+    rationale: "Works correctly — decoys die when Spy is hit"

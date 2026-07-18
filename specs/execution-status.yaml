@@ -244,9 +244,24 @@ stories:
     note: "Photon Orb, Beam, Sentry Turret, Teleporter, Shield Gen, Floating Barrier, Photon Barrier. 2 tests passing."
 
 # Totals
-total_bcps: 91
-total_stories: 31
+total_bcps: 98
+total_stories: 33
 completed_stories: 0
 stories_done: 31
 stories_partial: 0
-stories_untested: 0
+stories_untested: 2
+
+  # ── e15: Spy Decoy Redesign ──
+  - id: e15s01
+    epic: e15
+    title: "SpyDecoyEntity class with targeting via TargetEntity"
+    bcps: 5
+    status: planned
+    note: "Replace Marker-based decoys with SpyDecoyEntity(Entity)"
+
+  - id: e15s02
+    epic: e15
+    title: "Remove TargetSpyOrDecoys and choices.py hack"
+    bcps: 2
+    status: planned
+    note: "Clean up custom Aiming class and isinstance hack"

@@ -1,0 +1,91 @@
+# specs/epics/e15-spy-decoys/e15s01-tasks.yaml
+# Story: SpyDecoyEntity class with targeting via TargetEntity
+
+story_id: e15s01
+title: "SpyDecoyEntity class with targeting via TargetEntity"
+status: planned
+bcps: 5
+
+tasks:
+  - id: e15s01t01
+    description: >
+      Create SpyDecoyEntity(Entity) subclass in backend/src/heroes/spy.py.
+      1 HP, team matches Spy, no abilities other than Do Nothing (auto from
+      Entity.__init__). Remove SpyDecoyMarker class. Keep ChangeLocationEvent
+      hook for movement. Keep RevealOnHit mechanic.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      timeout 10 python -c "
+      import sys; sys.path.insert(0,'backend/src'); sys.path.insert(0,'backend')
+      from engine import Engine; from grid import Grid; from point import Point
+      from hero_registry import get_hero_class
+      e = Engine(grid=Grid(6,6), agents={}, seed=1)
+      Spy = get_hero_class('Spy')
+      s = Spy(engine=e, pos=Point(0,2), team=0)
+      e.finalize_setup()
+      decoys = [x for x in e.entities if x.name == 'SpyDecoy']
+      assert len(decoys) == 2, f'Expected 2 decoys, got {len(decoys)}'
+      for d in decoys:
+          assert hasattr(d, 'hp'), 'Decoy should have hp'
+          assert d.hp == 1, f'Expected 1 hp, got {d.hp}'
+          assert d.team == 0, f'Expected team 0, got {d.team}'
+      print(f'OK: {len(decoys)} SpyDecoyEntity instances created')
+      "
+
+  - id: e15s01t02
+    description: >
+      Update Revolver and Knife to use standard TargetEntity instead of
+      TargetSpyOrDecoys. Use TargetEntity(in_range=4) for Revolver and
+      TargetEntity(in_range=1) for Knife. Add an is_enemy_or_decoy condition
+      function that accepts enemy heroes OR SpyDecoyEntity instances.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      timeout 10 python -c "
+      import sys; sys.path.insert(0,'backend/src'); sys.path.insert(0,'backend')
+      from engine import Engine; from grid import Grid; from point import Point
+      from hero_registry import get_hero_class
+      e = Engine(grid=Grid(6,6), agents={}, seed=1)
+      Spy = get_hero_class('Spy'); Axe = get_hero_class('Axe')
+      s = Spy(engine=e, pos=Point(0,2), team=0)
+      a = Axe(engine=e, pos=Point(5,2), team=1)
+      e.finalize_setup()
+      revolver = next(ab for ab in s.abilities if ab.name == 'Revolver')
+      from aimings import Aiming, TargetEntity
+      assert type(revolver.aiming) == TargetEntity, f'Expected TargetEntity, got {type(revolver.aiming).__name__}'
+      aimings = revolver.aiming.get_all_aimings(e, s, start_pos=Point(2,2), require_los=False)
+      # Should find Axe AND decoys
+      pts = [p for aim in aimings for p in aim.target_points]
+      ents = [e.entity_at(p) for p in pts]
+      names = [x.name for x in ents if x]
+      print(f'OK: Revolver targets {names}')
+      assert 'Axe' in names, 'Should target enemy hero'
+      assert 'SpyDecoy' in names, 'Should target decoys'
+      " && echo "PASS"
+
+  - id: e15s01t03
+    description: >
+      Remove the type-name-based isinstance check for TargetSpyOrDecoys
+      from choices.py (the workaround added in the previous fix). Standard
+      TargetEntity handling now covers Spy decoys automatically.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      ! grep -n \"TargetSpyOrDecoys\" backend/src/choices.py &&
+      echo \"OK: no TargetSpyOrDecoys reference in choices.py\"
+
+  - id: e15s01t04
+    description: >
+      Update existing Spy tests to work with SpyDecoyEntity instead of
+      SpyDecoyMarker. Tests should verify: decoys are entities, have 1 HP,
+      move with Spy, die on reveal. Keep all existing test assertions valid.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      find . -path \"*/__pycache__/*\" -delete 2>/dev/null &&
+      timeout 30 python -m pytest tests/test_spy.py -q 2>&1 | tail -3
+
+  - id: e15s01t05
+    description: >
+      Full regression: all 143+ tests must pass after Spy refactor.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      find . -path \"*/__pycache__/*\" -delete 2>/dev/null &&
+      timeout 30 python -m pytest tests/ -q --ignore=tests/test_heroes.py 2>&1 | tail -5

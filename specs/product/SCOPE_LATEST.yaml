@@ -1,143 +1,58 @@
 # specs/product/SCOPE_LATEST.yaml
-# Written by: scope-work
-# What this file is: The bounded PRD — what's in and out of scope for this
-#   initiative. Every in_scope item maps to a future epic/story. Every
-#   out_of_scope has a reason (deferred, not valuable, too risky).
-#   This is WHAT and WHY, not HOW.
+# Scope for the Spy Decoy Object Redesign epic.
 
 core_value: >
-  A deterministic, API-served tactical game engine for Overwatch-style
-  hero battles on a grid, with frame-by-frame playback and extensible
-  hero abilities.
+  Replace the fragile custom-aiming hack for Spy decoys with proper Entity
+  objects, making the decoy system scalable, testable, and compatible with
+  the standard targeting pipeline.
 
 summary: >
-  This project builds a tactical teamfight game engine where two teams
-  of 4 heroes battle on a grid over 6 rounds. The engine runs the
-  simulation via a 3-phase event pipeline (BEFORE→RESOLVE→AFTER),
-  supporting attack rolls, damage modifiers, line-of-sight, area-of-effect
-  abilities, and composable instant-action reactions.
-  The engine serves game results via a FastAPI HTTP API, returning
-  frame-by-frame logs that a React/Phaser frontend renders as an
-  animated playback. New heroes can be added as Python modules without
-  modifying core engine code.
+  Spy decoys are currently SpyDecoyMarker(Marker) objects targeted via a
+  custom TargetSpyOrDecoys Aiming subclass. This pattern is unscalable:
+  the custom Aiming was silently dropped by choices.py's isinstance chain,
+  causing Spy to never attack. Every new hero needing targetable objects
+  would require its own Aiming hack. This scope replaces Marker-based
+  decoys with SpyDecoyEntity(Entity) subclasses that have 1 HP, appear in
+  entity_at() lookups, and are targetable via standard TargetEntity.
+  The custom TargetSpyOrDecoys class and the isinstance hack in choices.py
+  are removed.
 
 in_scope:
-  # ── Epic: Core Engine ──
-  - description: "Grid movement (non-diagonal, speed-based, pathfinding)"
-    epic: Core Engine
-  - description: "Turn system: 6 rounds, L-to-R activation, dead heroes pass"
-    epic: Core Engine
-  - description: "Entity system with heroes, summons, markers, and objects"
-    epic: Core Engine
-  - description: "3-phase event pipe (BEFORE→RESOLVE→AFTER) w/ re-enqueue"
-    epic: Core Engine
-  - description: "Router pub/sub for Modifier hooks at each event phase"
-    epic: Core Engine
-  - description: "Agent framework (RuleBasedAgent, RandomAgent)"
-    epic: Core Engine
-
-  # ── Epic: Combat System ──
-  - description: "Attack rolls with defense, miss chance, and crit hits"
-    epic: Combat System
-  - description: "Dmg modifiers (additive, multiplicative, resistance, armor)"
-    epic: Combat System
-  - description: "Line-of-sight with cover (+2 def vs blocking terrain)"
-    epic: Combat System
-  - description: "AoE shapes (burst, line, path, NxN) for multi-unit targeting"
-    epic: Combat System
-  - description: "Death handling and scoring (1 point per enemy hero killed)"
-    epic: Combat System
-
-  # ── Epic: Hero System ──
-  - description: "Hero registry with class lookup by name"
-    epic: Hero System
-  - description: "Ability system: costs, targeting, instructions, charges, ults"
-    epic: Hero System
-  - description: "Instruction lib (damage, heal, move, apply modifier, etc.)"
-    epic: Hero System
-  - description: "Playable heroes: Tracer, Axe, Viktoria, Necrophos"
-    epic: Hero System
-  - description: "Extensible hero modules — new heroes added w/o engine changes"
-    epic: Hero System
-
-  # ── Epic: Reaction System ──
-  - description: "Instant abilities (ActionCost.INSTANT) usable as reactions"
-    epic: Reaction System
-  - description: "ReactionOpportunityEvent between BEFORE and RESOLVE phases"
-    epic: Reaction System
-  - description: "Composable reaction priority (value, escape, conservation)"
-    epic: Reaction System
-  - description: "Reaction condition system — per-ability trigger conditions"
-    epic: Reaction System
-
-  # ── Epic: Log System ──
-  - description: "Hierarchical Logger with context manager scopes"
-    epic: Log System
-  - description: "Event merge (type, source_id) with ability absorption"
-    epic: Log System
-  - description: "Initial frame (pre-round empty state) + final frame (done)"
-    epic: Log System
-  - description: "Human-readable messages generated from EventDescriptions"
-    epic: Log System
-
-  # ── Epic: API ──
-  - description: "FastAPI /run-game (team config in, GameLog out)"
-    epic: API
-  - description: "FastAPI /heroes listing available hero classes"
-    epic: API
-  - description: "Pydantic schemas (GameLog, LogEntry, EventDescription, etc.)"
-    epic: API
-
-  # ── Epic: Frontend ──
-  - description: "Game setup screen (team composition, grid size, seed)"
-    epic: Frontend
-  - description: "Frame-by-frame playback with tween animations"
-    epic: Frontend
-  - description: "Entity sidebar: HP, modifiers, action logs per frame"
-    epic: Frontend
-  - description: "Viewport: 100vh, overflow hidden, scrollable sidebars"
-    epic: Frontend
-
-  # ── Epic: Integration / Game Runner ──
-  - description: "End-to-end sim: setup → run → log → API response"
-    epic: Game Runner
+  - "Create SpyDecoyEntity(Entity) subclass with 1 HP"
+  - "Decoys move with Spy via ChangeLocationEvent hook (existing mechanism)"
+  - "Decoys die when Spy is revealed or takes damage (existing mechanic)"
+  - "Revolver targets decoys AND enemies via TargetEntity(in_range=4, condition=is_enemy_or_decoy)"
+  - "Knife targets decoys AND enemies via TargetEntity(in_range=1, condition=is_enemy_or_decoy)"
+  - "Remove TargetSpyOrDecoys custom Aiming class"
+  - "Remove isinstance(ability.aiming, TargetSpyOrDecoys) hack from choices.py"
+  - "Update existing Spy tests to work with new Entity-based decoys"
+  - "Verify AI uses Revolver and Knife via analyze_ability_usage.py"
 
 out_of_scope:
-  - description: "Multiplayer networking / real-time sync"
-    reason: "Single-machine sim; no network layer"
-  - description: "Persistent save/load of game state"
-    reason: "Each game is ephemeral; no database"
-  - description: "Undo/replay system"
-    reason: "Effect pattern would be needed; deferred"
-  - description: "Player authentication or user accounts"
-    reason: "Open API for local/dev use only"
-  - description: "Reinhardt hero"
-    reason: "DEFERRED — needs ability design work; separate epic"
-  - description: "Spy hero"
-    reason: "DEFERRED — needs ability design work; separate epic"
-  - description: "Tabletop Simulator integration"
-    reason: "Physical board game out of scope"
+  - "General ability priority improvements (BUG-002) — deferred to separate work"
+  - "Spy Go Invisible priority fix (BUG-004) — deferred"
+  - "Other heroes' ability priority fixes (BUG-007, BUG-008, BUG-009) — deferred"
+  - "Movement AI optimal range (BUG-010) — deferred"
+  - "Zenyatta post-death damage fix (BUG-011) — deferred"
+  - "Necrophos Ghost Shroud timing fix (BUG-012) — deferred"
+  - "MCTS self-play pipeline"
+  - "Spy balance or ability tuning"
 
 constraints:
-  - "Python backend (3.12+), React/Phaser frontend"
-  - "FastAPI for HTTP API"
-  - "No database or external storage"
-  - "Deterministic simulation (seeded random for reproducibility)"
-  - "All heroes must follow the same ability/instruction contract"
-  - "New heroes must be addable without modifying core engine files"
+  - "All existing Spy tests must still pass after refactor"
+  - "No custom Aiming subclasses for Spy targeting"
+  - "choices.py must not contain isinstance hacks for Spy"
+  - "Decoys must be destroyable (1 HP)"
+  - "Decoys must move with Spy automatically"
 
 success_criteria:
-  - "Engine runs a full 6-round game with two teams of 4 heroes"
-  - "3-phase pipeline correctly processes BEFORE/RESOLVE/AFTER for every event"
-  - "Reactions fire and resolve within the triggering action's window"
-  - "Attack rolls respect defense, miss, and crit mechanics"
-  - "Hierarchical combat log captures per-action detail in tree format"
-  - "API serves valid GameLog responses for any valid team composition"
-  - "Frontend renders frame-by-frame playback from API response"
-  - "A new hero can be added by creating one file with no engine changes"
+  - "SpyDecoyEntity replaces SpyDecoyMarker — decoys are full Entity objects"
+  - "TargetSpyOrDecoys class is removed from codebase"
+  - "isinstance hack for Spy in choices.py is removed"
+  - "Spy uses Revolver and Knife in AI games (verify via analyze_ability_usage.py)"
+  - "All Spy tests pass"
+  - "All 143 existing tests pass"
 
 references:
-  - specs/planning-context.yaml
-  - specs/plans/TECH_STACK_LATEST.md
-  - specs/product/VISION_LATEST.yaml
-  - CONTEXT.md (domain glossary)
+  - "BUG-001: specs/bugs/BUG-001-spy-decoys-objects.md"
+  - "CONVENTIONS.md: Hero & Ability Standards"

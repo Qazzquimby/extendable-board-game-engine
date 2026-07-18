@@ -1,0 +1,50 @@
+# specs/epics/e15-spy-decoys/e15s02-tasks.yaml
+# Story: Remove TargetSpyOrDecoys and choices.py hack — final cleanup
+
+story_id: e15s02
+title: "Remove TargetSpyOrDecoys and choices.py hack"
+status: planned
+bcps: 2
+
+tasks:
+  - id: e15s02t01
+    description: >
+      Delete TargetSpyOrDecoys class and SpyDecoyMarker class from spy.py.
+      These are replaced by standard TargetEntity targeting working on
+      SpyDecoyEntity instances. Verify no references remain.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      ! grep -n \"class TargetSpyOrDecoys\" backend/src/heroes/spy.py &&
+      ! grep -n \"class SpyDecoyMarker\" backend/src/heroes/spy.py &&
+      ! grep -n \"SpyDecoyMarker\" backend/src/heroes/spy.py &&
+      ! grep -n \"TargetSpyOrDecoys\" backend/src/heroes/spy.py &&
+      echo \"OK: no TargetSpyOrDecoys or SpyDecoyMarker in spy.py\"
+
+  - id: e15s02t02
+    description: >
+      Remove the isinstance type-name workaround from choices.py
+      (the 'type(ability.aiming).__name__ == TargetSpyOrDecoys' hack).
+      Confirm no references to Spy decoys remain in choices.py.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      ! grep -n \"TargetSpyOrDecoys\" backend/src/choices.py &&
+      ! grep -n \"SpyDecoy\" backend/src/choices.py &&
+      echo \"OK: no Spy decoy hack in choices.py\"
+
+  - id: e15s02t03
+    description: >
+      Run ability usage analysis to confirm Spy uses Revolver and Knife
+      after the refactor. Target: both abilities used in at least 3/5 games.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      python analyze_ability_usage.py Spy --games 5 --seed 500 2>&1 |
+      grep -E \"Revolver.*used|Knife.*used\" &&
+      echo \"OK: abilities used by AI\"
+
+  - id: e15s02t04
+    description: >
+      Full regression after cleanup — verify all tests pass.
+    verify: >
+      cd D:/Users/User/PycharmProjects/gameEngineExperiments &&
+      find . -path \"*/__pycache__/*\" -delete 2>/dev/null &&
+      timeout 30 python -m pytest tests/ -q --ignore=tests/test_heroes.py 2>&1 | tail -5

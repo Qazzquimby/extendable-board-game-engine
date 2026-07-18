@@ -53,3 +53,9 @@ epics:
     wsjf: 10
     status: done
     summary: "End-to-end simulation, deterministic replay, integration"
+
+  - id: e15
+    title: "Spy Decoy Object Redesign"
+    wsjf: 20
+    status: planned
+    summary: "Replace Marker-based decoys + custom aiming hack with proper SpyDecoyEntity objects"
