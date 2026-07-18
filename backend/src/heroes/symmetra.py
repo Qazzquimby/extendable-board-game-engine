@@ -7,7 +7,7 @@ from abilities import (
     ActionContext,
     Instruction,
 )
-from instruction_library import DamageInstruction, TeleportInstruction
+from instruction_library import DamageInstruction, TeleportInstruction, AddModifierInstruction
 from aimings import (
     TargetEntity,
     MultipleAiming,
@@ -29,6 +29,7 @@ from modifiers import (
     Token,
     SlowToken,
 )
+from queries import QueryRoll
 from events import after
 from event_library import (
     TurnStartEvent,
@@ -44,15 +45,49 @@ from valence import Valence
 
 
 # region Photon Orb
-class PhotonOrb(Ability):
+@dataclass(kw_only=True)
+class ChargedPhotonOrb(Modifier):
+    """Fires a charged Photon Orb at the nearest enemy at the start of the owner's next turn."""
+    valence = Valence.BAD
+
+    @after(TurnStartEvent, only_self=False)
+    def fire_orb(self, engine: "Engine", event: TurnStartEvent):
+        owner = engine.get_entity_by_id(self.owner_id)
+        if not owner or owner.pos is None:
+            return
+        if event.subject_id != owner.id:
+            return
+
+        from aimings import get_blocked_points
+        blocked = get_blocked_points(engine, owner)
+        enemies = [
+            e for e in engine.living_entities
+            if e.team != owner.team and e.pos is not None
+            and owner.distance_to(e) <= 4
+            and engine.grid.get_line_of_sight(owner.pos, e.pos, blocked_points=blocked)[0]
+        ]
+        if enemies:
+            target = min(enemies, key=lambda e: owner.distance_to(e))
+            target_def = target.get_defense(engine=engine, attack_source=owner, ability=None) + 2
+            target_def = min(4, target_def)
+            roll = QueryRoll(rng=engine.rng, subject=owner).resolve(engine=engine)
+            if roll > target_def:
+                dmg = 4
+                # No crit for Photon Orb (it's a projectile, not a beam)
+                engine.event_queue.enqueue(DamageEvent(source=owner, subject=target, amount=dmg))
+
+        owner.remove_modifier(engine, self)
+
+
+class ChargePhotonOrb(Ability):
     def __init__(self, owner_id: str):
         super().__init__(
-            name="Photon Orb",
-            text="Range 4: +2 miss, 4dmg.",
-            aiming=TargetEntity(in_range=4),
-            instructions=[DamageInstruction(amount=4)],
+            name="Charge Photon Orb",
+            text="Charge a Photon Orb. Fires at the start of your next turn: Range 4, 4dmg, +2 miss.",
+            aiming=TargetSelf(),
+            instructions=[AddModifierInstruction(modifier_class=ChargedPhotonOrb)],
             is_default=True,
-            defense=2,
+            max_charges=1,
             owner_id=owner_id,
         )
 
@@ -153,7 +188,7 @@ class PhotonBeam(Ability):
         if not target:
             return 0.0
         token_count = target.get_token_count(engine, PhotonBeamToken)
-        return 3.0 + token_count * 2.0
+        return 2.0 + token_count * 2.0
 
 
 # endregion
@@ -240,7 +275,9 @@ class CreateSentryTurretInstruction(Instruction):
                 )
 
 
-def _is_near_any_enemy_max_range(engine: "Engine", actor: "Entity", point: "Point", max_range: int = 2) -> bool:
+def _is_near_any_enemy_max_range(
+    engine: "Engine", actor: "Entity", point: "Point", max_range: int = 2
+) -> bool:
     """Check if point is within turret firing range of any enemy entity."""
     for e in engine.living_entities:
         if e.team != actor.team and e.pos is not None:
@@ -256,7 +293,8 @@ class CreateSentryTurret(Ability):
             aiming=MultipleAiming(
                 [
                     TargetPoint(
-                        in_range=None, empty=True,
+                        in_range=None,
+                        empty=True,
                         condition=lambda e, a, p: _is_near_any_enemy_max_range(e, a, p),
                     )
                     for _i in range(3)
@@ -546,7 +584,9 @@ class FloatingBarrierModifier(Modifier):
 
 
 class FloatingBarrier(Object):
-    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity, direction: Point):
+    def __init__(
+        self, engine: Engine, pos: Point, team: int, summoner: Entity, direction: Point
+    ):
         super().__init__(
             engine=engine,
             name="Floating Barrier",
@@ -643,7 +683,14 @@ class BlocksLOSModifier(Modifier):
 
 
 class PhotonBarrier(Object):
-    def __init__(self, engine: Engine, pos: Point, team: int, summoner: Entity, is_horizontal: bool = False):
+    def __init__(
+        self,
+        engine: Engine,
+        pos: Point,
+        team: int,
+        summoner: Entity,
+        is_horizontal: bool = False,
+    ):
         super().__init__(
             engine=engine,
             name="Photon Barrier",
@@ -652,10 +699,13 @@ class PhotonBarrier(Object):
             team=team,
             summoner=summoner,
         )
-        self.add_modifier(engine, BlocksLOSModifier(
-            is_horizontal=is_horizontal,
-            line_index=pos.y if is_horizontal else pos.x,
-        ))
+        self.add_modifier(
+            engine,
+            BlocksLOSModifier(
+                is_horizontal=is_horizontal,
+                line_index=pos.y if is_horizontal else pos.x,
+            ),
+        )
 
 
 @dataclass(kw_only=True)
@@ -732,7 +782,7 @@ class Symmetra(Hero):
         self.add_modifier(engine, photon_beam_manager)
         self.abilities.append(PhotonBeam(owner_id=self.id, tracker=photon_beam_manager))
 
-        self.abilities.append(PhotonOrb(owner_id=self.id))
+        self.abilities.append(ChargePhotonOrb(owner_id=self.id))
 
         self.add_modifier(engine, SentryTurretManager())
         self.abilities.append(CreateSentryTurret(owner_id=self.id))

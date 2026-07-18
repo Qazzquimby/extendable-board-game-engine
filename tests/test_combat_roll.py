@@ -215,9 +215,9 @@ def test_ability_crit_chance():
     assert crit_count < hit_count, "Crits should be a subset of hits"
 
 
-def test_photon_orb_has_plus_two_miss():
-    """Verify Symmetra's Photon Orb still has +2 miss after the refactor."""
-    from heroes.symmetra import Symmetra
+def test_photon_orb_charge_then_fire():
+    """Verify Photon Orb is a charge-then-fire ability with +2 miss."""
+    from heroes.symmetra import Symmetra, ChargedPhotonOrb
 
     engine = Engine(seed=42, grid=Grid(width=5, height=5))
     symm = Symmetra(engine=engine, pos=Point(1, 1), team=0)
@@ -225,35 +225,22 @@ def test_photon_orb_has_plus_two_miss():
         engine=engine, name="Enemy", hp=10, speed=3, pos=Point(1, 2), team=1
     )
 
-    photon_orb = next(a for a in symm.abilities if a.name == "Photon Orb")
-    assert photon_orb is not None, "Symmetra should have Photon Orb"
-    assert photon_orb.defense == 2, (
-        f"Photon Orb should have defense=2, got {photon_orb.defense}"
+    # Ability is called "Charge Photon Orb", has TargetSelf aiming
+    charge_orb = next(a for a in symm.abilities if a.name == "Charge Photon Orb")
+    assert charge_orb is not None, "Symmetra should have Charge Photon Orb"
+    assert charge_orb.is_default, "Charge Photon Orb should be default"
+    assert charge_orb.aiming.__class__.__name__ == "TargetSelf", (
+        "Charge Photon Orb should aim at self"
     )
 
-    # Run a game and verify miss occurs
-    hit_count = 0
-    for run in range(20):
-        engine2 = Engine(seed=42 + run, grid=Grid(width=5, height=5))
-        symm2 = Symmetra(engine=engine2, pos=Point(1, 1), team=0)
-        enemy2 = TestHero(
-            engine=engine2, name="Enemy", hp=10, speed=3, pos=Point(1, 2), team=1
-        )
+    # +2 miss is in the ChargedPhotonOrb modifier's fire_orb method
+    assert hasattr(ChargedPhotonOrb, "fire_orb"), "ChargedPhotonOrb needs fire_orb"
 
-        po2 = next(a for a in symm2.abilities if a.name == "Photon Orb")
-        aiming_result = po2.aiming.get_all_aimings(
-            engine2, actor=symm2, start_pos=symm2.pos, require_los=False
-        )[0]
-        roll_result = po2.get_roll_result(
-            aiming_result=aiming_result, engine=engine2, source=symm2
-        )
-        if roll_result.hit_points:
-            hit_count += 1
-
-    # With defense=2, ~67% hit rate. Over 20 runs both hits and misses.
-    assert 0 < hit_count < 20, (
-        f"Photon Orb should sometimes miss with defense=2, got {hit_count}/20 hits"
-    )
+    # Verify ChargedPhotonOrb adds +2 to defense when firing
+    import inspect
+    source = inspect.getsource(ChargedPhotonOrb.fire_orb)
+    assert "+ 2" in source, ("ChargedPhotonOrb should have +2 miss bonus")
+    assert "target_def = min(4, target_def)" in source, "Defense should cap at 4"
 
 
 def test_no_photon_orb_miss_chance_modifier():

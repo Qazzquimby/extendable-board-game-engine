@@ -49,7 +49,9 @@ def run_game(req: RunGameRequest) -> GameLog:
     _validate_positions(req)
 
     agents = {0: RuleBasedAgent(), 1: RuleBasedAgent()}
-    engine = Engine(grid=Grid(req.grid_size, req.grid_size), agents=agents, seed=req.seed)
+    engine = Engine(
+        grid=Grid(req.grid_size, req.grid_size), agents=agents, seed=req.seed
+    )
     _create_entities(engine, req, hero_classes)
 
     engine.finalize_setup()
@@ -105,4 +107,4 @@ def _create_entities(engine, req, hero_classes):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
