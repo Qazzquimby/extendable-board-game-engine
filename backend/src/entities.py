@@ -86,6 +86,11 @@ class Entity:
         self.move_actions = 1
         self.standard_actions = 1
         self.free_actions = 99  # Arbitrary large number
+        for ab in self.abilities:
+            if ab.is_tapped:
+                ab.is_tapped = False
+            if ab.tapped_this_turn:
+                ab.tapped_this_turn = False
 
     def gain_ability(self, engine: "Engine", ability: Ability):
         ability.owner_id = self.id

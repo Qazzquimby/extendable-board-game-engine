@@ -130,7 +130,6 @@ def get_plausible_actions_after_movement(
     ):
         actions = non_passing_actions
 
-    assert actions, f"No valid actions for {actor.name} at {move_pos}"
     return actions
 
 

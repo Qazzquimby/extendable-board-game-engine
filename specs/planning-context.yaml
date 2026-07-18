@@ -1,36 +1,37 @@
 # specs/planning-context.yaml
-# Written by elaborate-spec for the Spy decoy redesign epic.
+# Priority rewrite epic — BUG-002, BUG-007, BUG-008, BUG-009, BUG-004, BUG-012
 
-feature_name: "Spy decoys as real objects"
+feature_name: "Ability Priority System Overhaul"
 problem_statement: >
-  Spy decoys are currently implemented as SpyDecoyMarker(Marker) with a custom
-  TargetSpyOrDecoys Aiming subclass. This is an unscalable pattern: the custom
-  Aiming isn't recognized by choices.py's isinstance chain (was silently dropped,
-  causing Spy to never attack), and every new hero needing targetable objects
-  would require its own Aiming hack. Markers have no HP, no entity_at lookup,
-  and can't be targeted by standard targeting systems.
+  Multiple heroes have abilities the AI never uses because they lack
+  get_priority() overrides. The default _auto_priority returns 0.0 for
+  self-targeting buffs, AddModifierInstructions, ultimates, and tap
+  abilities. Every ability needs a priority that reflects "how good is
+  this ability in this situation" — if an ability is genuinely never
+  good, that's a game design problem, not a code problem.
 
 constraints:
-  - "Decoys must be targetable by standard TargetEntity logic"
-  - "Decoys must move with Spy via ChangeLocationEvent"
-  - "Decoys must die when Spy is revealed or takes damage"
-  - "Decoys must have HP (1hp) so they can be destroyed"
-  - "choices.py must have no special-case isinstance hacks for Spy"
-  - "All existing Spy tests must pass after refactor"
+  - "Every ability must have get_priority() returning a value reflecting situation quality"
+  - "Common patterns should use helpers from scoring.py to avoid boilerplate"
+  - "Modifier values should be individual (not all worth 2)"
+  - "Default _auto_priority should handle buffs, heals, and modifiers"
+  - "Ultimates should become more attractive as the game progresses"
+  - "Tap abilities should be preferred if they improve the situation"
+  - "Verify with analyze_ability_usage.py before declaring done"
 
 out_of_scope:
-  - "MCTS self-play pipeline"
-  - "Spy balance or ability tuning"
-  - "Other heroes' targeting systems"
-  - "Spy Go Invisible priority improvements (separate bug BUG-004)"
-  - "General ability priority refactor (separate bug BUG-002)"
+  - "Spy decoy redesign (BUG-001 — already fixed)"
+  - "File size refactoring (BUG-003 — already fixed)"
+  - "Movement optimal range (BUG-010 — already fixed)"
+  - "Zenyatta damage persists after death (BUG-011 — separate Zenyatta fix)"
+  - "Floating Barrier and Teleporter (BUG-005, BUG-006 — design issues)"
 
 key_decisions:
-  - decision: "Decoys become SpyDecoyEntity(Entity) with 1hp, not Marker"
-    rationale: "Entity subclasses appear in entity_at(), are targetable by TargetEntity, and can have HP/be destroyed"
-  - decision: "Remove TargetSpyOrDecoys entirely"
-    rationale: "No longer needed; standard TargetEntity with condition check replaces it"
-  - decision: "Keep ChangeLocationEvent hook for decoy movement"
-    rationale: "Decoys follow Spy, this mechanism works correctly"
-  - decision: "Keep removal-on-damage mechanic from RevealOnHit modifier"
-    rationale: "Works correctly — decoys die when Spy is hit"
+  - decision: "Merge BUG-007, BUG-008, BUG-009, BUG-004, BUG-012 into one epic"
+    rationale: "All are the same root cause: missing get_priority overrides"
+  - decision: "Modifier.valence drives default modifier priority weight"
+    rationale: "Bad modifiers on enemies ≈ 2 + (duration / 2), Good modifiers on allies ≈ 1 + (duration / 4)"
+  - decision: "AddModifierInstruction.score uses modifier's valence × weight"
+    rationale: "Replaces flat 2.0 for all modifiers with contextual valuation"
+  - decision: "Ultimate priority scales with round number (flat 1.0 from ult_turn onward)"
+    rationale: "Ultimates become available at specific rounds and should be used when available"
