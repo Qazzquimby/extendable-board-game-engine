@@ -2,15 +2,17 @@
 """
 Quick-play harness: set up a game, run it, print readable results.
 Usage:
-    python quick_play.py                                    # Symmetra vs Axe
-    python quick_play.py --seed 7                           # Specific seed
+    python quick_play.py --hero0 Symmetra                   # Vs Melee Hero
+    python quick_play.py --hero0 Symmetra --seed 7          # Specific seed
     python quick_play.py --hero0 Symmetra --hero1 Axe       # Named heroes
-    python quick_play.py --grid 6 --turns 5                 # Verbose first 5 turns
+    python quick_play.py --hero0 Symmetra--grid 6 --turns 5 # Verbose first 5 turns
 """
 
 import sys
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "backend", "src"))
+
 
 def main():
     import argparse
@@ -18,10 +20,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--grid", type=int, default=6)
-    parser.add_argument("--hero0", default="Symmetra")
-    parser.add_argument("--hero1", default="Axe")
-    parser.add_argument("--turns", type=int, default=0,
-                        help="Show raw events for the first N turns (0=skip)")
+    parser.add_argument("--hero0", default="MeleeHero")
+    parser.add_argument("--hero1", default="MeleeHero")
+    parser.add_argument(
+        "--turns",
+        type=int,
+        default=0,
+        help="Show raw events for the first N turns (0=skip)",
+    )
     args = parser.parse_args()
 
     from engine import Engine, RuleBasedAgent
@@ -37,8 +43,8 @@ def main():
     Hero0 = get_hero_class(args.hero0)
     Hero1 = get_hero_class(args.hero1)
 
-    h0 = Hero0(engine=e, pos=Point(0, 0), team=0)
-    h1 = Hero1(engine=e, pos=Point(args.grid - 1, 0), team=1)
+    h0 = Hero0(engine=e, pos=Point(1, 1), team=0)
+    h1 = Hero1(engine=e, pos=Point(3, 3), team=1)
 
     e.finalize_setup()
     log = e.run_game()
@@ -46,13 +52,15 @@ def main():
     print(f"Game: {args.hero0} (team 0) vs {args.hero1} (team 1)")
     print(f"Grid: {args.grid}x{args.grid},  seed: {args.seed}")
     print(f"Turns: {len(log.logs)}")
-    print(f"Winner: team {log.winner_team} ({args.hero0 if log.winner_team == 0 else args.hero1 if log.winner_team == 1 else 'draw'})")
+    print(
+        f"Winner: team {log.winner_team} ({args.hero0 if log.winner_team == 0 else args.hero1 if log.winner_team == 1 else 'draw'})"
+    )
     print()
 
     # ── Debug: show raw events for first N turns ──
     if args.turns > 0:
         print(f"─── First {args.turns} turns ───")
-        for i, entry in enumerate(log.logs[:args.turns]):
+        for i, entry in enumerate(log.logs[: args.turns]):
             state = entry.state
             # Snapshot: which entities are where
             entities_at = {}
@@ -111,6 +119,7 @@ def main():
 
     # ── Ability use summary ──
     from collections import Counter
+
     ability_uses = Counter()
     damage_dealt = Counter()
     for entry in log.logs:
