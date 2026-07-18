@@ -1,0 +1,88 @@
+# specs/bugs/registry.yaml
+# Flat registry of all filed bugs.
+# New issues get sequential IDs starting at BUG-001.
+
+bugs:
+  - id: BUG-001
+    title: "Spy decoys use custom TargetSpyOrDecoys aiming hack instead of real objects"
+    status: open
+    severity: major
+    area: hero/spy
+
+  - id: BUG-002
+    title: "Many abilities never used by AI — missing get_priority overrides"
+    status: open
+    severity: major
+    area: ai/priority
+
+  - id: BUG-003
+    title: "Hero files too large — multiple files over 400 lines"
+    status: open
+    severity: minor
+    area: code-quality
+
+  - id: BUG-004
+    title: "Spy Go Invisible never used (no instructions, no priority)"
+    status: open
+    severity: minor
+    area: hero/spy
+
+  - id: BUG-005
+    title: "Floating Barrier disabled — no edge UI, AI can't use it"
+    status: open
+    severity: minor
+    area: hero/symmetra
+
+  - id: BUG-006
+    title: "Teleporter disabled — complex AI deferred"
+    status: open
+    severity: minor
+    area: hero/symmetra
+
+  - id: BUG-007
+    title: "Soldier 76 Helix Rockets, Biotic Field, Tactical Visor never used"
+    status: open
+    severity: major
+    area: hero/soldier76
+
+  - id: BUG-008
+    title: "Reinhardt Fire Strike, Earthshatter never used"
+    status: open
+    severity: major
+    area: hero/reinhardt
+
+  - id: BUG-009
+    title: "Scout Bonk, Crit-a-Cola, Fan O'War never used (priority issues)"
+    status: open
+    severity: major
+    area: hero/scout
+
+  - id: BUG-010
+    title: "Movement AI doesn't maintain optimal range"
+    status: open
+    severity: major
+    area: ai/movement
+
+  - id: BUG-011
+    title: "Zenyatta damage persists after death"
+    status: open
+    severity: major
+    area: hero/zenyatta
+
+  - id: BUG-012
+    title: "Necrophos Ghost Shroud used at wrong time"
+    status: open
+    severity: minor
+    area: hero/necrophos
+
+  - id: BUG-013
+    title: "No CONVENTIONS.md existed — no enforced standards for code quality"
+    status: fixed
+    severity: major
+    area: process
+
+  - id: BUG-014
+    title: "Issues lived in .scratch/ instead of specs/bugs/"
+    status: fixed
+    severity: minor
+    area: process
