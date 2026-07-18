@@ -1,9 +1,10 @@
 """
 Spy — infiltration hero with invisibility decoys.
 
-Invisibility: Spy creates decoy markers at nearby positions.
+Invisibility: Spy creates decoy entities at nearby positions.
 Only the real Spy can be damaged, but enemies see all positions as equal.
 When Spy moves, decoys move too. Attacking while invisible reveals Spy.
+Decoys have 1 HP and can be destroyed by enemy attacks.
 """
 
 from dataclasses import dataclass
@@ -14,19 +15,13 @@ from abilities import (
     Instruction,
     ActionContext,
 )
-from aimings import AimingResult, MultipleAimingResults
 from typing import Union
 from point import Point
 from valence import Valence
 from instruction_library import DamageInstruction
-from aimings import (
-    TargetEntity,
-    TargetSelf,
-    Aiming,
-    AimingResult,
-)
+from aimings import TargetEntity, TargetSelf, AimingResult
 from engine import Engine
-from entities import Hero, Marker
+from entities import Hero, Entity
 from events import after
 from event_library import (
     ChangeLocationEvent,
@@ -37,18 +32,29 @@ from modifiers import Modifier
 from point import Point
 
 
-class SpyDecoyMarker(Marker):
-    """Marker that looks like a Spy to the enemy."""
+class SpyDecoyEntity(Entity):
+    """Entity that looks like a Spy to the enemy. 1 HP, no activation."""
 
     def __init__(self, engine: Engine, pos: Point, team: int, summoner_id: int):
         super().__init__(
-            engine=engine, name="Spy Decoy", pos=pos, team=team, summoner_id=summoner_id
+            engine=engine, name="SpyDecoy", hp=1, speed=0, pos=pos, team=team
         )
+        self.summoner_id = summoner_id
+
+
+def is_enemy_or_decoy(engine: "Engine", actor: "Entity", point: "Point") -> bool:
+    """Condition: target at point is an enemy OR a SpyDecoyEntity."""
+    target = engine.entity_at(point)
+    if target is None:
+        return False
+    if target.team != actor.team:
+        return True
+    return isinstance(target, SpyDecoyEntity)
 
 
 @dataclass(kw_only=True)
 class SpyInvisibilityManager(Modifier):
-    """Manages Spy decoy markers — creates, moves, and cleans them up."""
+    """Manages Spy decoy entities — creates, moves, and cleans them up."""
 
     decoy_ids: list = None
     valence = Valence.GOOD
@@ -59,7 +65,9 @@ class SpyInvisibilityManager(Modifier):
         self._last_pos = None
 
     def create_decoys(self, engine: Engine, owner: Hero):
-        """Create decoy markers at cells around the Spy (not on top of anyone)."""
+        """Create decoy entities at cells around the Spy (not on top of anyone)."""
+        # Remove old decoys first
+        self.remove_decoys(engine)
         self.decoy_ids = []
         if not owner.pos:
             return
@@ -75,10 +83,9 @@ class SpyInvisibilityManager(Modifier):
                         candidates.append(p)
         # Pick up to 2 decoy positions, preferring ones far from each other
         chosen = []
-        for p in candidates[:8]:  # limit candidates to adjacent
+        for p in candidates:
             if len(chosen) >= 2:
                 break
-            # Prefer far from existing chosen decoys
             if all(p.get_distance(c) >= 2 for c in chosen):
                 chosen.append(p)
         # Fallback: just pick first 2
@@ -88,32 +95,35 @@ class SpyInvisibilityManager(Modifier):
                 chosen.append(p)
 
         for pos in chosen[:2]:
-            marker = SpyDecoyMarker(
+            decoy = SpyDecoyEntity(
                 engine=engine, pos=pos, team=owner.team, summoner_id=owner.id
             )
-            self.decoy_ids.append(marker.id)
+            self.decoy_ids.append(decoy.id)
 
     def remove_decoys(self, engine: Engine):
-        """Remove all decoy markers."""
-        engine.markers = [m for m in engine.markers if m.id not in self.decoy_ids]
+        """Remove all decoy entities."""
+        for decoy_id in self.decoy_ids:
+            decoy = engine.get_entity_by_id(decoy_id)
+            if decoy:
+                decoy.hp = 0
         self.decoy_ids = []
 
     def move_decoys(self, engine: Engine, old_pos: Point, new_pos: Point):
         """Move decoys along with Spy using the same relative offset."""
         dx = new_pos.x - old_pos.x
         dy = new_pos.y - old_pos.y
-        for marker_id in self.decoy_ids:
-            marker = next((m for m in engine.markers if m.id == marker_id), None)
-            if marker and marker.pos is not None:
+        for decoy_id in self.decoy_ids:
+            decoy = engine.get_entity_by_id(decoy_id)
+            if decoy and decoy.pos is not None:
                 new_decoy_pos = Point(
-                    marker.pos.x + dx, marker.pos.y + dy
+                    decoy.pos.x + dx, decoy.pos.y + dy
                 )
                 # Clamp to grid bounds
                 new_decoy_pos = Point(
                     max(0, min(engine.grid.width - 1, new_decoy_pos.x)),
                     max(0, min(engine.grid.height - 1, new_decoy_pos.y)),
                 )
-                marker.pos = new_decoy_pos
+                decoy.pos = new_decoy_pos
 
     @after(ChangeLocationEvent, only_self=False)
     def on_spy_move(self, engine: "Engine", event: ChangeLocationEvent):
@@ -122,8 +132,7 @@ class SpyInvisibilityManager(Modifier):
         owner = engine.get_entity_by_id(self.owner_id)
         if not owner or not owner.pos:
             return
-        # We don't have old_pos from the event, so store it
-        if hasattr(self, '_last_pos') and self._last_pos is not None:
+        if self._last_pos is not None:
             self.move_decoys(engine, self._last_pos, owner.pos)
         self._last_pos = owner.pos
 
@@ -132,53 +141,6 @@ class SpyInvisibilityManager(Modifier):
         if event.subject_id != self.owner_id:
             return
         self.remove_decoys(engine)
-
-
-class TargetSpyOrDecoys(Aiming):
-    """Targets enemy entities OR Spy decoy markers (for targeting through invisibility)."""
-
-    def __init__(self, in_range: int = None):
-        super().__init__()
-        self.in_range = in_range
-
-    def get_all_aimings(
-        self, engine: "Engine", actor: "Entity", start_pos=None, require_los=True,
-    ) -> list:
-        if not start_pos:
-            start_pos = actor.pos
-
-        results = []
-        # Regular entities
-        from aimings import get_blocked_points
-        blocked = get_blocked_points(engine, actor) if require_los else set()
-        targets = set()
-
-        for e in engine.entities:
-            if e.pos is None or e.team == actor.team:
-                continue
-            if self.in_range is not None:
-                d = engine.grid.get_range(start_pos, e.pos)
-                if d > self.in_range:
-                    continue
-            if require_los and e.pos in blocked:
-                continue
-            targets.add(e.pos)
-
-        # Spy decoy markers (on enemy team from actor's perspective)
-        for m in getattr(engine, "markers", []):
-            if m.pos is None or m.team == actor.team:
-                continue
-            if not isinstance(m, SpyDecoyMarker):
-                continue
-            if self.in_range is not None:
-                d = engine.grid.get_range(start_pos, m.pos)
-                if d > self.in_range:
-                    continue
-            targets.add(m.pos)
-
-        for pos in targets:
-            results.append(AimingResult(target_points=[pos]))
-        return results
 
 
 class RevealOnHit(Modifier):
@@ -210,11 +172,11 @@ class Spy(Hero):
         # Create decoys AFTER position is set (super().__init__ sets pos)
         self.invisibility.create_decoys(engine, self)
 
-        # Revolver — basic attack that can target through decoys
+        # Revolver — basic attack targeting enemies and decoys
         self.abilities.append(
             Ability(
                 name="Revolver",
-                aiming=TargetSpyOrDecoys(in_range=4),
+                aiming=TargetEntity(in_range=4, condition=is_enemy_or_decoy),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
                 requires_target=False,
@@ -222,11 +184,11 @@ class Spy(Hero):
             )
         )
 
-        # Knife — backstab (high damage if target can't see you)
+        # Knife — backstab (high damage, short range)
         self.abilities.append(
             Ability(
                 name="Knife",
-                aiming=TargetSpyOrDecoys(in_range=1),
+                aiming=TargetEntity(in_range=1, condition=is_enemy_or_decoy),
                 instructions=[DamageInstruction(amount=4)],
                 max_charges=1,
                 requires_target=False,
@@ -246,5 +208,3 @@ class Spy(Hero):
                 owner_id=self.id,
             )
         )
-
-
