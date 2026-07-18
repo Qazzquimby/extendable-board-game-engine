@@ -139,9 +139,9 @@ class ReactionOpportunityEvent(Event):
                 self.entity_idx += 1
                 continue
 
+            from planner import _get_plausible_uses_of_ability_at_pos
             from choices import (
                 PlausibleFreeAction,
-                _get_plausible_uses_of_ability_at_pos,
                 Choice,
             )
             from abilities import ActionCost

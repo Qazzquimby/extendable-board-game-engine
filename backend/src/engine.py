@@ -17,8 +17,8 @@ from choices import (
     PlausibleFreeAction,
     PlausibleMoveAndAction,
     get_plausible_free_actions,
-    get_plausible_move_and_actions,
 )
+from planner import get_plausible_move_and_actions
 from entities import Entity, Marker, Hero
 from events import (
     EventPhase,
