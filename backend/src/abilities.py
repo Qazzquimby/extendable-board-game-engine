@@ -575,6 +575,8 @@ class Ability:
         return hash(self) == hash(other)
 
     def __post_init__(self):
+        if self.is_ultimate and self.max_charges is None:
+            self.max_charges = 1
         self.charges = self.max_charges
 
     @property

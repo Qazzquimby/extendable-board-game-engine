@@ -15,6 +15,7 @@ class EntityState(BaseModel):
     standard_actions: int
     free_actions: int
     modifiers: List[str] = []
+    is_object: bool = False
 
 
 class EngineState(BaseModel):

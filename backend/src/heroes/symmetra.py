@@ -224,8 +224,6 @@ class SentryTurret(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, TurretAttack())
-        from entities import DoNothingAbility
-        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -368,9 +366,6 @@ class Teleporter(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, TeleporterModifier())
-        from entities import DoNothingAbility
-        from aimings import TargetSelf
-        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -453,9 +448,6 @@ class ShieldGenerator(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, ShieldGeneratorModifier())
-        from entities import DoNothingAbility
-        from aimings import TargetSelf
-        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -497,7 +489,17 @@ class CreateShieldGenerator(Ability):
         pos: "Point",
         aiming_result: Union["AimingResult", "MultipleAimingResults"],
     ) -> float:
-        return 10.0
+        # Prefer positions far from enemies
+        if not aiming_result or not aiming_result.target_points:
+            return 10.0
+        tp = aiming_result.target_points[0]
+        min_dist = engine.grid.width + engine.grid.height
+        for e in engine.living_entities:
+            if e.team != actor.team and e.pos is not None:
+                d = tp.get_distance(e.pos)
+                if d < min_dist:
+                    min_dist = d
+        return 10.0 + min_dist * 0.5
 
 
 # endregion
@@ -556,8 +558,6 @@ class FloatingBarrier(Object):
             summoner=summoner,
         )
         self.add_modifier(engine, FloatingBarrierModifier(direction=direction))
-        from entities import DoNothingAbility
-        self.abilities.append(DoNothingAbility(name="Do Nothing", aiming=TargetSelf(), instructions=[], owner_id=self.id))
 
 
 @dataclass(kw_only=True)
@@ -572,12 +572,21 @@ class CreateFloatingBarrierInstruction(Instruction):
         dy = 1 if raw_dir.y > 0 else (-1 if raw_dir.y < 0 else 0)
         direction = Point(dx, dy)
 
+        # Place on the grid edge in the chosen direction
+        # Barrier moves inward (toward center) from the edge
+        edge_pos = Point(
+            target_point.x if dx == 0 else (engine.grid.width - 1 if dx > 0 else 0),
+            target_point.y if dy == 0 else (engine.grid.height - 1 if dy > 0 else 0),
+        )
+        # Movement direction: inward from the edge (toward center)
+        inward_direction = Point(-dx, -dy)
+
         FloatingBarrier(
             engine=engine,
-            pos=target_point,
+            pos=edge_pos,
             team=source.team,
             summoner=source,
-            direction=direction,
+            direction=inward_direction,
         )
 
 

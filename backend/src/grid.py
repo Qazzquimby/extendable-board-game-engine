@@ -126,6 +126,7 @@ class Grid:
             e.pos
             for e in engine.entities
             if e.team != actor.team and e.hp > 0 and e.pos is not None
+            and not hasattr(e, 'summoner')  # Objects are walk-through
         }
         occupied_points = {
             e.pos
@@ -185,6 +186,7 @@ class Grid:
             e.pos
             for e in engine.entities
             if e.team != actor.team and e.hp > 0 and e.pos is not None
+            and not hasattr(e, 'summoner')  # Objects are walk-through
         }
 
         width = self.width

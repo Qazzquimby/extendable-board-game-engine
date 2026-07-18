@@ -63,6 +63,13 @@ class Entity:
         engine.add_entity(self)
         self.pos = pos  # runs setter
 
+        from aimings import TargetSelf
+        self.abilities.append(
+            DoNothingAbility(
+                name=DO_NOTHING, aiming=TargetSelf(), instructions=[], owner_id=self.id
+            )
+        )
+
     def __str__(self):
         return f"{self.name}({self.id})"
 
@@ -111,6 +118,7 @@ class Entity:
             standard_actions=self.standard_actions,
             free_actions=self.free_actions,
             modifiers=[str(modifier) for modifier in self.modifiers],
+            is_object=hasattr(self, 'summoner'),
         )
 
     # --- Engine Query Helpers ---
@@ -218,6 +226,12 @@ class Entity:
         event = RemoveTokenEvent(subject=self, token_class=token_class, amount=amount)
         engine.event_queue.enqueue(event)
 
+    @property
+    def blocks_path(self) -> bool:
+        """Whether this entity blocks enemy movement through its cell.
+        Objects (non-Hero entities) do not block pathing."""
+        return False
+
     def get_token_count(self, engine: "Engine", token_class: Type["Token"]) -> int:
         return GetTokenCountQuery(subject=self, token_class=token_class).resolve(engine)
 
@@ -243,11 +257,7 @@ class Hero(Entity):
             engine=engine, name=name, hp=hp, speed=speed, pos=pos, team=team
         )
         self.activator = self
-        self.abilities.append(
-            DoNothingAbility(
-                name=DO_NOTHING, aiming=TargetSelf(), instructions=[], owner_id=self.id
-            )
-        )
+        # Heroes block enemy movement through their cells
 
 
 class Summon(Entity):

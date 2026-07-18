@@ -65,6 +65,7 @@ export interface EntityState {
   standard_actions: StandardActions;
   free_actions: FreeActions;
   modifiers?: Modifiers;
+  is_object?: boolean;
   [k: string]: unknown;
 }
 

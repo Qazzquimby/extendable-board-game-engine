@@ -441,22 +441,34 @@ export class GameScene extends Phaser.Scene {
         const isDead = entity.hp <= 0;
         const entityContainer = this.add.container(pixelX, pixelY);
 
-        // Team-colored background disc
+        // Team-colored background
         const bg = this.add.graphics();
-        const radius = this.tileSize * 0.4;
+        const isObj = entity.is_object;
+        const radius = this.tileSize * (isObj ? 0.32 : 0.4);
+        const halfSize = radius * 0.7;
         const teamColor = isDead ? 0x444444 : TEAM_COLORS[entity.team];
 
         bg.fillStyle(teamColor, isDead ? 0.4 : 0.85);
-        bg.fillCircle(0, 0, radius);
-        bg.lineStyle(2, isDead ? 0x666666 : TEAM_COLORS_LIGHT[entity.team], 1);
-        bg.strokeCircle(0, 0, radius);
+        if (isObj) {
+            bg.fillRoundedRect(-halfSize, -halfSize, halfSize * 2, halfSize * 2, 3);
+            bg.lineStyle(2, isDead ? 0x666666 : TEAM_COLORS_LIGHT[entity.team], 1);
+            bg.strokeRoundedRect(-halfSize, -halfSize, halfSize * 2, halfSize * 2, 3);
+        } else {
+            bg.fillCircle(0, 0, radius);
+            bg.lineStyle(2, isDead ? 0x666666 : TEAM_COLORS_LIGHT[entity.team], 1);
+            bg.strokeCircle(0, 0, radius);
+        }
         entityContainer.add(bg);
 
         // Active entity highlight ring
         if (isActive && !isDead) {
             const ring = this.add.graphics();
             ring.lineStyle(3, 0xffff44, 1);
-            ring.strokeCircle(0, 0, radius + 4);
+            if (isObj) {
+                ring.strokeRoundedRect(-halfSize - 3, -halfSize - 3, halfSize * 2 + 6, halfSize * 2 + 6, 3);
+            } else {
+                ring.strokeCircle(0, 0, radius + 4);
+            }
             entityContainer.add(ring);
         }
 
