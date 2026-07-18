@@ -11,7 +11,12 @@ from dataclasses import dataclass
 from abilities import (
     Ability,
     ActionCost,
+    Instruction,
+    ActionContext,
 )
+from aimings import AimingResult, MultipleAimingResults
+from typing import Union
+from point import Point
 from valence import Valence
 from instruction_library import DamageInstruction
 from aimings import (
@@ -212,6 +217,7 @@ class Spy(Hero):
                 aiming=TargetSpyOrDecoys(in_range=4),
                 instructions=[DamageInstruction(amount=2)],
                 is_default=True,
+                requires_target=False,
                 owner_id=self.id,
             )
         )
@@ -223,6 +229,7 @@ class Spy(Hero):
                 aiming=TargetSpyOrDecoys(in_range=1),
                 instructions=[DamageInstruction(amount=4)],
                 max_charges=1,
+                requires_target=False,
                 owner_id=self.id,
             )
         )
@@ -235,6 +242,9 @@ class Spy(Hero):
                 aiming=TargetSelf(),
                 instructions=[],
                 max_charges=1,
+                requires_target=False,
                 owner_id=self.id,
             )
         )
+
+

@@ -350,7 +350,7 @@ def _get_plausible_uses_of_ability_at_pos(
                         priority=priority,
                         **choice_kwargs,
                     )
-            elif isinstance(ability.aiming, TargetEntity):
+            elif isinstance(ability.aiming, TargetEntity) or type(ability.aiming).__name__ == 'TargetSpyOrDecoys':
                 for target_point in aiming_res.target_points:
                     target = engine.entity_at(target_point)
                     if not target:

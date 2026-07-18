@@ -479,6 +479,13 @@ class Ability:
         elif isinstance(self.aiming, IncludeArea):
             attack_range = self.aiming.area.in_range
 
+        # TargetSpyOrDecoys is a custom aiming that works like TargetEntity
+        aiming_type = type(self.aiming).__name__
+        if aiming_type == 'TargetSpyOrDecoys':
+            in_range = getattr(self.aiming, 'in_range', None)
+            if in_range is not None:
+                attack_range = in_range
+
         if attack_range > 0 and reachable_points:
             reachable_enemies = [
                 e

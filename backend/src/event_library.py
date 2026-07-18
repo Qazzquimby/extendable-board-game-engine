@@ -206,6 +206,36 @@ class DamageEvent(Event):
         if subject.has_armor(engine=engine):
             self.amount.add(-1)
 
+        # Check for damage amplification modifiers
+        vuln_pct = 0
+        for mod in subject.modifiers:
+            fn = getattr(mod, "apply_vulnerable", None)
+            if fn is not None:
+                try:
+                    vuln_pct += fn()
+                except Exception:
+                    pass
+
+        buff_pct = 0
+        if self.source:
+            for mod in self.source.modifiers:
+                fn = getattr(mod, "apply_damage_buff", None)
+                if fn is not None:
+                    try:
+                        buff_pct += fn()
+                    except Exception:
+                        pass
+
+        if vuln_pct > 0:
+            bonus = (self.amount.value * vuln_pct) // 100
+            if bonus > 0:
+                self.amount.add(bonus)
+
+        if buff_pct > 0:
+            bonus = (self.amount.value * buff_pct) // 100
+            if bonus > 0:
+                self.amount.add(bonus)
+
         final_damage = max(0, self.amount.value)
         old_hp = subject.hp
         new_hp = max(0, subject.hp - final_damage)

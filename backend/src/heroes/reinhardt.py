@@ -20,7 +20,7 @@ from instruction_library import (
     ApplyModifierInstruction,
 )
 from aimings import IncludeArea, TargetSelf
-from areas import Square, PathArea, Line
+from areas import Square, PathArea, Line, OrthogonalLine
 from engine import Engine
 from entities import Hero, Marker
 from events import before, after
@@ -72,11 +72,10 @@ class ChargeInstruction(Instruction):
                 enemies_on_path.append((entity, i))
 
         if enemies_on_path:
-            # Damage each enemy (first for 6, rest for 1)
-            for i, (ent, _) in enumerate(enemies_on_path):
-                amount = 6 if i == 0 else 1
+            # All enemies take 4 damage
+            for ent, _ in enemies_on_path:
                 engine.event_queue.enqueue(
-                    DamageEvent(source=source, subject=ent, amount=amount)
+                    DamageEvent(source=source, subject=ent, amount=4)
                 )
 
             # Push all enemies to the end of the path, farthest enemy goes farthest
@@ -89,13 +88,18 @@ class ChargeInstruction(Instruction):
                         ChangeLocationEvent(subject=ent, new_pos=path_points[push_idx])
                     )
 
-            # Reinhardt moves to just behind the nearest enemy's original position
-            nearest_enemy_idx = enemies_on_path[0][1]
-            rein_pos = path_points[max(0, nearest_enemy_idx - 1)] if nearest_enemy_idx > 0 else path_points[0]
-            source.pos = rein_pos
-            engine.event_queue.enqueue(
-                ChangeLocationEvent(subject=source, new_pos=rein_pos)
-            )
+            # Reinhardt moves to adjacent to the nearest pushed enemy's FINAL position
+            nearest_enemy = enemies_on_path[0][0]
+            for i in range(len(path_points) - 1, -1, -1):
+                if path_points[i] == nearest_enemy.pos:
+                    # nearest_enemy is now at path_points[i] after push
+                    rein_pos_idx = max(0, i - 1)
+                    rein_pos = path_points[rein_pos_idx]
+                    source.pos = rein_pos
+                    engine.event_queue.enqueue(
+                        ChangeLocationEvent(subject=source, new_pos=rein_pos)
+                    )
+                    break
         else:
             source.pos = path_points[-1]
             engine.event_queue.enqueue(
@@ -175,7 +179,7 @@ class Reinhardt(Hero):
         self.abilities.append(
             Ability(
                 name="Fire Strike",
-                aiming=IncludeArea(area=Line(length=99)),
+                aiming=IncludeArea(area=OrthogonalLine(length=99)),
                 instructions=[DamageInstruction(amount=3)],
                 taps=True,
                 owner_id=self.id,

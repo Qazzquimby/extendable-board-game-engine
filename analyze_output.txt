@@ -1,0 +1,18 @@
+
+=== Analyzing Scout vs Axe (5 games) ===
+
+  Game 1 (seed=700, winner=team 1): ['Scattergun']
+  Game 2 (seed=701, winner=team 1): ['Scattergun']
+  Game 3 (seed=702, winner=team 1): ['Scattergun']
+  Game 4 (seed=703, winner=team 1): ['Scattergun']
+  Game 5 (seed=704, winner=team 1): ['Scattergun']
+
+--- Summary ---
+  Scattergun                     used in  5/5 games (100%) avg 2.0/game
+  Bonk Atomic Punch              used in  0/5 games (  0%) avg 0.0/game ** NEVER USED **
+  Crit-a-Cola                    used in  0/5 games (  0%) avg 0.0/game ** NEVER USED **
+  Fan O'War                      used in  0/5 games (  0%) avg 0.0/game ** NEVER USED **
+
+  ** NEVER USED: ['Bonk Atomic Punch', 'Crit-a-Cola', "Fan O'War"]
+
+Results saved to D:\Users\User\PycharmProjects\gameEngineExperiments\analyze_output.txt

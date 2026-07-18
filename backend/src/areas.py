@@ -56,6 +56,43 @@ class Burst(Area):
             yield selection
 
 
+class OrthogonalLine(Area):
+    """Line that only extends in the 4 cardinal directions (no diagonals)."""
+
+    def __init__(
+        self,
+        length: int,
+        in_range: int = 0,
+    ):
+        super().__init__(in_range=in_range)
+        self.length = length
+
+    def __hash__(self):
+        return hash((type(self), self.in_range, self.length))
+
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return (self.in_range, self.length) == (other.in_range, other.length)
+
+    def get_selections(self, grid: Grid, start: Point) -> Iterator[Set[Point]]:
+        valid_starts = (
+            {start}
+            if self.in_range == 0
+            else grid.get_points_in_range(start, self.in_range)
+        )
+        seen_lines = set()
+        for s in valid_starts:
+            for dx, dy in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                target = Point(s.x + dx * self.length, s.y + dy * self.length)
+                if not (0 <= target.x < grid.width and 0 <= target.y < grid.height):
+                    continue
+                line = UniqueTuple(get_line(grid, s, target, self.length))
+                if line and line not in seen_lines:
+                    seen_lines.add(line)
+                    yield line
+
+
 class Line(Area):
     def __init__(
         self,
