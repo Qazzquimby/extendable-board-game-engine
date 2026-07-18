@@ -283,7 +283,7 @@ class Ability:
             return Valence.GOOD
         if has_bad:
             return Valence.BAD
-        assert False
+        return Valence.MIXED  # No instructions (e.g. Sprint)
 
     def is_available(self, round_num: Optional[int] = None):
         if self.is_tapped:

@@ -61,8 +61,9 @@ def test_ranged_hero_fallback_moves_to_optimal_range():
     # Enemy at distance 9, Soldier76 has speed 4 and range 4
     # Fallback should propose moving to maintain range (not adjacent)
     moves = get_plausible_movements(s, e)
-    assert len(moves) == 1, f"Expected 1 fallback move, got {len(moves)}"
-    move_pos = list(moves.keys())[0]
+    move_positions = [p for p in moves.keys() if p != s.pos]
+    assert len(move_positions) >= 1, f"Expected at least 1 non-stay move, got {move_positions}"
+    move_pos = move_positions[0]
     enemy_dist = move_pos.get_distance(a.pos)
     assert enemy_dist >= 4, f"Should be at least range 4 from enemy, got {enemy_dist}"
     assert move_pos != s.pos, "Should not stay in place"
