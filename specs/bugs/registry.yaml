@@ -17,9 +17,10 @@ bugs:
 
   - id: BUG-003
     title: "Hero files too large — multiple files over 400 lines"
-    status: open
+    status: fixed
     severity: minor
     area: code-quality
+    note: "Resolved by user — file sizes refactored in BUG-003 branch"
 
   - id: BUG-004
     title: "Spy Go Invisible never used (no instructions, no priority)"
@@ -59,9 +60,10 @@ bugs:
 
   - id: BUG-010
     title: "Movement AI doesn't maintain optimal range"
-    status: open
+    status: fixed
     severity: major
     area: ai/movement
+    note: "Resolved — get_optimal_range on Hero, fallback prefers optimal distance"
 
   - id: BUG-011
     title: "Zenyatta damage persists after death"
