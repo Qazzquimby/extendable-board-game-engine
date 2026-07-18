@@ -1,17 +1,38 @@
+from __future__ import annotations
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import (
     List,
     Optional,
     TYPE_CHECKING,
     Union,
     Callable,
-    Type,
 )
 
+from ability_base import (
+    ActionCost,
+    ActionContext,
+    DynamicInt,
+    DynamicPoint,
+    Instruction,
+    RollResult,
+    default_reaction_condition,
+)
+from scoring import (
+    resolve_int,
+    best_move_for_score,
+    displacement_value,
+    score_damage,
+    score_expected_damage,
+    score_heal,
+    score_add_token,
+    reaction_value_of_instructions,
+    point_is_in_aiming_result,
+    reaction_resource_conservation,
+)
+
+
 from aimings import Aiming, AimingResult, MultipleAimingResults
-from logger import log
-from queries import QueryAvoidInclusion, QueryRoll
+from queries import QueryAvoidInclusion
 from util import UniqueTuple, DO_NOTHING, EntityId
 from valence import Valence
 from modifiers import Modifier
@@ -23,361 +44,6 @@ if TYPE_CHECKING:
     )
     from events import Event
     from point import Point
-
-
-class ActionCost(Enum):
-    FREE = "free"
-    INSTANT = "instant"
-    STANDARD = "standard"
-    MOVE = "move"
-    MOVE_AND_STANDARD = "move_and_standard"
-    MOVE_OR_STANDARD = "move_or_standard"
-
-
-@dataclass(slots=True)
-class ActionContext:
-    source_id: EntityId
-    subject_point: "Point"  # The point currently being affected
-
-    # all points with targets
-    target_points: UniqueTuple["Point"] = field(default_factory=list)
-
-    # all points included in areas
-    included_points: UniqueTuple["Point"] = field(default_factory=list)
-    ability: Optional["Ability"] = None
-    is_hit: bool = True
-    is_crit: bool = False
-
-    _target: "Entity" = None
-
-    @property
-    def target_point(self):
-        if len(self.target_points) != 1:
-            raise ValueError("Cannot use `.target` when there are multiple targets.")
-        return self.target_points[0]
-
-    def get_target(self, engine: "Engine") -> Optional["Entity"]:
-        if self._target is None:
-            self._target = engine.entity_at(self.target_point)
-        return self._target
-
-
-DynamicInt = Union[int, Callable[[ActionContext], int]]
-DynamicPoint = Union["Point", Callable[[ActionContext], "Point"]]
-
-
-def resolve_int(val: DynamicInt, ctx: ActionContext) -> int:
-    return val(ctx) if callable(val) else val
-
-
-def best_move_for_score(
-    reachable_points: set["Point"],
-    actor_pos: "Point",
-    score_fn: Callable[["Point"], float],
-    reason: str,
-) -> dict["Point", str]:
-    """Score each reachable point and return the best one with a reason string.
-
-    Uses the standard tiebreaker: prefer the point closest to the actor.
-    Returns an empty dict if no point scores > 0.
-    """
-    if not reachable_points:
-        return {}
-    best = max(
-        reachable_points,
-        key=lambda pt: (score_fn(pt), -pt.get_distance(actor_pos)),
-    )
-    # Tie-break by lowest distance moved (prefer closest to current position)
-    tied = [pt for pt in reachable_points if score_fn(pt) == score_fn(best)]
-    if tied and len(tied) > 1:
-        return {min(tied, key=lambda pt: pt.get_distance(actor_pos)): reason}
-    if score_fn(best) > 0:
-        return {best: reason}
-    return {}
-
-
-def displacement_value(
-    entity: "Entity",
-    from_pos: "Point",
-    to_pos: "Point",
-    engine: "Engine",
-) -> float:
-    """How many movement-actions this displacement saves (or costs if negative).
-
-    Positive = the entity ends up closer to its preferred position
-    (its nearest enemy), saving future movement actions.
-    Negative = the entity ends up farther away, needing extra actions to get back.
-
-    Value = (old_distance - new_distance) / speed.
-    """
-    pref = entity.get_preferred_position(engine)
-    if pref is None:
-        return 0.0
-    saved_distance = from_pos.get_distance(pref) - to_pos.get_distance(pref)
-    speed = entity.get_speed(engine)
-    if speed == 0:
-        return 0.0
-    return saved_distance / speed
-
-
-def score_damage(amount: int, target_hp: int) -> float:
-    """Score for dealing `amount` damage to a target with `target_hp`.
-
-    Automatically values kills: damage is doubled if amount >= target_hp.
-    Capped at target_hp (can't overkill for extra score).
-    """
-    effective = min(amount, target_hp)
-    if amount >= target_hp:
-        effective += 1.5  # killing is better than leaving low health
-    return float(effective)
-
-
-def score_expected_damage(
-    amount: int,
-    target_hp: int,
-    target_defense: int = 0,
-    ability_defense: int = 0,
-    attacker_crit: int = 0,
-) -> float:
-    """Score for dealing `amount` damage, adjusted for miss/crit probability.
-
-    Uses the 1d6 combat roll: hit if roll > defense, crit if roll >= 7-crit_chance.
-    Accounts for the fact that crit is a subset of hit.
-    """
-    total_defense = min(4, target_defense + ability_defense)  # Cap at 4 (impossible to hit)
-    hit_values = max(0, 6 - total_defense)  # Rolls that hit: D+1 .. 6
-    crit_values = min(attacker_crit, 6 - total_defense)  # Crit rolls, capped at remaining hit values
-    # Expected damage = P(hit_no_crit) * amount + P(crit) * amount * 2
-    exp_dmg = (hit_values - crit_values) / 6.0 * amount + crit_values / 6.0 * amount * 2
-    if exp_dmg <= 0:
-        return 0.0
-    return score_damage(int(round(exp_dmg)), target_hp)
-
-
-def score_heal(amount: int, missing_hp: int) -> float:
-    """Score for healing `amount` on a target missing `missing_hp` HP.
-
-    Capped at missing_hp (can't overheal for extra score).
-    """
-    return float(min(amount, missing_hp))
-
-
-def score_add_token(token_class: "Type"):
-    """Base priority for applying a token/modifier to a single target.
-
-    Returns a simple default — specific abilities may want custom values.
-    Bad tokens on enemies = +2, Good tokens on allies = +1.
-    """
-    from valence import Valence
-
-    if token_class.valence == Valence.BAD:
-        return 2.0
-    elif token_class.valence == Valence.GOOD:
-        return 1.0
-    return 0.0
-
-
-def reaction_value_of_instructions(
-    trigger_event: object,
-    actor: "Entity",
-    engine: "Engine",
-    target_pos: "Point",
-) -> float:
-    """Total value of harmful instructions the trigger event would apply to `actor`.
-
-    Determines which instruction sub-aimings include `target_pos` (the actor's
-    original position), then scores each instruction by type. Composable so any
-    dodge ability (Blink, Recall, etc.) can use the same logic.
-    """
-    from instruction_library import (
-        DamageInstruction,
-        AddTokenInstruction,
-        AddModifierInstruction,
-        PullInstruction,
-        TeleportInstruction,
-    )
-    from events import AbilityUseEvent
-
-    if not isinstance(trigger_event, AbilityUseEvent):
-        return 0.0
-
-    total = 0.0
-    aiming = trigger_event.aiming_result
-
-    # Determine which points are targeted/included by each instruction
-    for inst in trigger_event.ability.instructions:
-        # Find the aiming result for this instruction
-        if inst.aiming_name and aiming.sub_aimings:
-            inst_aiming = aiming.sub_aimings.get(inst.aiming_name)
-        else:
-            inst_aiming = aiming
-
-        if inst_aiming is None:
-            continue
-
-        # Check if the actor's position is in this instruction's targets
-        all_pts = list(inst_aiming.target_points) + list(inst_aiming.included_points)
-        if actor.pos not in all_pts:
-            continue
-
-        if isinstance(inst, DamageInstruction):
-            dmg = inst.amount if isinstance(inst.amount, int) else 0
-            total += score_damage(dmg, actor.hp) * 0.8
-        elif isinstance(inst, AddTokenInstruction):
-            token_val = score_add_token(inst.token_class)
-            if token_val > 0 and inst.token_class.valence == Valence.BAD:
-                total += token_val
-        elif isinstance(inst, AddModifierInstruction):
-            mod_val = score_add_token(inst.modifier_class)
-            if mod_val > 0 and inst.modifier_class.valence == Valence.BAD:
-                total += mod_val
-        elif isinstance(inst, PullInstruction):
-            dist = inst.distance if isinstance(inst.distance, int) else 0
-            total += dist * 0.5
-        elif isinstance(inst, TeleportInstruction):
-            total += 0.5  # Being forcibly moved is disruptive
-
-    return total
-
-
-def point_is_in_aiming_result(point: "Point", aiming_result: AimingResult) -> bool:
-    """True if `to_pos` is outside ALL of the trigger event's target/included points.
-
-    This means the actor has fully escaped the attack's area and cannot be hit.
-    """
-    from events import AbilityUseEvent
-
-    # Collect all points the trigger affects
-    all_trigger_points = set()
-    if aiming_result.sub_aimings:
-        for res in aiming_result.sub_aimings.values():
-            all_trigger_points.update(res.target_points)
-            all_trigger_points.update(res.included_points)
-    else:
-        all_trigger_points.update(aiming_result.target_points)
-        all_trigger_points.update(aiming_result.included_points)
-
-    return point in all_trigger_points
-
-
-def reaction_resource_conservation(
-    ability: "Ability",
-    engine: "Engine",
-) -> float:
-    """Penalty for using a charged/limited ability now vs saving for later.
-
-    Returns a value 0..N that should be subtracted from the ability's priority.
-    Higher when the ability is scarce (few charges) and the game is early.
-    Lower when the game is nearly over or the ability has many charges.
-    """
-    if (
-        ability.charges is None
-        or ability.max_charges is None
-        or ability.max_charges <= 0
-    ):
-        return 0.0
-
-    # todo factor in missing life, estimated turns to live
-
-    charges_left = ability.charges
-    # Game progress as fraction of 7 rounds
-    game_progress = min(engine.round_num / 7.0, 1.0)
-
-    # Scarcity: how much of the resource has been used
-    used_fraction = 1.0 - (charges_left / ability.max_charges)
-
-    # Penalty = low when game is late OR when we're hoarding (haven't used any yet)
-    # Peak penalty: mid-game with few charges left
-    if charges_left <= 1:
-        # Last charge — conserve unless late game
-        conservation_factor = max(0, 1.0 - game_progress)
-        return 1.5 * conservation_factor
-    elif charges_left <= 2:
-        conservation_factor = max(0, 1.0 - game_progress * 1.5)
-        return 0.8 * conservation_factor
-
-    return 0.0
-
-
-@dataclass(kw_only=True)  # Not frozen
-class Instruction:
-    """Base class for all ability effects."""
-
-    aiming_name: Optional[str] = None
-    valence: Valence
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if "valence" not in cls.__dict__ and "__post_init__" not in cls.__dict__:
-            raise TypeError(
-                f"{cls.__name__} must define a class-level `valence` attribute. "
-                f"Add `valence: Valence = Valence.<GOOD|BAD|MIXED>` to the class body."
-            )
-
-    def __deepcopy__(self, memo):
-        return self
-
-    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
-        pass
-
-    def score(
-        self,
-        engine: "Engine",
-        actor: "Entity",
-        target: "Entity",
-        ctx: ActionContext,
-    ) -> float:
-        """Priority contribution of this instruction for a single target entity."""
-        raise NotImplementedError
-
-
-def default_reaction_condition(
-    engine: "Engine", event: "Event", actor: "Entity", ability: "Ability"
-) -> bool:
-    from events import AbilityUseEvent
-    from queries import QueryLegalAimings
-
-    if ability.name == DO_NOTHING:
-        return False
-    if not isinstance(event, AbilityUseEvent):
-        return False
-    subject = engine.get_entity_by_id(event.subject_id)
-    if subject.team == actor.team:
-        return False
-
-    trigger_targets = []
-    if event.aiming_result.sub_aimings:
-        for res in event.aiming_result.sub_aimings.values():
-            trigger_targets.extend(res.target_points)
-            trigger_targets.extend(res.included_points)
-    elif event.aiming_result:
-        trigger_targets.extend(event.aiming_result.target_points)
-        trigger_targets.extend(event.aiming_result.included_points)
-
-    raw_aimings = ability.aiming.get_all_aimings(
-        engine=engine, actor=actor, start_pos=actor.pos, require_los=True
-    )
-
-    legal_aimings = engine.ask(
-        QueryLegalAimings(subject=actor, ability=ability, base_result=raw_aimings)
-    )
-
-    for aiming_res in legal_aimings:
-        ability_targets = list(aiming_res.target_points) + list(
-            aiming_res.included_points
-        )
-        if any(t in trigger_targets for t in ability_targets):
-            if ability.is_plausible_reaction(engine, event, actor):
-                return True
-
-    return False
-
-
-@dataclass(frozen=True, slots=True)
-class RollResult:
-    roll: Optional[int]
-    hit_points: UniqueTuple["Point"]
-    crit_points: UniqueTuple["Point"]
 
 
 @dataclass(slots=True)
@@ -734,52 +400,6 @@ class Ability:
         engine: "Engine",
         source: "Entity",
     ) -> RollResult:
-        if isinstance(aiming_result, dict):
-            all_target_points = []
-            for aiming_result_set in aiming_result.values():
-                all_target_points += aiming_result_set.target_points
-                all_target_points = UniqueTuple(all_target_points)
-        else:
-            all_target_points = aiming_result.target_points
-        hit_target_points = []
-        crit_target_points = []
+        from scoring import resolve_roll_result
+        return resolve_roll_result(self, aiming_result, engine, source)
 
-        roll = None
-        for target_point in all_target_points:
-            target = engine.entity_at(target_point)
-            if target:
-                defense = target.get_defense(
-                    engine=engine, attack_source=source, ability=self
-                )
-                defense += self.defense  # ability's inherent miss chance
-                defense = min(4, defense)
-                crit_chance = source.get_crit(
-                    engine=engine, subject=target, ability=self
-                )
-
-                if defense > 0 or crit_chance > 0:
-                    if not roll:
-                        roll = QueryRoll(rng=engine.rng, subject=source).resolve(
-                            engine=engine
-                        )
-
-                    if roll > defense:
-                        hit_target_points.append(target_point)
-                        if roll >= 7 - crit_chance:
-                            crit_target_points.append(target_point)
-                            log(
-                                f"Crit {target} with a roll of {roll} on crit chance {crit_chance}"
-                            )
-                    else:
-                        log(
-                            f"Missed {target} with a roll of {roll} less than defense {defense}"
-                        )
-                else:
-                    # No roll means auto hits
-                    hit_target_points.append(target_point)
-
-        return RollResult(
-            roll=roll,
-            hit_points=UniqueTuple(hit_target_points),
-            crit_points=UniqueTuple(crit_target_points),
-        )

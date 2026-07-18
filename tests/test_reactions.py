@@ -318,7 +318,8 @@ def test_instant_abilities_not_in_standard_actions():
     from engine import Engine
     from grid import Grid
     from heroes.tracer import Tracer
-    from choices import get_plausible_move_and_actions, get_plausible_free_actions
+    from planner import get_plausible_move_and_actions
+    from choices import get_plausible_free_actions
     from point import Point
 
     engine = Engine(grid=Grid(6, 6))
