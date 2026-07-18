@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Quick-play harness: set up a game, run it, print a readable result summary.
+Quick-play harness: set up a game, run it, print readable results.
 Usage:
-    python quick_play.py                          # Symmetra vs Axe (defaults)
-    python quick_play.py --seed 7                 # Specific seed
-    python quick_play.py --hero0 Symmetra --hero1 Axe --grid 6
+    python quick_play.py                                    # Symmetra vs Axe
+    python quick_play.py --seed 7                           # Specific seed
+    python quick_play.py --hero0 Symmetra --hero1 Axe       # Named heroes
+    python quick_play.py --grid 6 --turns 5                 # Verbose first 5 turns
 """
 
 import sys
@@ -19,6 +20,8 @@ def main():
     parser.add_argument("--grid", type=int, default=6)
     parser.add_argument("--hero0", default="Symmetra")
     parser.add_argument("--hero1", default="Axe")
+    parser.add_argument("--turns", type=int, default=0,
+                        help="Show raw events for the first N turns (0=skip)")
     args = parser.parse_args()
 
     from engine import Engine, RuleBasedAgent
@@ -46,29 +49,67 @@ def main():
     print(f"Winner: team {log.winner_team} ({args.hero0 if log.winner_team == 0 else args.hero1 if log.winner_team == 1 else 'draw'})")
     print()
 
-    # Final state
-    team0_alive = []
-    team1_alive = []
+    # ── Debug: show raw events for first N turns ──
+    if args.turns > 0:
+        print(f"─── First {args.turns} turns ───")
+        for i, entry in enumerate(log.logs[:args.turns]):
+            state = entry.state
+            # Snapshot: which entities are where
+            entities_at = {}
+            for es in state.entities:
+                if es.pos:
+                    key = f"({es.pos[0]},{es.pos[1]})"
+                    entities_at.setdefault(key, []).append(es.name)
+            print(f"\n  Turn {i}: round={state.round_num} team={state.current_team}")
+            # Grid map
+            for y in range(args.grid - 1, -1, -1):
+                row = f"    {y}|"
+                for x in range(args.grid):
+                    key = f"({x},{y})"
+                    if key in entities_at:
+                        names = entities_at[key]
+                        # abbreviate to first letter(s)
+                        abbr = ",".join(n[:4] for n in names)
+                        row += f" {abbr:4s}"
+                    else:
+                        row += " .   "
+                print(row)
+            print("     " + "─" * (args.grid * 5))
+            print("     " + "".join(f"{x:5d}" for x in range(args.grid)))
+
+            # Events this turn
+            for ev in entry.events:
+                parts = []
+                if ev.type:
+                    parts.append(ev.type)
+                if ev.ability_name:
+                    parts.append(ev.ability_name)
+                if ev.amount:
+                    parts.append(f"amt={ev.amount}")
+                if ev.source_id is not None:
+                    src = e.get_entity_by_id(ev.source_id)
+                    parts.append(f"src={src.name if src else ev.source_id}")
+                if ev.target_id is not None:
+                    tgt = e.get_entity_by_id(ev.target_id)
+                    parts.append(f"tgt={tgt.name if tgt else ev.target_id}")
+                if ev.target_pos:
+                    parts.append(f"at=({ev.target_pos[0]},{ev.target_pos[1]})")
+                print(f"    {' '.join(parts)}" if parts else "")
+        print()
+
+    # ── Final state ──
+    print("─── Final State ───")
     for ent in sorted(e.entities, key=lambda x: x.id):
         entry = f"  {ent.name}: {ent.hp}/{ent.max_hp}"
         if ent.pos is not None:
             entry += f"  @({ent.pos.x},{ent.pos.y})"
         else:
             entry += "  (dead)"
-        if ent.team == 0:
-            team0_alive.append(entry)
-        else:
-            team1_alive.append(entry)
-
-    print("Team 0:")
-    for line in team0_alive:
-        print(line)
-    print("Team 1:")
-    for line in team1_alive:
-        print(line)
+        entry += f"  team={ent.team}"
+        print(entry)
     print()
 
-    # Ability use summary
+    # ── Ability use summary ──
     from collections import Counter
     ability_uses = Counter()
     damage_dealt = Counter()

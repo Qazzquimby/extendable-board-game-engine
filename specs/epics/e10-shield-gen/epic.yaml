@@ -1,0 +1,9 @@
+id: e10
+title: "Shield Generator AI"
+description: >
+  Shield Generator should always prefer positions that are as far from
+  all enemy heroes as possible. The priority function should rank available
+  empty cells by minimum Manhattan distance to any enemy, picking the safest.
+dependencies: []
+size: 1
+priority: high

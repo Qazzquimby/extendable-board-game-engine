@@ -47,11 +47,20 @@ export interface EventDescription {
   [k: string]: unknown;
 }
 
+export interface MarkerState {
+  id: number;
+  name: string;
+  pos: Point | null;
+  team: number;
+  modifiers?: string[];
+}
+
 export interface EngineState {
   round_num: RoundNum;
   current_team: CurrentTeam;
   active_entity: ActiveEntity;
   entities: Entities;
+  markers?: MarkerState[];
   [k: string]: unknown;
 }
 

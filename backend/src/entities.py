@@ -328,3 +328,13 @@ class Marker:
     @pos.setter
     def pos(self, value: Optional[Point]) -> None:
         self._pos = value
+
+    def to_model(self):
+        from schemas import MarkerState
+        return MarkerState(
+            id=self.id,
+            name=self.name,
+            pos=self.pos,
+            team=self.team,
+            modifiers=[str(m) for m in self.modifiers],
+        )

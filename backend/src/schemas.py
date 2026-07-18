@@ -5,6 +5,14 @@ from pydantic import BaseModel
 from point import Point
 
 
+class MarkerState(BaseModel):
+    id: int
+    name: str
+    pos: Optional[Point]
+    team: int
+    modifiers: List[str] = []
+
+
 class EntityState(BaseModel):
     id: int
     name: str
@@ -23,6 +31,7 @@ class EngineState(BaseModel):
     current_team: int
     active_entity: Optional[int]
     entities: List[EntityState]
+    markers: List[MarkerState] = []
 
 
 class ActionState(BaseModel):

@@ -1,0 +1,10 @@
+id: e13
+title: "Edge Markers UI"
+description: >
+  Markers (Floating Barrier, Photon Barrier edge lines, etc.) need to be
+  legible in the frontend. Currently they render as invisible or confusing.
+  Add marker rendering to the Phaser UI, showing edge-wall visuals for
+  barriers and distinct shapes for markers vs entities.
+dependencies: []
+size: 3
+priority: high

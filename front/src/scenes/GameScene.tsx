@@ -1,4 +1,4 @@
-import { EngineState, EntityState } from '../types';
+import { EngineState, EntityState, MarkerState } from '../types';
 
 interface FrameEvent {
   type: string;
@@ -28,6 +28,7 @@ function getHpColor(hp: number): number {
 
 export class GameScene extends Phaser.Scene {
     private entitiesGroup: Phaser.GameObjects.Group;
+    private markersGroup: Phaser.GameObjects.Group;
     private overlaysGroup: Phaser.GameObjects.Group;
     private uiGroup: Phaser.GameObjects.Group;
     private gridGameObject: Phaser.GameObjects.Grid | null = null;
@@ -43,6 +44,7 @@ export class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.entitiesGroup = new Phaser.GameObjects.Group(this);
+        this.markersGroup = new Phaser.GameObjects.Group(this);
         this.overlaysGroup = new Phaser.GameObjects.Group(this);
         this.uiGroup = new Phaser.GameObjects.Group(this);
     }
@@ -84,7 +86,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     public updateEngineState(state: EngineState, events?: FrameEvent[]) {
-        if (this.entitiesGroup && this.overlaysGroup) {
+        if (this.entitiesGroup && this.markersGroup && this.overlaysGroup) {
             this.drawState(state, events || []);
         } else {
             this.events.once(Phaser.Scenes.Events.CREATE, () => {
@@ -95,6 +97,7 @@ export class GameScene extends Phaser.Scene {
 
     private drawState(state: EngineState, events: FrameEvent[]) {
         this.entitiesGroup.clear(true, true);
+        this.markersGroup.clear(true, true);
         this.overlaysGroup.clear(true, true);
         this.uiGroup.clear(true, true);
 
@@ -215,6 +218,13 @@ export class GameScene extends Phaser.Scene {
             const container = this.drawEntity(entityState, isActive, totalAtPos, indexAtPos, drawPos);
             if (container) entityContainers.set(entityState.id, container);
         });
+
+        // Render markers (edges, barrier lines, invisibility decoys)
+        if (state.markers) {
+            state.markers.forEach(marker => {
+                this.drawMarker(marker);
+            });
+        }
 
         // Animate based on events
         if (events.length > 0) {
@@ -423,6 +433,54 @@ export class GameScene extends Phaser.Scene {
 
         arrow.strokePath();
         this.overlaysGroup.add(arrow);
+    }
+
+    private drawMarker(marker: MarkerState) {
+        const pos = marker.pos;
+        if (!pos) return;
+        const [x, y] = pos;
+        const pixelX = this.gridOffsetX + x * this.tileSize + this.tileSize / 2;
+        const pixelY = this.gridOffsetY + y * this.tileSize + this.tileSize / 2;
+        const halfTile = this.tileSize * 0.4;
+
+        const g = this.add.graphics();
+        const color = TEAM_COLORS[marker.team] || 0x888888;
+
+        // Edge markers: diamond shape
+        g.fillStyle(color, 0.6);
+        g.fillTriangle(
+            pixelX, pixelY - halfTile,
+            pixelX - halfTile * 0.7, pixelY,
+            pixelX + halfTile * 0.7, pixelY
+        );
+        g.fillTriangle(
+            pixelX, pixelY + halfTile,
+            pixelX - halfTile * 0.7, pixelY,
+            pixelX + halfTile * 0.7, pixelY
+        );
+        g.lineStyle(2, TEAM_COLORS_LIGHT[marker.team] || 0xcccccc, 1);
+        g.strokeTriangle(
+            pixelX, pixelY - halfTile,
+            pixelX - halfTile * 0.7, pixelY,
+            pixelX + halfTile * 0.7, pixelY
+        );
+        g.strokeTriangle(
+            pixelX, pixelY + halfTile,
+            pixelX - halfTile * 0.7, pixelY,
+            pixelX + halfTile * 0.7, pixelY
+        );
+
+        // Label
+        const label = this.add.text(pixelX, pixelY + halfTile + 6, marker.name, {
+            fontSize: '9px',
+            color: '#ffffff',
+            fontFamily: 'Arial, sans-serif',
+            stroke: '#000000',
+            strokeThickness: 1,
+        }).setOrigin(0.5, 0);
+
+        this.markersGroup.add(g);
+        this.markersGroup.add(label);
     }
 
     private drawEntity(entity: EntityState, isActive: boolean, totalAtPos: number, indexAtPos: number, drawPos?: [number, number] | null) {

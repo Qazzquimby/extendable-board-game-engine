@@ -663,6 +663,7 @@ class Engine:
             current_team=self.current_team,
             active_entity=self.active_entity.id if self.active_entity else None,
             entities=[e.to_model() for e in self.entities],
+            markers=[m.to_model() for m in self.markers],
         )
 
     def copy(self) -> "Engine":
