@@ -102,7 +102,7 @@ class PushEvent(Event):
                 for point in path:
                     engine.event_queue.enqueue(
                         ChangeLocationEvent(
-                            engine=engine, subject=subject, new_pos=point
+                            subject=subject, new_pos=point
                         )
                     )
 

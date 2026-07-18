@@ -11,9 +11,11 @@ from event_library import (
     RemoveModifierEvent,
     AddTokenEvent,
     RemoveTokenEvent,
+    PushEvent,
     PullEvent,
     ChangeLocationEvent,
 )
+from grid import Direction
 from modifiers import Modifier, Token
 from point import Point
 from util import UniqueTuple
@@ -321,20 +323,31 @@ class ApplyModifierInstruction(Instruction):
         return score_add_token(self.modifier_class)
 
 
-# @dataclass
-# class PushInstruction(Instruction):
-#     distance: DynamicInt
-#
-# add valence
+@dataclass(kw_only=True)
+class PushInstruction(Instruction):
+    distance: DynamicInt = 1
+    valence: Valence = Valence.MIXED
 
-#     # todo probably want direction param and update resolution
-#     def execute(self, ctx: ActionContext) -> None:
-#         subject = engine.entity_at(ctx.subject_point)
-#         if subject:
-#             dist = resolve_int(self.distance, ctx)
-#             PushEvent(
-#                 engine=engine,
-#                 subject=ctx.target,
-#                 distance=dist,
-#                 source=ctx.source_id,
-#             ).resolve()
+    def execute(self, engine: "Engine", ctx: ActionContext) -> None:
+        subject = ctx.get_target(engine)
+        if subject:
+            dist = resolve_int(self.distance, ctx)
+            source = engine.get_entity_by_id(ctx.source_id)
+            direction = Direction.EAST
+            if source and subject.pos and source.pos:
+                dx = subject.pos.x - source.pos.x
+                dy = subject.pos.y - source.pos.y
+                if abs(dx) >= abs(dy):
+                    direction = Direction.EAST if dx >= 0 else Direction.WEST
+                else:
+                    direction = Direction.SOUTH if dy >= 0 else Direction.NORTH
+            engine.event_queue.enqueue(
+                PushEvent(
+                    subject=subject,
+                    distance=dist,
+                    direction=direction,
+                )
+            )
+
+    def score(self, engine, actor, target, ctx) -> float:
+        return 0.0
