@@ -21,12 +21,14 @@ Single-context repo. See `docs/agents/domain.md`.
 
 ### Mandatory policies
 
+Always follow tdd skill when making changes.
+Always register bugs you find.
+Follow craft hero skill for hero creation and significant updates. 
+
 **Read CONVENTIONS.md before any coding session.** It contains:
 - Code standards (400-line file limit, function sizing, naming)
 - Hero and ability design rules
-- Issue tracking process
-- Testing standards (all abilities must be used by AI)
-- Branch and commit standards (one fix per commit)
+- One fix per commit.
 - AI agent behaviour (survey before coding, file bugs first)
 
 ### Workflow

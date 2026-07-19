@@ -15,9 +15,10 @@ from aimings import TargetEntity, IncludeArea, TargetSelf
 from areas import Burst
 from engine import Engine
 from entities import Hero, Marker
-from modifiers import Modifier
-from events import after
-from event_library import TurnStartEvent, HealEvent
+from modifiers import Modifier, ClearAtEndOfTurnMixin
+from events import after, query
+from event_library import TurnStartEvent, HealEvent, TurnEndEvent
+from queries import QuerySpeed
 from valence import Valence
 from point import Point
 from scoring import displacement_value
@@ -55,10 +56,13 @@ class BioticFieldManager(Modifier):
                     engine.event_queue.enqueue(HealEvent(subject=entity, amount=2))
 
 
-class SprintBuff(Modifier):
-    """Grants +3 speed for the turn. Applied by Sprint ability."""
+class SprintBuff(Modifier, ClearAtEndOfTurnMixin):
+    """Grants +3 speed until end of turn."""
     valence = Valence.GOOD
-    duration: int = 1
+
+    @query(QuerySpeed)
+    def add_speed(self, engine, q):
+        q.result.add(3)
 
 
 # ── Abilities ──
@@ -90,15 +94,29 @@ class SprintAbility(Ability):
         return displacement_value(actor, actor.pos, pref, engine) * 0.5
 
     def get_movement(self, engine, actor, reachable_points, enemies, allies):
-        """Propose positions up to speed + 3 away (normal move + sprint move)."""
+        """Propose positions up to speed + 3 away.
+
+        Recalculates reachable points with sprint speed since normal
+        reachable_points are limited to the hero's base speed.
+        """
         pref = actor.get_preferred_position(engine)
-        if not pref or not reachable_points:
+        if not pref:
             return {}
-        from queries import QuerySpeed
-        speed = QuerySpeed(actor).resolve(engine).value  # 3
-        extra = 3  # sprint gives +3
-        valid = [p for p in reachable_points
-                 if p.get_distance(actor.pos) <= speed + extra and p != actor.pos]
+        speed = QuerySpeed(actor).resolve(engine).value
+        extra = 3  # Sprint adds +3 movement
+        # Recalculate reachable points with sprint speed
+        sprint_reachable = engine.grid.get_movable_spaces(
+            engine=engine, actor=actor, max_movement=speed + extra
+        )
+        occupied = {e.pos for e in engine.living_entities if e != actor and e.pos is not None}
+        valid = [p for p in sprint_reachable if p not in occupied and p != actor.pos]
+        if not valid:
+            return {}
+        best = max(valid, key=lambda p: (
+            displacement_value(actor, actor.pos, p, engine),
+            -p.get_distance(actor.pos),
+        ))
+        return {best: f"Sprint to range {best.get_distance(pref)} of enemy"}
         if not valid:
             return {}
         best = max(valid, key=lambda p: (
