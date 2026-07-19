@@ -32,12 +32,17 @@ from scoring import displacement_value
 
 class VisorModifier(Modifier):
     """Default abilities from the owner are undefendable."""
+
     valence = Valence.GOOD
 
     @query(QueryIsUndefendable)
     def make_undefendable(self, engine, q):
-        if (q.ability and q.ability.is_default
-                and q.attack_source and q.attack_source.id == self.owner_id):
+        if (
+            q.ability
+            and q.ability.is_default
+            and q.attack_source
+            and q.attack_source.id == self.owner_id
+        ):
             q.result = True
 
 
@@ -150,16 +155,6 @@ class SprintAbility(Ability):
             ),
         )
         return {best: f"Sprint to range {best.get_distance(pref)} of enemy"}
-        if not valid:
-            return {}
-        best = max(
-            valid,
-            key=lambda p: (
-                displacement_value(actor, actor.pos, p, engine),
-                -p.get_distance(actor.pos),
-            ),
-        )
-        return {best: f"Sprint to range {best.get_distance(pref)} of enemy"}
 
 
 class HelixRocketsAbility(Ability):
@@ -172,14 +167,6 @@ class HelixRocketsAbility(Ability):
             defense=2,
             owner_id=owner_id,
         )
-
-    def get_priority(self, engine, actor, pos, aiming_result):
-        enemies_hit = sum(
-            1
-            for pt in aiming_result.included_points
-            if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team
-        )
-        return 1.5 * enemies_hit
 
 
 class BioticFieldMarker(Marker):
@@ -236,14 +223,7 @@ class TacticalVisorAbility(Ability):
         )
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        enemies = [e for e in engine.living_entities if e.team != actor.team and e.pos]
-        if not enemies:
-            return 0.0
-        valuable_targets = 0
-        for e in enemies:
-            d = actor.pos.get_distance(e.pos)
-            valuable_targets += 2 if d > 4 else 1
-        return valuable_targets * 1.0
+        return 999  # No reason not to use when available, free action permanent buff
 
 
 # ── Hero ──

@@ -146,16 +146,6 @@ def score_targets_in_area(
     return count
 
 
-def score_missing_hp(actor: "Entity") -> float:
-    """Priority based on how much HP the actor is missing.
-    Returns 0.0 at full HP, scales up to 3.0 when near death.
-    """
-    missing = actor.max_hp - actor.hp
-    if missing <= 0:
-        return 0.0
-    return min(missing * 0.5, 3.0)
-
-
 def reaction_value_of_instructions(
     trigger_event: object,
     actor: "Entity",

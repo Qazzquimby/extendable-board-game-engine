@@ -50,6 +50,7 @@ from point import Point
 
 class OrbOfDiscordModifier(Modifier):
     """Target takes -2 defense (easier to hit)."""
+
     valence = Valence.BAD
 
     @query(QueryDefense)
@@ -94,19 +95,16 @@ class OrbOfDestructionAbility(Ability):
             name="Orb of Destruction",
             aiming=TargetEntity(in_range=4),
             instructions=[DamageInstruction(amount=2)],
-            is_default=True, crit_chance=1, defense=2, owner_id=owner_id,
+            is_default=True,
+            crit_chance=1,
+            defense=2,
+            owner_id=owner_id,
         )
-
-    def get_priority(self, engine, actor, pos, aiming_result):
-        for pt in aiming_result.target_points:
-            target = engine.entity_at(pt)
-            if target and target.team != actor.team:
-                return 6.0
-        return 0.0
 
 
 class ChargedOrbModifier(Modifier):
     """At the start of the owner's activation, fire 6dmg +1 miss +2 crit, move 1, lose standard action."""
+
     valence = Valence.BAD
 
     @after(TurnStartEvent, only_self=False)
@@ -129,20 +127,30 @@ class ChargedOrbModifier(Modifier):
             )
             target = min(enemies, key=lambda e: owner.pos.get_distance(e.pos))
             # Fire at nearest enemy: 6dmg, +1 miss, +2 crit
-            target_def = target.get_defense(engine=engine, attack_source=owner, ability=None) + 1
+            target_def = (
+                target.get_defense(engine=engine, attack_source=owner, ability=None) + 1
+            )
             target_def = min(4, target_def)
             crit_chance = 2
             from queries import QueryRoll
+
             roll = QueryRoll(rng=engine.rng, subject=owner).resolve(engine=engine)
             if roll > target_def:
                 from event_library import DamageEvent
-                engine.event_queue.enqueue(DamageEvent(source=owner, subject=target, amount=6))
+
+                engine.event_queue.enqueue(
+                    DamageEvent(source=owner, subject=target, amount=6)
+                )
                 if roll >= 7 - crit_chance:
-                    engine.event_queue.enqueue(DamageEvent(source=owner, subject=target, amount=6))
+                    engine.event_queue.enqueue(
+                        DamageEvent(source=owner, subject=target, amount=6)
+                    )
 
             # Move 1 toward enemy
             if engine.grid.is_in_bounds(step) and not engine.entity_at(step):
-                engine.event_queue.enqueue(ChangeLocationEvent(subject=owner, new_pos=step))
+                engine.event_queue.enqueue(
+                    ChangeLocationEvent(subject=owner, new_pos=step)
+                )
 
         # Consume a standard action
         owner.standard_actions = max(0, owner.standard_actions - 1)
@@ -151,6 +159,7 @@ class ChargedOrbModifier(Modifier):
 
 class ChargeOrbOfDestructionAbility(Ability):
     """Gain a Charged token. At start of next activation, fire 6dmg, move 1, lose standard action."""
+
     def __init__(self, owner_id):
         super().__init__(
             name="Charge Orb",
