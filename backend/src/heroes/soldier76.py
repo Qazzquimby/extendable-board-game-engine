@@ -22,7 +22,8 @@ from entities import Hero, Marker
 from modifiers import Modifier, ClearAtEndOfTurnMixin
 from events import after, query
 from event_library import TurnStartEvent, HealEvent, TurnEndEvent
-from queries import QuerySpeed
+from queries import QuerySpeed, QueryDefense
+from mod_value import ModInt
 from valence import Valence
 from point import Point
 from scoring import displacement_value
@@ -31,13 +32,14 @@ from scoring import displacement_value
 
 
 class VisorModifier(Modifier):
+    """Default abilities ignore enemy defense."""
     valence = Valence.GOOD
 
-    def apply_undefendable(self) -> bool:
-        return True
-
-    def modify_range(self, base_range: int) -> int:
-        return 999
+    @query(QueryDefense)
+    def ignore_defense(self, engine, q):
+        """Reduce defense to 0 for default abilities."""
+        if q.ability and q.ability.is_default:
+            q.result = ModInt(0)
 
 
 @dataclass(kw_only=True)

@@ -15,9 +15,6 @@ from point import Point
 class BonkedModifier(Modifier, ClearAtStartOfTurnMixin):
     valence = Valence.GOOD
 
-    def apply_immunity(self) -> bool:
-        return True
-
     @before(DamageEvent)
     def block_damage(self, engine, event):
         if event.subject_id == self.owner_id:

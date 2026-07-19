@@ -30,37 +30,35 @@ Burst 1, allies Heal 5.
 Until the start of your next turn, you are immune to damage conditions you don't want.
 """
 
-# todo update to match definition
-
-
-from abilities import Ability, score_damage
+from abilities import Ability
 from instruction_library import (
     DamageInstruction,
     HealInstruction,
     ApplyModifierInstruction,
     PushInstruction,
 )
-from aimings import TargetEntity, TargetSelf, IncludeArea, is_ally_aim_condition
+from aimings import TargetEntity, IncludeArea, is_ally_aim_condition
 from areas import Burst
-from engine import Engine
-from entities import Hero, Entity
+from entities import Hero
 from modifiers import Modifier
 from events import after
 from event_library import TurnEndEvent
 from valence import Valence
-from point import Point
 
 
 class OrbOfDiscordModifier(Modifier):
     """Permanent until replaced or source dies. +50% damage taken."""
+
     valence = Valence.BAD
 
+    # todo actually implement..?
     def apply_vulnerable(self) -> int:
         return 50
 
 
 class OrbOfHarmonyModifier(Modifier):
     """Permanent until replaced or source dies. Heals 2 on turn end."""
+
     valence = Valence.GOOD
 
     @after(TurnEndEvent)
@@ -146,7 +144,7 @@ class OrbOfDiscordAbility(Ability):
                     isinstance(m, OrbOfDiscordModifier) for m in target.modifiers
                 )
                 if not has_discord:
-                    return 2.5  # Valuable debuff — +50% damage for team
+                    return 2.5
         return 0.0
 
 

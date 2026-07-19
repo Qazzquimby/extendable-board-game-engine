@@ -145,7 +145,7 @@ class Ability:
         elif isinstance(self.aiming, IncludeArea):
             attack_range = self.aiming.area.in_range
 
-        if attack_range > 0 and reachable_points:
+        if attack_range is not None and attack_range > 0 and reachable_points:
             reachable_enemies = [
                 e
                 for e in enemies
