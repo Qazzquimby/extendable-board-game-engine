@@ -32,13 +32,14 @@ from scoring import displacement_value
 
 
 class VisorModifier(Modifier):
-    """Default abilities ignore enemy defense."""
+    """Default abilities from the owner ignore enemy defense."""
     valence = Valence.GOOD
 
     @query(QueryDefense)
     def ignore_defense(self, engine, q):
-        """Reduce defense to 0 for default abilities."""
-        if q.ability and q.ability.is_default:
+        """Reduce target defense to 0 when the owner uses a default ability."""
+        if (q.ability and q.ability.is_default
+                and q.attack_source and q.attack_source.id == self.owner_id):
             q.result = ModInt(0)
 
 

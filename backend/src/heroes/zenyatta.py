@@ -41,19 +41,20 @@ from aimings import TargetEntity, IncludeArea, is_ally_aim_condition
 from areas import Burst
 from entities import Hero
 from modifiers import Modifier
-from events import after
+from events import after, query
 from event_library import TurnEndEvent
+from queries import QueryDefense
 from valence import Valence
 
 
 class OrbOfDiscordModifier(Modifier):
-    """Permanent until replaced or source dies. +50% damage taken."""
-
+    """Target takes -2 defense (easier to hit)."""
     valence = Valence.BAD
 
-    # todo actually implement..?
-    def apply_vulnerable(self) -> int:
-        return 50
+    @query(QueryDefense)
+    def lower_defense(self, engine, q):
+        if q.subject_id == self.owner_id:
+            q.result.add(-2)
 
 
 class OrbOfHarmonyModifier(Modifier):
@@ -92,15 +93,33 @@ class OrbOfDestructionAbility(Ability):
             name="Orb of Destruction",
             aiming=TargetEntity(in_range=4),
             instructions=[DamageInstruction(amount=2)],
-            is_default=True,
-            owner_id=owner_id,
+            is_default=True, crit_chance=1, defense=2, owner_id=owner_id,
         )
 
     def get_priority(self, engine, actor, pos, aiming_result):
         for pt in aiming_result.target_points:
             target = engine.entity_at(pt)
             if target and target.team != actor.team:
-                return 6.0  # Default attack
+                return 6.0
+        return 0.0
+
+
+class ChargedOrbOfDestructionAbility(Ability):
+    """Charged attack: unlimited range, +1 miss, +2 crit, 6dmg, lose a Standard Action."""
+    def __init__(self, owner_id):
+        super().__init__(
+            name="Charged Orb of Destruction",
+            aiming=TargetEntity(in_range=99),
+            instructions=[DamageInstruction(amount=6)],
+            defense=1, crit_chance=2, owner_id=owner_id,
+        )
+
+    def get_priority(self, engine, actor, pos, aiming_result):
+        # High priority when a target is in sight — this is the big hit
+        for pt in aiming_result.target_points:
+            target = engine.entity_at(pt)
+            if target and target.team != actor.team:
+                return 8.0
         return 0.0
 
 
@@ -180,6 +199,7 @@ class Zenyatta(Hero):
         )
         self.abilities.append(SnapKickAbility(owner_id=self.id))
         self.abilities.append(OrbOfDestructionAbility(owner_id=self.id))
+        self.abilities.append(ChargedOrbOfDestructionAbility(owner_id=self.id))
         self.abilities.append(OrbOfHarmonyAbility(owner_id=self.id))
         self.abilities.append(OrbOfDiscordAbility(owner_id=self.id))
         self.abilities.append(TranscendenceAbility(owner_id=self.id))
