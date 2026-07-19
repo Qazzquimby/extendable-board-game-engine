@@ -10,7 +10,11 @@ Tactical Visor: Ultimate 4, Free Action, unlimited + undefendable defaults
 from dataclasses import dataclass
 
 from abilities import Ability, ActionCost
-from instruction_library import DamageInstruction, AddModifierInstruction, SummonInstruction
+from instruction_library import (
+    DamageInstruction,
+    AddModifierInstruction,
+    SummonInstruction,
+)
 from aimings import TargetEntity, IncludeArea, TargetSelf
 from areas import Burst
 from engine import Engine
@@ -23,13 +27,17 @@ from valence import Valence
 from point import Point
 from scoring import displacement_value
 
-
 # ── Modifiers ──
+
 
 class VisorModifier(Modifier):
     valence = Valence.GOOD
-    def apply_undefendable(self) -> bool: return True
-    def modify_range(self, base_range: int) -> int: return 999
+
+    def apply_undefendable(self) -> bool:
+        return True
+
+    def modify_range(self, base_range: int) -> int:
+        return 999
 
 
 @dataclass(kw_only=True)
@@ -49,7 +57,9 @@ class BioticFieldManager(Modifier):
         for dx in range(-half, half + 1):
             for dy in range(-half, half + 1):
                 pt = Point(marker.pos.x + dx, marker.pos.y + dy)
-                if not (0 <= pt.x < engine.grid.width and 0 <= pt.y < engine.grid.height):
+                if not (
+                    0 <= pt.x < engine.grid.width and 0 <= pt.y < engine.grid.height
+                ):
                     continue
                 entity = engine.entity_at(pt)
                 if entity and entity.team == marker.team and entity.hp < entity.max_hp:
@@ -58,6 +68,7 @@ class BioticFieldManager(Modifier):
 
 class SprintBuff(Modifier, ClearAtEndOfTurnMixin):
     """Grants +3 speed until end of turn."""
+
     valence = Valence.GOOD
 
     @query(QuerySpeed)
@@ -67,10 +78,16 @@ class SprintBuff(Modifier, ClearAtEndOfTurnMixin):
 
 # ── Abilities ──
 
+
 class HeavyPulseRifleAbility(Ability):
     def __init__(self, owner_id):
-        super().__init__(name="Heavy Pulse Rifle", aiming=TargetEntity(in_range=4),
-            instructions=[DamageInstruction(amount=3)], is_default=True, owner_id=owner_id)
+        super().__init__(
+            name="Heavy Pulse Rifle",
+            aiming=TargetEntity(in_range=4),
+            instructions=[DamageInstruction(amount=3)],
+            is_default=True,
+            owner_id=owner_id,
+        )
 
     def get_priority(self, engine, actor, pos, aiming_result):
         for pt in aiming_result.target_points:
@@ -82,10 +99,15 @@ class HeavyPulseRifleAbility(Ability):
 
 class SprintAbility(Ability):
     """Move 3 spaces (standard action)."""
+
     def __init__(self, owner_id):
-        super().__init__(name="Sprint", aiming=TargetSelf(),
+        super().__init__(
+            name="Sprint",
+            aiming=TargetSelf(),
             instructions=[AddModifierInstruction(modifier_class=SprintBuff)],
-            is_default=True, owner_id=owner_id)
+            is_default=True,
+            owner_id=owner_id,
+        )
 
     def get_priority(self, engine, actor, pos, aiming_result):
         pref = actor.get_preferred_position(engine)
@@ -113,48 +135,74 @@ class SprintAbility(Ability):
         sprint_reachable = engine.grid.get_movable_spaces(
             engine=engine, actor=actor, max_movement=speed + extra
         )
-        occupied = {e.pos for e in engine.living_entities if e != actor and e.pos is not None}
+        occupied = {
+            e.pos for e in engine.living_entities if e != actor and e.pos is not None
+        }
         valid = [p for p in sprint_reachable if p not in occupied and p != actor.pos]
         if not valid:
             return {}
-        best = max(valid, key=lambda p: (
-            displacement_value(actor, actor.pos, p, engine),
-            -p.get_distance(actor.pos),
-        ))
+        best = max(
+            valid,
+            key=lambda p: (
+                displacement_value(actor, actor.pos, p, engine),
+                -p.get_distance(actor.pos),
+            ),
+        )
         return {best: f"Sprint to range {best.get_distance(pref)} of enemy"}
         if not valid:
             return {}
-        best = max(valid, key=lambda p: (
-            displacement_value(actor, actor.pos, p, engine),
-            -p.get_distance(actor.pos),
-        ))
+        best = max(
+            valid,
+            key=lambda p: (
+                displacement_value(actor, actor.pos, p, engine),
+                -p.get_distance(actor.pos),
+            ),
+        )
         return {best: f"Sprint to range {best.get_distance(pref)} of enemy"}
 
 
 class HelixRocketsAbility(Ability):
     def __init__(self, owner_id):
-        super().__init__(name="Helix Rockets",
+        super().__init__(
+            name="Helix Rockets",
             aiming=IncludeArea(area=Burst(radius=1, in_range=4)),
             instructions=[DamageInstruction(amount=3), DamageInstruction(amount=1)],
-            max_charges=1, defense=2, owner_id=owner_id)
+            max_charges=1,
+            defense=2,
+            owner_id=owner_id,
+        )
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        enemies_hit = sum(1 for pt in aiming_result.included_points
-            if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team)
+        enemies_hit = sum(
+            1
+            for pt in aiming_result.included_points
+            if engine.entity_at(pt) and engine.entity_at(pt).team != actor.team
+        )
         return 1.5 * enemies_hit
 
 
 class BioticFieldMarker(Marker):
     def __init__(self, engine, pos, team, summoner_id):
-        super().__init__(engine=engine, name="Biotic Field", pos=pos, team=team,
-            summoner_id=summoner_id)
+        super().__init__(
+            engine=engine,
+            name="Biotic Field",
+            pos=pos,
+            team=team,
+            summoner_id=summoner_id,
+        )
 
 
 class CreateBioticFieldAbility(Ability):
     def __init__(self, owner_id):
-        super().__init__(name="Create Biotic Field", aiming=TargetSelf(),
-            instructions=[SummonInstruction(entity_factory=BioticFieldMarker, is_marker=True)],
-            max_charges=1, owner_id=owner_id)
+        super().__init__(
+            name="Create Biotic Field",
+            aiming=TargetSelf(),
+            instructions=[
+                SummonInstruction(entity_factory=BioticFieldMarker, is_marker=True)
+            ],
+            max_charges=1,
+            owner_id=owner_id,
+        )
 
     def get_priority(self, engine, actor, pos, aiming_result):
         if not actor.pos:
@@ -164,7 +212,9 @@ class CreateBioticFieldAbility(Ability):
         for dx in range(-half, half + 1):
             for dy in range(-half, half + 1):
                 pt = Point(actor.pos.x + dx, actor.pos.y + dy)
-                if not (0 <= pt.x < engine.grid.width and 0 <= pt.y < engine.grid.height):
+                if not (
+                    0 <= pt.x < engine.grid.width and 0 <= pt.y < engine.grid.height
+                ):
                     continue
                 entity = engine.entity_at(pt)
                 if entity and entity.team == actor.team and entity.hp < entity.max_hp:
@@ -174,10 +224,15 @@ class CreateBioticFieldAbility(Ability):
 
 class TacticalVisorAbility(Ability):
     def __init__(self, owner_id):
-        super().__init__(name="Tactical Visor", aiming=TargetSelf(),
+        super().__init__(
+            name="Tactical Visor",
+            aiming=TargetSelf(),
             instructions=[AddModifierInstruction(modifier_class=VisorModifier)],
-            is_ultimate=True, ultimate_turn=4, action_cost=ActionCost.FREE,
-            owner_id=owner_id)
+            is_ultimate=True,
+            ultimate_turn=4,
+            action_cost=ActionCost.FREE,
+            owner_id=owner_id,
+        )
 
     def get_priority(self, engine, actor, pos, aiming_result):
         enemies = [e for e in engine.living_entities if e.team != actor.team and e.pos]
@@ -192,9 +247,12 @@ class TacticalVisorAbility(Ability):
 
 # ── Hero ──
 
+
 class Soldier76(Hero):
     def __init__(self, engine, pos, team):
-        super().__init__(engine=engine, name="Soldier 76", hp=8, speed=3, pos=pos, team=team)
+        super().__init__(
+            engine=engine, name="Soldier 76", hp=8, speed=3, pos=pos, team=team
+        )
         self.add_modifier(engine, BioticFieldManager())
         self.abilities.append(HeavyPulseRifleAbility(owner_id=self.id))
         self.abilities.append(SprintAbility(owner_id=self.id))
