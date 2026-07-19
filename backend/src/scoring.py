@@ -112,20 +112,16 @@ def score_heal(amount: int, missing_hp: int) -> float:
 def score_add_token(token_class: "Type"):
     """Base priority for applying a token/modifier to a single target.
 
-    Uses individual valence and duration for contextual valuation.
-    Bad modifiers on enemies = 2 + min(duration, 3) * 0.5
-    Good modifiers on allies = 1 + min(duration, 3) * 0.25
+    Bad modifiers on enemies = 2.0, Good modifiers on allies = 1.0.
+    Duration no longer used as a field — actual timing is handled by
+    ClearAtEndOfTurnMixin, ClearAtStartOfTurnMixin, or ClearAfterTurnsMixin.
     """
     from valence import Valence
 
     if token_class.valence == Valence.BAD:
-        duration = getattr(token_class, 'duration', None)
-        duration_bonus = min(duration or 0, 3) * 0.5
-        return 2.0 + duration_bonus
+        return 2.0
     elif token_class.valence == Valence.GOOD:
-        duration = getattr(token_class, 'duration', None)
-        duration_bonus = min(duration or 0, 3) * 0.25
-        return 1.0 + duration_bonus
+        return 1.0
     return 0.0
 
 

@@ -52,16 +52,16 @@ from point import Point
 
 
 class OrbOfDiscordModifier(Modifier):
+    """Permanent until replaced or source dies. +50% damage taken."""
     valence = Valence.BAD
-    duration: int = 2
 
     def apply_vulnerable(self) -> int:
         return 50
 
 
 class OrbOfHarmonyModifier(Modifier):
+    """Permanent until replaced or source dies. Heals 2 on turn end."""
     valence = Valence.GOOD
-    duration: int = 2
 
     @after(TurnEndEvent)
     def heal_owner(self, engine, event):

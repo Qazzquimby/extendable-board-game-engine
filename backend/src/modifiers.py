@@ -55,7 +55,7 @@ class Token(Modifier):
 
 class ClearAtStartOfTurnMixin:
     @before(TurnStartEvent)
-    def clear_at_end_of_turn(self, engine: "Engine", event: TurnStartEvent) -> None:
+    def clear_at_start_of_turn(self, engine: "Engine", event: TurnStartEvent) -> None:
         owner = engine.get_entity_by_id(self.owner_id)
         if self in owner.modifiers:
             owner.remove_modifier(engine=engine, modifier=self)
@@ -67,6 +67,24 @@ class ClearAtEndOfTurnMixin:
         owner = engine.get_entity_by_id(self.owner_id)
         if self in owner.modifiers:
             owner.remove_modifier(engine=engine, modifier=self)
+
+
+class ClearAfterTurnsMixin:
+    """Remove this modifier after N turn-start events on the owner.
+
+    Subclasses must call `self.turns_remaining = N` in their __init__.
+    """
+    turns_remaining: int = 1
+
+    @before(TurnStartEvent)
+    def tick_down(self, engine: "Engine", event: TurnStartEvent) -> None:
+        if event.subject_id != self.owner_id:
+            return
+        self.turns_remaining -= 1
+        if self.turns_remaining <= 0:
+            owner = engine.get_entity_by_id(self.owner_id)
+            if owner and self in owner.modifiers:
+                owner.remove_modifier(engine=engine, modifier=self)
 
 
 class Immobile(Modifier):

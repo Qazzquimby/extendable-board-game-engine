@@ -5,16 +5,15 @@ from instruction_library import DamageInstruction, ApplyModifierInstruction, Pus
 from aimings import TargetEntity, TargetSelf
 from engine import Engine
 from entities import Hero, Entity
-from modifiers import Modifier
+from modifiers import Modifier, ClearAtStartOfTurnMixin, ClearAfterTurnsMixin
 from events import before
 from event_library import DamageEvent
 from valence import Valence
 from point import Point
 
 
-class BonkedModifier(Modifier):
+class BonkedModifier(Modifier, ClearAtStartOfTurnMixin):
     valence = Valence.GOOD
-    duration: int = 1
 
     def apply_immunity(self) -> bool:
         return True
@@ -26,21 +25,20 @@ class BonkedModifier(Modifier):
                 event.canceled = True
 
 
-class CritAColaDebuff(Modifier):
+class CritAColaDebuff(Modifier, ClearAtStartOfTurnMixin):
     valence = Valence.BAD
-    duration: int = 1
     def apply_vulnerable(self) -> int: return 50
 
 
-class CritAColaBuff(Modifier):
+class CritAColaBuff(Modifier, ClearAtStartOfTurnMixin):
     valence = Valence.GOOD
-    duration: int = 1
     def apply_damage_buff(self) -> int: return 50
 
 
-class FanOWarDebuff(Modifier):
+class FanOWarDebuff(Modifier, ClearAfterTurnsMixin):
     valence = Valence.BAD
-    duration: int = 2
+    def __init__(self):
+        self.turns_remaining = 2
     def apply_vulnerable(self) -> int: return 50
 
 
