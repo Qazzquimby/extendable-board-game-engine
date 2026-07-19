@@ -180,6 +180,7 @@ class MultipleAiming(Aiming):
         actor: "Entity",
         start_pos: Point = None,
         require_los: bool = True,
+        ability: "Ability" = None,
     ) -> List[AimingResult]:
         if not start_pos:
             start_pos = actor.pos
@@ -187,7 +188,7 @@ class MultipleAiming(Aiming):
         # Get all possible aimings for each sub-aiming
         all_sub_aimings = {}
         for name, aiming in self.aimings.items():
-            sub_aims = aiming.get_all_aimings(engine, actor, start_pos, require_los)
+            sub_aims = aiming.get_all_aimings(engine, actor, start_pos, require_los, ability=ability)
             if not sub_aims:
                 # If any sub-aiming has no valid targets, then no combinations are possible.
                 return []
@@ -266,6 +267,7 @@ class TargetSelf(Aiming):
         actor: "Entity",
         start_pos: Point = None,
         require_los: bool = True,
+        ability: "Ability" = None,
     ) -> List[AimingResult]:
         if not start_pos:
             start_pos = actor.pos
@@ -297,18 +299,25 @@ class TargetEntity(Aiming):
         actor: "Entity",
         start_pos: Point = None,
         require_los: bool = True,
+        ability: "Ability" = None,
     ) -> List[AimingResult]:
         if not start_pos:
             start_pos = actor.pos
+
+        effective_range = self.in_range
+        if effective_range is not None and ability is not None:
+            effective_range = actor.get_effective_range(
+                engine=engine, ability=ability, base_range=effective_range
+            )
 
         res = []
         for e in engine.entities:
             if e.pos is None:
                 continue
 
-            if self.in_range is not None:
+            if effective_range is not None:
                 distance = engine.grid.get_range(start_pos, e.pos)
-                if distance > self.in_range:
+                if distance > effective_range:
                     continue
 
             if require_los:
@@ -357,9 +366,16 @@ class TargetPoint(Aiming):
         actor: "Entity",
         start_pos: Point = None,
         require_los: bool = True,
+        ability: "Ability" = None,
     ) -> List[AimingResult]:
         if not start_pos:
             start_pos = actor.pos
+
+        effective_range = self.in_range
+        if effective_range is not None and ability is not None:
+            effective_range = actor.get_effective_range(
+                engine=engine, ability=ability, base_range=effective_range
+            )
 
         # Limit plausible positions: when no range limit, return only nearest N
         # This prevents combinatorial explosion from MultipleAiming with TargetPoint
@@ -371,8 +387,8 @@ class TargetPoint(Aiming):
                 p = Point(x, y)
                 if self.empty and engine.entity_at(p):
                     continue
-                if self.in_range is not None:
-                    if engine.grid.get_range(start_pos, p) > self.in_range:
+                if effective_range is not None:
+                    if engine.grid.get_range(start_pos, p) > effective_range:
                         continue
                 if self.condition and not self.condition(engine, actor, p):
                     continue
@@ -419,6 +435,7 @@ class IncludeArea(Aiming):
         actor: "Entity",
         start_pos: Point = None,
         require_los: bool = True,
+        ability: "Ability" = None,
     ) -> List[AimingResult]:
         if not start_pos:
             start_pos = actor.pos

@@ -267,7 +267,7 @@ class UseAnAbilityInstruction(Instruction):
         )
         chosen_ability = valid_abilities[chosen_ability_index]
         possible_aimings = chosen_ability.aiming.get_all_aimings(
-            engine=engine, actor=subject, require_los=True
+            engine=engine, actor=subject, require_los=True, ability=chosen_ability
         )
         if possible_aimings:
             aiming = possible_aimings[0]

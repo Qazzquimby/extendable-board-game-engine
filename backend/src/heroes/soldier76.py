@@ -22,7 +22,7 @@ from entities import Hero, Marker
 from modifiers import Modifier, ClearAtEndOfTurnMixin
 from events import after, query
 from event_library import TurnStartEvent, HealEvent, TurnEndEvent
-from queries import QuerySpeed, QueryIsUndefendable
+from queries import QuerySpeed, QueryIsUndefendable, QueryAttackRange
 from valence import Valence
 from point import Point
 from scoring import displacement_value
@@ -44,6 +44,11 @@ class VisorModifier(Modifier):
             and q.attack_source.id == self.owner_id
         ):
             q.result = True
+
+    @query(QueryAttackRange)
+    def extend_range(self, engine, q):
+        if q.ability and q.ability.is_default and q.subject_id == self.owner_id:
+            q.result.add(99)
 
 
 @dataclass(kw_only=True)
@@ -94,13 +99,7 @@ class HeavyPulseRifleAbility(Ability):
             is_default=True,
             owner_id=owner_id,
         )
-
-    def get_priority(self, engine, actor, pos, aiming_result):
-        for pt in aiming_result.target_points:
-            target = engine.entity_at(pt)
-            if target and target.team != actor.team:
-                return 1.5
-        return 0.0
+    # Auto-priority from DamageInstruction.score handles scoring
 
 
 class SprintAbility(Ability):

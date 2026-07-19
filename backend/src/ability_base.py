@@ -119,7 +119,7 @@ def default_reaction_condition(
         trigger_targets.extend(event.aiming_result.included_points)
 
     raw_aimings = ability.aiming.get_all_aimings(
-        engine=engine, actor=actor, start_pos=actor.pos, require_los=True
+        engine=engine, actor=actor, start_pos=actor.pos, require_los=True, ability=ability
     )
 
     legal_aimings = engine.ask(

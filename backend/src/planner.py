@@ -220,7 +220,7 @@ def _get_plausible_uses_of_ability_at_pos(
             valence = Valence.MIXED
 
         raw_aimings = ability.aiming.get_all_aimings(
-            engine=sim_engine, actor=actor, start_pos=pos, require_los=True
+            engine=sim_engine, actor=actor, start_pos=pos, require_los=True, ability=ability
         )
 
         legal_aimings = sim_engine.ask(

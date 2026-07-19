@@ -200,6 +200,23 @@ class Entity:
         q.resolve(engine=engine)
         return bool(q.result)
 
+    def get_effective_range(
+        self,
+        engine: "Engine",
+        ability: Optional["Ability"] = None,
+        base_range: Optional[int] = None,
+    ) -> Optional[int]:
+        if base_range is None:
+            return None
+        from queries import QueryAttackRange
+        q = QueryAttackRange(
+            subject=self,
+            ability=ability,
+            base_range=base_range,
+        )
+        q.resolve(engine=engine)
+        return int(q.result)
+
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])
 

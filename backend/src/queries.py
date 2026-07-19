@@ -104,6 +104,18 @@ class QueryIsUndefendable(Query[bool]):
         self.ability = ability
 
 
+class QueryAttackRange(Query[ModInt]):
+    """Modifies the range of an ability."""
+    def __init__(
+        self,
+        subject: "Entity",
+        ability: "Ability",
+        base_range: int,
+    ):
+        super().__init__(subject=subject, base_result=ModInt(base_range))
+        self.ability = ability
+
+
 class QueryCrit(Query[ModInt]):
     def __init__(
         self,
@@ -129,3 +141,15 @@ class GetTokenCountQuery(Query[int]):
                 break
 
         super().__init__(subject=subject, base_result=base_result)
+
+
+class QueryVulnerable(Query[ModInt]):
+    """Percentage of bonus damage the subject takes (e.g. 50 = +50%)."""
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject, base_result=ModInt(0))
+
+
+class QueryDamageBuff(Query[ModInt]):
+    """Percentage of bonus damage the subject deals (e.g. 50 = +50%)."""
+    def __init__(self, subject: "Entity"):
+        super().__init__(subject=subject, base_result=ModInt(0))

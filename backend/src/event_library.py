@@ -201,9 +201,29 @@ class DamageEvent(Event):
         )
 
     def _resolve(self, engine: "Engine") -> None:
+        from queries import QueryVulnerable, QueryDamageBuff
+
         subject = engine.get_entity_by_id(self.subject_id)
         if subject.has_armor(engine=engine):
             self.amount.add(-1)
+
+        # Query damage amplification
+        q_vuln = QueryVulnerable(subject=subject)
+        q_vuln.resolve(engine=engine)
+        vuln_pct = int(q_vuln.result)
+        if vuln_pct > 0 and self.source:
+            bonus = (self.amount.value * vuln_pct) // 100
+            if bonus > 0:
+                self.amount.add(bonus)
+
+        if self.source:
+            q_buff = QueryDamageBuff(subject=self.source)
+            q_buff.resolve(engine=engine)
+            buff_pct = int(q_buff.result)
+            if buff_pct > 0:
+                bonus = (self.amount.value * buff_pct) // 100
+                if bonus > 0:
+                    self.amount.add(bonus)
 
         final_damage = max(0, self.amount.value)
         old_hp = subject.hp

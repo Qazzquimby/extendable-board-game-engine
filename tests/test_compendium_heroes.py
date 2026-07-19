@@ -156,9 +156,8 @@ def test_soldier76_game_runs():
     agents = {0: RuleBasedAgent(), 1: RuleBasedAgent()}
     e = Engine(grid=g, agents=agents, seed=7)
     Soldier76 = get_hero_class("Soldier76")
-    Axe = get_hero_class("Axe")
     s = Soldier76(engine=e, pos=Point(0, 2), team=0)
-    a = Axe(engine=e, pos=Point(5, 2), team=1)
+    a = Soldier76(engine=e, pos=Point(5, 2), team=1)
     e.finalize_setup()
     log = e.run_game()
     assert log.winner_team is not None
