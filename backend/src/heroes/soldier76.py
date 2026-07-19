@@ -22,8 +22,7 @@ from entities import Hero, Marker
 from modifiers import Modifier, ClearAtEndOfTurnMixin
 from events import after, query
 from event_library import TurnStartEvent, HealEvent, TurnEndEvent
-from queries import QuerySpeed, QueryDefense
-from mod_value import ModInt
+from queries import QuerySpeed, QueryIsUndefendable
 from valence import Valence
 from point import Point
 from scoring import displacement_value
@@ -32,15 +31,14 @@ from scoring import displacement_value
 
 
 class VisorModifier(Modifier):
-    """Default abilities from the owner ignore enemy defense."""
+    """Default abilities from the owner are undefendable."""
     valence = Valence.GOOD
 
-    @query(QueryDefense)
-    def ignore_defense(self, engine, q):
-        """Reduce target defense to 0 when the owner uses a default ability."""
+    @query(QueryIsUndefendable)
+    def make_undefendable(self, engine, q):
         if (q.ability and q.ability.is_default
                 and q.attack_source and q.attack_source.id == self.owner_id):
-            q.result = ModInt(0)
+            q.result = True
 
 
 @dataclass(kw_only=True)

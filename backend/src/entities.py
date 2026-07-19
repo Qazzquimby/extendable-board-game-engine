@@ -10,6 +10,7 @@ from queries import (
     QueryCanMove,
     QueryDefense,
     QueryCrit,
+    QueryIsUndefendable,
     GetTokenCountQuery,
     QuerySpeed,
 )
@@ -184,6 +185,20 @@ class Entity:
         )
         engine.router.publish(engine=engine, event=q, phase=EventPhase.QUERY)
         return int(q.result)
+
+    def get_is_undefendable(
+        self,
+        engine: "Engine",
+        attack_source: "Entity",
+        ability: Optional["Ability"] = None,
+    ) -> bool:
+        q = QueryIsUndefendable(
+            subject=self,
+            attack_source=attack_source,
+            ability=ability,
+        )
+        q.resolve(engine=engine)
+        return bool(q.result)
 
     def distance_to(self, other: "Entity") -> int:
         return abs(self.pos[0] - other.pos[0]) + abs(self.pos[1] - other.pos[1])

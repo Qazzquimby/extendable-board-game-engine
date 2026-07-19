@@ -292,6 +292,24 @@ def resolve_roll_result(
     for target_point in all_target_points:
         target = engine.entity_at(target_point)
         if target:
+            # Undefendable check — always hits
+            undefendable = target.get_is_undefendable(
+                engine=engine, attack_source=source, ability=ability
+            )
+            if undefendable:
+                hit_target_points.append(target_point)
+                crit_chance = source.get_crit(
+                    engine=engine, subject=target, ability=ability
+                )
+                if crit_chance > 0:
+                    if not roll:
+                        roll = QueryRoll(rng=engine.rng, subject=source).resolve(
+                            engine=engine
+                        )
+                    if roll >= 7 - crit_chance:
+                        crit_target_points.append(target_point)
+                continue
+
             defense = target.get_defense(
                 engine=engine, attack_source=source, ability=ability
             )

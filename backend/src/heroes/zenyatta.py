@@ -37,14 +37,15 @@ from instruction_library import (
     ApplyModifierInstruction,
     PushInstruction,
 )
-from aimings import TargetEntity, IncludeArea, is_ally_aim_condition
+from aimings import TargetEntity, IncludeArea, TargetSelf, is_ally_aim_condition
 from areas import Burst
 from entities import Hero
 from modifiers import Modifier
 from events import after, query
-from event_library import TurnEndEvent
+from event_library import TurnEndEvent, TurnStartEvent, ChangeLocationEvent
 from queries import QueryDefense
 from valence import Valence
+from point import Point
 
 
 class OrbOfDiscordModifier(Modifier):
@@ -104,22 +105,66 @@ class OrbOfDestructionAbility(Ability):
         return 0.0
 
 
-class ChargedOrbOfDestructionAbility(Ability):
-    """Charged attack: unlimited range, +1 miss, +2 crit, 6dmg, lose a Standard Action."""
+class ChargedOrbModifier(Modifier):
+    """At the start of the owner's activation, fire 6dmg +1 miss +2 crit, move 1, lose standard action."""
+    valence = Valence.BAD
+
+    @after(TurnStartEvent, only_self=False)
+    def fire_charged_orb(self, engine, event):
+        if event.subject_id != self.owner_id:
+            return
+        owner = engine.get_entity_by_id(self.owner_id)
+        if not owner or not owner.pos:
+            return
+
+        # Move 1 toward nearest enemy
+        enemies = [e for e in engine.living_entities if e.team != owner.team and e.pos]
+        if enemies:
+            nearest = min(enemies, key=lambda e: owner.pos.get_distance(e.pos))
+            dx = nearest.pos.x - owner.pos.x
+            dy = nearest.pos.y - owner.pos.y
+            step = Point(
+                owner.pos.x + (1 if dx > 0 else -1 if dx < 0 else 0),
+                owner.pos.y + (1 if dy > 0 else -1 if dy < 0 else 0),
+            )
+            target = min(enemies, key=lambda e: owner.pos.get_distance(e.pos))
+            # Fire at nearest enemy: 6dmg, +1 miss, +2 crit
+            target_def = target.get_defense(engine=engine, attack_source=owner, ability=None) + 1
+            target_def = min(4, target_def)
+            crit_chance = 2
+            from queries import QueryRoll
+            roll = QueryRoll(rng=engine.rng, subject=owner).resolve(engine=engine)
+            if roll > target_def:
+                from event_library import DamageEvent
+                engine.event_queue.enqueue(DamageEvent(source=owner, subject=target, amount=6))
+                if roll >= 7 - crit_chance:
+                    engine.event_queue.enqueue(DamageEvent(source=owner, subject=target, amount=6))
+
+            # Move 1 toward enemy
+            if engine.grid.is_in_bounds(step) and not engine.entity_at(step):
+                engine.event_queue.enqueue(ChangeLocationEvent(subject=owner, new_pos=step))
+
+        # Consume a standard action
+        owner.standard_actions = max(0, owner.standard_actions - 1)
+        owner.remove_modifier(engine, self)
+
+
+class ChargeOrbOfDestructionAbility(Ability):
+    """Gain a Charged token. At start of next activation, fire 6dmg, move 1, lose standard action."""
     def __init__(self, owner_id):
         super().__init__(
-            name="Charged Orb of Destruction",
-            aiming=TargetEntity(in_range=99),
-            instructions=[DamageInstruction(amount=6)],
-            defense=1, crit_chance=2, owner_id=owner_id,
+            name="Charge Orb",
+            aiming=TargetSelf(),
+            instructions=[ApplyModifierInstruction(modifier_class=ChargedOrbModifier)],
+            max_charges=1,
+            owner_id=owner_id,
         )
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        # High priority when a target is in sight — this is the big hit
-        for pt in aiming_result.target_points:
-            target = engine.entity_at(pt)
-            if target and target.team != actor.team:
-                return 8.0
+        # Priority when there's an enemy to shoot
+        enemies = [e for e in engine.living_entities if e.team != actor.team and e.pos]
+        if enemies:
+            return 3.0  # Setup for big damage next turn
         return 0.0
 
 
@@ -199,7 +244,7 @@ class Zenyatta(Hero):
         )
         self.abilities.append(SnapKickAbility(owner_id=self.id))
         self.abilities.append(OrbOfDestructionAbility(owner_id=self.id))
-        self.abilities.append(ChargedOrbOfDestructionAbility(owner_id=self.id))
+        self.abilities.append(ChargeOrbOfDestructionAbility(owner_id=self.id))
         self.abilities.append(OrbOfHarmonyAbility(owner_id=self.id))
         self.abilities.append(OrbOfDiscordAbility(owner_id=self.id))
         self.abilities.append(TranscendenceAbility(owner_id=self.id))

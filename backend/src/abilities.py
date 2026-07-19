@@ -68,7 +68,7 @@ class Ability:
     ultimate_turn: Optional[int] = None
 
     is_undefendable: bool = False
-    defense: int = 0
+    defense: int = 0  # miss chance
     crit_chance: int = 0
     reaction_condition: Optional[
         Callable[["Event", "Engine", "Entity", "Ability"], bool]
@@ -401,5 +401,5 @@ class Ability:
         source: "Entity",
     ) -> RollResult:
         from scoring import resolve_roll_result
-        return resolve_roll_result(self, aiming_result, engine, source)
 
+        return resolve_roll_result(self, aiming_result, engine, source)

@@ -91,6 +91,19 @@ class QueryDefense(Query[ModInt]):
         self.ability = ability
 
 
+class QueryIsUndefendable(Query[bool]):
+    """True = attack always hits regardless of defense."""
+    def __init__(
+        self,
+        subject: "Entity",
+        attack_source: Optional["Entity"] = None,
+        ability: Optional["Ability"] = None,
+    ):
+        super().__init__(subject=subject, base_result=ability.is_undefendable if ability else False)
+        self.attack_source = attack_source
+        self.ability = ability
+
+
 class QueryCrit(Query[ModInt]):
     def __init__(
         self,
