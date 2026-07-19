@@ -111,30 +111,30 @@ class SprintAbility(Ability):
 
     def get_priority(self, engine, actor, pos, aiming_result):
         pref = actor.get_preferred_position(engine)
-        if not pref:
+        if not pref or not actor.pos:
             return 0.0
-        # Only score Sprint if it actually moves us toward the enemy
+        # Sprint is useful if hero needs to get closer to enemies
         current_dist = actor.pos.get_distance(pref)
-        new_dist = pos.get_distance(pref)
-        if new_dist >= current_dist:
-            return 0.0  # Not making progress — don't waste the action
-        return displacement_value(actor, actor.pos, pos, engine) * 0.5
+        if current_dist <= 2:
+            return 0.0  # Close enough — don't waste the action
+        return 1.0  # Always useful for repositioning
 
     def get_movement(self, engine, actor, reachable_points, enemies, allies):
-        """Propose positions up to speed + 3 away.
+        """Propose positions ONLY beyond normal reach (speed + 3).
 
-        Recalculates reachable points with sprint speed since normal
-        reachable_points are limited to the hero's base speed.
+        Skips positions already reachable by normal speed so standard
+        abilities can't piggyback on Sprint's extra movement.
         """
         pref = actor.get_preferred_position(engine)
         if not pref:
             return {}
         speed = QuerySpeed(actor).resolve(engine).value
-        extra = 3  # Sprint adds +3 movement
-        # Recalculate reachable points with sprint speed
+        extra = 3
         sprint_reachable = engine.grid.get_movable_spaces(
             engine=engine, actor=actor, max_movement=speed + extra
         )
+        # Only keep positions that normal speed can't reach
+        sprint_reachable = {p for p in sprint_reachable if p not in reachable_points}
         occupied = {
             e.pos for e in engine.living_entities if e != actor and e.pos is not None
         }

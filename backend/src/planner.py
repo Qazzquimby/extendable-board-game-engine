@@ -111,6 +111,12 @@ def get_plausible_actions_after_movement(
         from abilities import ActionCost
         if ability.action_cost == ActionCost.INSTANT:
             continue
+        # Movement-specific abilities (e.g. Sprint) should only pair with themselves
+        if movement_name.startswith("Sprint") and ability.name != "Sprint":
+            continue
+        # Sprint shouldn't be used from the stay position — it's a movement ability
+        if ability.name == "Sprint" and move_pos == actor.pos:
+            continue
         actions.update(
             get_plausible_uses_of_ability_after_movement(
                 actor=actor,
