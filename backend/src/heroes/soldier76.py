@@ -10,9 +10,7 @@ Tactical Visor: Ultimate 4, Free Action, unlimited + undefendable defaults
 from dataclasses import dataclass
 
 from abilities import Ability, ActionCost
-from instruction_library import (
-    DamageInstruction, AddModifierInstruction, SummonInstruction
-)
+from instruction_library import DamageInstruction, AddModifierInstruction, SummonInstruction
 from aimings import TargetEntity, IncludeArea, TargetSelf
 from areas import Burst
 from engine import Engine
@@ -28,12 +26,9 @@ from scoring import displacement_value
 # ── Modifiers ──
 
 class VisorModifier(Modifier):
-    """Default abilities have unlimited range and are undefendable."""
     valence = Valence.GOOD
-    def apply_undefendable(self) -> bool:
-        return True
-    def modify_range(self, base_range: int) -> int:
-        return 999
+    def apply_undefendable(self) -> bool: return True
+    def modify_range(self, base_range: int) -> int: return 999
 
 
 @dataclass(kw_only=True)
@@ -60,6 +55,12 @@ class BioticFieldManager(Modifier):
                     engine.event_queue.enqueue(HealEvent(subject=entity, amount=2))
 
 
+class SprintBuff(Modifier):
+    """Grants +3 speed for the turn. Applied by Sprint ability."""
+    valence = Valence.GOOD
+    duration: int = 1
+
+
 # ── Abilities ──
 
 class HeavyPulseRifleAbility(Ability):
@@ -76,34 +77,33 @@ class HeavyPulseRifleAbility(Ability):
 
 
 class SprintAbility(Ability):
-    """Move 3 spaces toward a tactically advantageous position."""
+    """Move 3 spaces (standard action)."""
     def __init__(self, owner_id):
         super().__init__(name="Sprint", aiming=TargetSelf(),
-            instructions=[], is_default=True, owner_id=owner_id)
+            instructions=[AddModifierInstruction(modifier_class=SprintBuff)],
+            is_default=True, owner_id=owner_id)
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        # Score based on displacement value toward nearest enemy
         pref = actor.get_preferred_position(engine)
         if not pref:
             return 0.0
-        # How much closer does Sprint get us?
-        current_dist = actor.pos.get_distance(pref) if actor.pos else 0
         return displacement_value(actor, actor.pos, pref, engine) * 0.5
 
     def get_movement(self, engine, actor, reachable_points, enemies, allies):
-        """Propose positions up to 3 away, prioritised by displacement value."""
+        """Propose positions up to speed + 3 away (normal move + sprint move)."""
         pref = actor.get_preferred_position(engine)
         if not pref or not reachable_points:
             return {}
         from queries import QuerySpeed
-        speed = QuerySpeed(actor).resolve(engine).value  # 3 for Soldier 76
-        valid = [p for p in reachable_points if p.get_distance(actor.pos) <= speed and p != actor.pos]
+        speed = QuerySpeed(actor).resolve(engine).value  # 3
+        extra = 3  # sprint gives +3
+        valid = [p for p in reachable_points
+                 if p.get_distance(actor.pos) <= speed + extra and p != actor.pos]
         if not valid:
             return {}
-        # Score each by displacement value
         best = max(valid, key=lambda p: (
             displacement_value(actor, actor.pos, p, engine),
-            -p.get_distance(actor.pos),  # prefer less movement
+            -p.get_distance(actor.pos),
         ))
         return {best: f"Sprint to range {best.get_distance(pref)} of enemy"}
 
@@ -130,13 +130,10 @@ class BioticFieldMarker(Marker):
 class CreateBioticFieldAbility(Ability):
     def __init__(self, owner_id):
         super().__init__(name="Create Biotic Field", aiming=TargetSelf(),
-            instructions=[SummonInstruction(
-                entity_factory=BioticFieldMarker, is_marker=True
-            )],
+            instructions=[SummonInstruction(entity_factory=BioticFieldMarker, is_marker=True)],
             max_charges=1, owner_id=owner_id)
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        # Score by how many wounded allies will be in the 2x2 area around the field
         if not actor.pos:
             return 0.0
         half = 1
@@ -163,14 +160,10 @@ class TacticalVisorAbility(Ability):
         enemies = [e for e in engine.living_entities if e.team != actor.team and e.pos]
         if not enemies:
             return 0.0
-        # Enemies with defense benefit most from undefendable
         valuable_targets = 0
         for e in enemies:
             d = actor.pos.get_distance(e.pos)
-            if d > 4:
-                valuable_targets += 2  # Would gain unlimited range benefit
-            else:
-                valuable_targets += 1  # Would gain undefendable benefit
+            valuable_targets += 2 if d > 4 else 1
         return valuable_targets * 1.0
 
 
