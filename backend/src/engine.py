@@ -11,6 +11,7 @@ from typing import (
 import copium
 from tqdm import tqdm
 
+from abilities import ActionCost
 from choices import (
     Choice,
     PlausibleFreeAction,
@@ -170,6 +171,10 @@ class Engine:
 
         moves = get_plausible_move_and_actions(entity, self)
         frees = get_plausible_free_actions(entity, self)
+
+        if entity.standard_actions <= 0:
+            return UniqueTuple(frees) if frees else UniqueTuple()
+
         all_actions = moves + frees
         return UniqueTuple(all_actions)
 
@@ -537,7 +542,24 @@ class Engine:
                     )
 
             if isinstance(action, PlausibleMoveAndAction):
-                self.advance_to_next_activator()
+                # Consume standard action for non-tap, non-free abilities
+                used_standard = False
+                if hasattr(action, 'ability'):
+                    ab = action.ability
+                    if not ab.taps and ab.action_cost != ActionCost.FREE:
+                        actor.standard_actions -= 1
+                        used_standard = True
+                if used_standard:
+                    # Check if entity has free actions remaining after standard action
+                    from choices import get_plausible_free_actions
+                    remaining = get_plausible_free_actions(actor, self)
+                    if not remaining:
+                        self.advance_to_next_activator()
+                    # else: stay on same entity, let it pick a free action
+                elif hasattr(action, 'ability') and action.ability.taps:
+                    pass  # Tap action — entity still has standard action
+                else:
+                    self.advance_to_next_activator()
         finally:
             self.is_resolving_action = was_resolving
 

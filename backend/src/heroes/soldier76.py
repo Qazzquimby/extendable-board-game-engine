@@ -79,7 +79,7 @@ class SprintAbility(Ability):
     """Move 3 spaces toward a tactically advantageous position."""
     def __init__(self, owner_id):
         super().__init__(name="Sprint", aiming=TargetSelf(),
-            instructions=[], is_default=True, owner_id=owner_id)
+            instructions=[], is_default=True, taps=True, owner_id=owner_id)
 
     def get_priority(self, engine, actor, pos, aiming_result):
         # Score based on displacement value toward nearest enemy
@@ -162,8 +162,6 @@ class TacticalVisorAbility(Ability):
     def get_priority(self, engine, actor, pos, aiming_result):
         if self.ultimate_turn and engine.round_num < self.ultimate_turn:
             return 0.0
-        # How valuable is undefendable + unlimited range?
-        # Score based on enemies in default attack range
         enemies = [e for e in engine.living_entities if e.team != actor.team and e.pos]
         if not enemies:
             return 0.0

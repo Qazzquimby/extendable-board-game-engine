@@ -162,12 +162,8 @@ class TranscendenceAbility(Ability):
         )
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        from scoring import score_ultimate
-
-        ult_score = score_ultimate(self, engine)
-        if ult_score <= 0:
+        if self.ultimate_turn is not None and engine.round_num < self.ultimate_turn:
             return 0.0
-        # Check if allies need healing
         included = aiming_result.included_points
         allies_hurt = sum(
             1
@@ -177,7 +173,7 @@ class TranscendenceAbility(Ability):
             and engine.entity_at(pt).hp < engine.entity_at(pt).max_hp
         )
         if allies_hurt > 0:
-            return ult_score * allies_hurt * 3.0
+            return allies_hurt * 3.0
         return 0.0
 
 

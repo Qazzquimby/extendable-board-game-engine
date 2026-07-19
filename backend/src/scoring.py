@@ -129,17 +129,6 @@ def score_add_token(token_class: "Type"):
     return 0.0
 
 
-def score_ultimate(ability: "Ability", engine: "Engine") -> float:
-    """Base priority for an ultimate ability.
-
-    Flat 1.0 from ultimate_turn onward. Ultimates are always valuable
-    enough to use when available — they're limited per game.
-    """
-    if ability.ultimate_turn is not None and engine.round_num >= ability.ultimate_turn:
-        return 1.0
-    return 0.0
-
-
 def score_targets_in_area(
     aiming_result: "AimingResult",
     engine: "Engine",
