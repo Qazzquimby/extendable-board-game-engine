@@ -91,7 +91,12 @@ class SprintAbility(Ability):
         pref = actor.get_preferred_position(engine)
         if not pref:
             return 0.0
-        return displacement_value(actor, actor.pos, pref, engine) * 0.5
+        # Only score Sprint if it actually moves us toward the enemy
+        current_dist = actor.pos.get_distance(pref)
+        new_dist = pos.get_distance(pref)
+        if new_dist >= current_dist:
+            return 0.0  # Not making progress — don't waste the action
+        return displacement_value(actor, actor.pos, pos, engine) * 0.5
 
     def get_movement(self, engine, actor, reachable_points, enemies, allies):
         """Propose positions up to speed + 3 away.
