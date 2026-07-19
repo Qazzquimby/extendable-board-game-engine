@@ -162,8 +162,6 @@ class TranscendenceAbility(Ability):
         )
 
     def get_priority(self, engine, actor, pos, aiming_result):
-        if self.ultimate_turn is not None and engine.round_num < self.ultimate_turn:
-            return 0.0
         included = aiming_result.included_points
         allies_hurt = sum(
             1

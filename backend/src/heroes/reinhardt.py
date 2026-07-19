@@ -194,9 +194,8 @@ class EarthshatterAbility(Ability):
 
     def get_priority(self, engine, actor, pos, aiming_result):
         from scoring import score_targets_in_area
-        if self.ultimate_turn is not None and engine.round_num < self.ultimate_turn:
-            return 0.0
         enemies = score_targets_in_area(aiming_result, engine, actor, "enemy")
+        # Score by how many enemies are caught, not by legality
         return enemies * 2.0
 
 
